@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>实验馆 · 沉浸式实验流</title>
+<style>
+:root{
+  --bg:#0b0f17; --panel:#121826; --panel2:#1a2234; --line:#26314a;
+  --txt:#e8edf7; --txt2:#93a1bd; --acc:#4f8cff; --acc2:#22d3a5;
+  --strip:linear-gradient(90deg,#4f8cff,#22d3a5,#a78bfa);
+  --hud-h:44px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;}
+/* ---------- feed ---------- */
+#feed{position:fixed;top:calc(var(--hud-h) + env(safe-area-inset-top));left:0;right:0;bottom:0;overflow:hidden;}
+#track{position:absolute;inset:0;transition:transform .38s cubic-bezier(.22,.8,.3,1);will-change:transform;}
+.page{position:absolute;left:0;width:100%;height:100%;background:var(--bg);}
+.page iframe{width:100%;height:100%;border:0;display:block;background:#fff;}
+.page .ph{position:absolute;inset:0;display:flex;flex-direction:column;gap:10px;
+  align-items:center;justify-content:center;color:var(--txt2);font-size:14px;}
+.page .ph .dot{width:34px;height:34px;border-radius:50%;border:3px solid var(--line);
+  border-top-color:var(--acc);animation:spin 1s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* ---------- HUD ---------- */
+#hud{position:fixed;top:0;left:0;right:0;height:var(--hud-h);z-index:40;display:flex;
+  align-items:center;gap:8px;padding:0 8px;padding-top:env(safe-area-inset-top);}
+#hud::before{content:"";position:absolute;inset:0;background:var(--bg);pointer-events:none;}
+.hud-btn{position:relative;z-index:2;width:34px;height:34px;border-radius:10px;border:1px solid var(--line);
+  background:#121826cc;color:var(--txt);font-size:16px;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;backdrop-filter:blur(6px);flex:none;}
+#hudStrip{position:relative;z-index:2;flex:1;min-width:0;height:28px;border-radius:14px;
+  background:var(--strip);padding:2px;display:flex;}
+#hudInner{flex:1;min-width:0;border-radius:12px;background:#0b0f17d9;display:flex;align-items:center;
+  gap:8px;padding:0 10px;font-size:12px;}
+#hudTag{color:var(--acc2);white-space:nowrap;flex:none;}
+#hudTitle{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--txt);}
+#hudIdx{color:var(--txt2);white-space:nowrap;flex:none;font-variant-numeric:tabular-nums;}
+/* ---------- edge strips ---------- */
+.edge{position:fixed;top:calc(var(--hud-h) + env(safe-area-inset-top));bottom:0;width:26px;z-index:30;touch-action:none;}
+#edgeL{left:0;}#edgeR{right:0;}
+.edge .rail{position:absolute;top:50%;transform:translateY(-50%);width:4px;height:84px;
+  border-radius:2px;background:#ffffff2a;transition:background .2s;}
+#edgeL .rail{left:4px;}#edgeR .rail{right:4px;}
+.edge.active .rail{background:var(--acc);}
+/* ---------- nav arrows ---------- */
+#navBtns{position:fixed;right:10px;bottom:calc(24px + env(safe-area-inset-bottom));z-index:30;
+  display:flex;flex-direction:column;gap:10px;}
+#navBtns button{width:40px;height:40px;border-radius:50%;border:1px solid var(--line);
+  background:#121826cc;color:var(--txt);font-size:16px;cursor:pointer;backdrop-filter:blur(6px);}
+#navBtns button:disabled{opacity:.3;}
+/* ---------- panels ---------- */
+#overlay{position:fixed;inset:0;background:#0008;z-index:50;opacity:0;pointer-events:none;transition:opacity .3s;}
+#overlay.show{opacity:1;pointer-events:auto;}
+.panel{position:fixed;top:0;bottom:0;width:min(320px,86vw);z-index:60;background:var(--panel);
+  display:flex;flex-direction:column;transition:transform .32s cubic-bezier(.22,.8,.3,1);
+  padding-top:env(safe-area-inset-top);}
+#panelCat{right:0;transform:translateX(105%);box-shadow:-12px 0 30px #0008;}
+#panelUser{left:0;transform:translateX(-105%);box-shadow:12px 0 30px #0008;}
+#panelCat.show,#panelUser.show{transform:translateX(0);}
+.panel header{padding:14px 16px 10px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;}
+.panel header h2{font-size:15px;font-weight:600;flex:1;}
+.panel header .close{width:28px;height:28px;border:none;border-radius:8px;background:var(--panel2);
+  color:var(--txt2);cursor:pointer;font-size:14px;}
+.panel .body{flex:1;overflow-y:auto;overscroll-behavior:contain;}
+/* catalog */
+#catSearch{margin:10px 12px 4px;display:flex;}
+#catSearch input{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+  color:var(--txt);padding:8px 12px;font-size:13px;outline:none;}
+.chips{display:flex;flex-wrap:wrap;gap:6px;padding:8px 12px;}
+.chip{font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);
+  background:var(--panel2);color:var(--txt2);cursor:pointer;}
+.chip.on{background:var(--acc);border-color:var(--acc);color:#fff;}
+.cat-group{padding:4px 0;}
+.cat-group h3{font-size:12px;color:var(--acc2);padding:10px 16px 6px;position:sticky;top:0;
+  background:var(--panel);z-index:1;}
+.cat-item{padding:9px 16px;font-size:13px;color:var(--txt);cursor:pointer;display:flex;gap:8px;
+  border-left:3px solid transparent;}
+.cat-item .no{color:var(--txt2);flex:none;font-variant-numeric:tabular-nums;width:30px;}
+.cat-item span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cat-item:hover{background:var(--panel2);}
+.cat-item.cur{border-left-color:var(--acc);background:var(--panel2);color:var(--acc);}
+/* user panel */
+.tabs{display:flex;border-bottom:1px solid var(--line);}
+.tabs button{flex:1;padding:11px 0;background:none;border:none;color:var(--txt2);font-size:13px;
+  cursor:pointer;border-bottom:2px solid transparent;}
+.tabs button.on{color:var(--txt);border-bottom-color:var(--acc);}
+.tabpane{display:none;flex-direction:column;flex:1;min-height:0;}
+.tabpane.on{display:flex;}
+#userCard{display:flex;align-items:center;gap:12px;padding:18px 16px;}
+#userCard .avatar{width:52px;height:52px;border-radius:50%;background:var(--strip);
+  display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#0b0f17;}
+#userCard .meta b{font-size:15px;}
+#userCard .meta p{font-size:12px;color:var(--txt2);margin-top:3px;}
+.stat-row{display:flex;gap:10px;padding:0 16px 14px;}
+.stat{flex:1;background:var(--panel2);border-radius:12px;padding:10px;text-align:center;}
+.stat b{font-size:17px;display:block;}
+.stat span{font-size:11px;color:var(--txt2);}
+.hist-item{padding:9px 16px;font-size:13px;cursor:pointer;display:flex;flex-direction:column;gap:2px;}
+.hist-item:hover{background:var(--panel2);}
+.hist-item small{color:var(--txt2);font-size:11px;}
+.empty{padding:30px 16px;text-align:center;color:var(--txt2);font-size:13px;}
+/* AI chat */
+#chatLog{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px;min-height:0;}
+.msg{max-width:85%;padding:9px 12px;border-radius:14px;font-size:13px;line-height:1.55;white-space:pre-wrap;}
+.msg.me{align-self:flex-end;background:var(--acc);color:#fff;border-bottom-right-radius:4px;}
+.msg.ai{align-self:flex-start;background:var(--panel2);border-bottom-left-radius:4px;}
+#chatBar{display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--line);
+  padding-bottom:calc(10px + env(safe-area-inset-bottom));}
+#chatBar input{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+  color:var(--txt);padding:9px 12px;font-size:13px;outline:none;}
+#chatBar button{background:var(--acc);border:none;border-radius:10px;color:#fff;padding:0 16px;cursor:pointer;font-size:13px;}
+/* hint */
+#hint{position:fixed;inset:0;z-index:80;background:#000a;display:flex;align-items:center;
+  justify-content:center;backdrop-filter:blur(3px);}
+#hint .card{background:var(--panel);border:1px solid var(--line);border-radius:18px;
+  padding:24px 26px;max-width:300px;font-size:13.5px;line-height:2;color:var(--txt);}
+#hint .card b{color:var(--acc2);}
+#hint .card .ok{margin-top:14px;width:100%;padding:10px;border:none;border-radius:10px;
+  background:var(--strip);color:#0b0f17;font-weight:700;font-size:14px;cursor:pointer;}
+#hint.hide{display:none;}
+/* toast */
+#toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:90;background:#121826ee;
+  border:1px solid var(--line);color:var(--txt);font-size:12.5px;padding:8px 16px;border-radius:999px;
+  opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;}
+#toast.show{opacity:1;}
+</style>
+</head>
+<body>
+<div id="feed"><div id="track"></div></div>
+
+<div id="hud">
+  <button class="hud-btn" id="btnUser" title="我的">👤</button>
+  <div id="hudStrip"><div id="hudInner">
+    <span id="hudTag">物理 · 初中</span><span id="hudTitle"></span><span id="hudIdx">1/1</span>
+  </div></div>
+  <button class="hud-btn" id="btnCat" title="目录">☰</button>
+</div>
+
+<div class="edge" id="edgeL"><div class="rail"></div></div>
+<div class="edge" id="edgeR"><div class="rail"></div></div>
+
+<div id="navBtns">
+  <button id="btnPrev" title="上一个">↑</button>
+  <button id="btnNext" title="下一个">↓</button>
+</div>
+
+<div id="overlay"></div>
+
+<aside class="panel" id="panelCat">
+  <header><h2>实验目录</h2><button class="close" data-close>✕</button></header>
+  <div id="catSearch"><input id="catInput" type="search" placeholder="搜索实验…"></div>
+  <div class="chips" id="catChips"></div>
+  <div class="body" id="catList"></div>
+</aside>
+
+<aside class="panel" id="panelUser">
+  <header><h2>我的</h2><button class="close" data-close>✕</button></header>
+  <div class="tabs">
+    <button class="on" data-tab="profile">信息</button>
+    <button data-tab="history">历史</button>
+    <button data-tab="ai">AI 问答</button>
+  </div>
+  <div class="tabpane on" data-pane="profile">
+    <div id="userCard">
+      <div class="avatar">A</div>
+      <div class="meta"><b>Albert</b><p>实验探索者 · 本地账户</p></div>
+    </div>
+    <div class="stat-row">
+      <div class="stat"><b id="stTotal">0</b><span>实验总数</span></div>
+      <div class="stat"><b id="stSeen">0</b><span>已浏览</span></div>
+      <div class="stat"><b id="stPct">0%</b><span>探索进度</span></div>
+    </div>
+  </div>
+  <div class="tabpane" data-pane="history">
+    <div class="body" id="histList"><div class="empty">还没有浏览记录</div></div>
+  </div>
+  <div class="tabpane" data-pane="ai">
+    <div id="chatLog"><div class="msg ai">你好，我是实验助手（占位界面，后端尚未接入）。接入后我可以围绕当前实验答疑。</div></div>
+    <div id="chatBar"><input id="chatInput" placeholder="围绕当前实验提问…"><button id="chatSend">发送</button></div>
+  </div>
+</aside>
+
+<div id="hint" class="hide"><div class="card">
+  <b>↑ 上下滑动</b>　左右边缘竖条上下滑可切换实验<br>
+  <b>← 左滑</b>　从右边缘向左滑打开目录<br>
+  <b>→ 右滑</b>　从左边缘向右滑打开我的/AI<br>
+  桌面端可用 滚轮 / 方向键 翻页
+  <button class="ok" id="hintOk">开始探索</button>
+</div></div>
+
+<div id="toast"></div>
+
+<script>
+const qs = new URLSearchParams(location.search);
+/* 内容源：默认线上站；与内容站同域时用相对路径；本地联调可用 ?base=/HTML-/ 覆盖 */
+const CONTENT_BASE = qs.get('base') ?? (location.hostname === 'html.xingnian.net.cn' ? '' : 'https://html.xingnian.net.cn/');
+const LS = { idx:'expfeed.idx', hist:'expfeed.hist', hint:'expfeed.hint' };
+
+fetch('manifest.json').then(r=>r.json()).then(boot).catch(e=>{
+  document.body.insertAdjacentHTML('beforeend','<div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#93a1bd;font-size:14px;z-index:99;background:#0b0f17">实验清单加载失败：'+e+'</div>');
+});
+
+function boot(MANIFEST){
+
+const track = document.getElementById('track');
+let cur = Math.min(parseInt(localStorage.getItem(LS.idx)||'0',10)||0, MANIFEST.length-1);
+let order = MANIFEST.map((_,i)=>i);   // current play order (filterable later)
+let animating = false;
+
+/* ---------- pages ---------- */
+const pages = MANIFEST.map((it,i)=>{
+  const d = document.createElement('div');
+  d.className='page';
+  d.style.top = (i*100)+'%';
+  d.innerHTML = '<div class="ph"><div class="dot"></div><div>'+esc(it.title)+'</div></div>';
+  track.appendChild(d);
+  return d;
+});
+function esc(s){return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+function mount(i){
+  if(i<0||i>=pages.length) return;
+  const p=pages[i];
+  if(!p.querySelector('iframe')){
+    const f=document.createElement('iframe');
+    f.src = CONTENT_BASE + MANIFEST[i].path;
+    f.loading='lazy';
+    f.addEventListener('load',()=>{const ph=p.querySelector('.ph'); if(ph) ph.remove();});
+    p.appendChild(f);
+  }
+}
+function unmount(i){
+  if(i<0||i>=pages.length) return;
+  const p=pages[i], f=p.querySelector('iframe');
+  if(f){ f.remove();
+    if(!p.querySelector('.ph')){
+      const ph=document.createElement('div'); ph.className='ph';
+      ph.innerHTML='<div class="dot"></div><div>'+esc(MANIFEST[i].title)+'</div>';
+      p.appendChild(ph);
+    }
+  }
+}
+function render(){
+  track.style.transform = 'translateY(' + (-cur*100) + '%)';
+  for(let i=0;i<pages.length;i++){
+    if(Math.abs(i-cur)<=1) mount(i); else unmount(i);
+  }
+  const it=MANIFEST[cur];
+  document.getElementById('hudTag').textContent = it.subject+' · '+it.level;
+  document.getElementById('hudTitle').textContent = it.title;
+  document.getElementById('hudIdx').textContent = (cur+1)+'/'+MANIFEST.length;
+  document.getElementById('btnPrev').disabled = cur===0;
+  document.getElementById('btnNext').disabled = cur===MANIFEST.length-1;
+  localStorage.setItem(LS.idx, cur);
+  markHistory(it);
+  highlightCat();
+}
+function goTo(i){
+  if(i<0||i>=MANIFEST.length||i===cur) return;
+  cur=i; render();
+}
+function next(){ goTo(cur+1); }
+function prev(){ goTo(cur-1); }
+
+/* ---------- history ---------- */
+function loadHist(){ try{return JSON.parse(localStorage.getItem(LS.hist)||'[]');}catch(e){return [];} }
+function markHistory(it){
+  let h=loadHist().filter(x=>x.path!==it.path);
+  h.unshift({path:it.path,title:it.title,ts:Date.now()});
+  if(h.length>100) h.length=100;
+  localStorage.setItem(LS.hist, JSON.stringify(h));
+  renderStats(); renderHist();
+}
+function renderStats(){
+  const h=loadHist();
+  document.getElementById('stTotal').textContent=MANIFEST.length;
+  document.getElementById('stSeen').textContent=h.length;
+  document.getElementById('stPct').textContent=Math.round(h.length/MANIFEST.length*100)+'%';
+}
+function renderHist(){
+  const el=document.getElementById('histList'), h=loadHist();
+  if(!h.length){ el.innerHTML='<div class="empty">还没有浏览记录</div>'; return; }
+  el.innerHTML=h.map(x=>{
+    const i=MANIFEST.findIndex(m=>m.path===x.path);
+    const t=new Date(x.ts);
+    const time=(t.getMonth()+1)+'月'+t.getDate()+'日 '+String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0');
+    return '<div class="hist-item" data-i="'+i+'"><span>'+esc(x.title)+'</span><small>'+time+'</small></div>';
+  }).join('');
+}
+document.getElementById('histList').addEventListener('click',e=>{
+  const it=e.target.closest('.hist-item'); if(!it) return;
+  goTo(+it.dataset.i); closePanels();
+});
+
+/* ---------- catalog ---------- */
+const groups={};
+MANIFEST.forEach((it,i)=>{ const k=it.subject+' · '+it.level; (groups[k]=groups[k]||[]).push(i); });
+let chipFilter=null, searchText='';
+function renderChips(){
+  const el=document.getElementById('catChips');
+  el.innerHTML='<span class="chip'+(chipFilter===null?' on':'')+'" data-k="">全部</span>'+
+    Object.keys(groups).map(k=>'<span class="chip'+(chipFilter===k?' on':'')+'" data-k="'+k+'">'+k+' ('+groups[k].length+')</span>').join('');
+}
+document.getElementById('catChips').addEventListener('click',e=>{
+  const c=e.target.closest('.chip'); if(!c) return;
+  chipFilter=c.dataset.k||null; renderChips(); renderCat();
+});
+document.getElementById('catInput').addEventListener('input',e=>{ searchText=e.target.value.trim(); renderCat(); });
+function renderCat(){
+  const el=document.getElementById('catList'); let html='';
+  for(const k of Object.keys(groups)){
+    if(chipFilter && k!==chipFilter) continue;
+    const items=groups[k].filter(i=>!searchText||MANIFEST[i].title.includes(searchText));
+    if(!items.length) continue;
+    html+='<div class="cat-group"><h3>'+k+'</h3>'+items.map((i,n)=>
+      '<div class="cat-item'+(i===cur?' cur':'')+'" data-i="'+i+'"><span class="no">'+(n+1)+'</span><span>'+esc(MANIFEST[i].title)+'</span></div>').join('')+'</div>';
+  }
+  el.innerHTML=html||'<div class="empty">没有匹配的实验</div>';
+}
+function highlightCat(){
+  document.querySelectorAll('.cat-item').forEach(d=>d.classList.toggle('cur', +d.dataset.i===cur));
+}
+document.getElementById('catList').addEventListener('click',e=>{
+  const it=e.target.closest('.cat-item'); if(!it) return;
+  goTo(+it.dataset.i); closePanels();
+});
+
+/* ---------- panels ---------- */
+const overlay=document.getElementById('overlay');
+function openPanel(which){
+  closePanels();
+  document.getElementById(which==='catalog'?'panelCat':'panelUser').classList.add('show');
+  overlay.classList.add('show');
+}
+function closePanels(){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('show'));
+  overlay.classList.remove('show');
+}
+overlay.addEventListener('click',closePanels);
+document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',closePanels));
+document.getElementById('btnCat').addEventListener('click',()=>openPanel('catalog'));
+document.getElementById('btnUser').addEventListener('click',()=>openPanel('user'));
+
+/* tabs */
+document.querySelectorAll('.tabs button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('.tabpane').forEach(p=>p.classList.toggle('on',p.dataset.pane===b.dataset.tab));
+}));
+
+/* ---------- AI chat (placeholder) ---------- */
+const chatLog=document.getElementById('chatLog');
+function sendChat(){
+  const inp=document.getElementById('chatInput'), t=inp.value.trim(); if(!t) return;
+  inp.value='';
+  const me=document.createElement('div'); me.className='msg me'; me.textContent=t; chatLog.appendChild(me);
+  setTimeout(()=>{
+    const ai=document.createElement('div'); ai.className='msg ai';
+    ai.textContent='（占位回复）当前实验是「'+MANIFEST[cur].title+'」。AI 后端尚未接入，接入后我会基于实验内容回答你的问题。';
+    chatLog.appendChild(ai); chatLog.scrollTop=chatLog.scrollHeight;
+  },400);
+  chatLog.scrollTop=chatLog.scrollHeight;
+}
+document.getElementById('chatSend').addEventListener('click',sendChat);
+document.getElementById('chatInput').addEventListener('keydown',e=>{ if(e.key==='Enter') sendChat(); });
+
+/* ---------- gestures ---------- */
+function attachEdge(el, side){
+  let sx=0,sy=0,on=false;
+  el.addEventListener('pointerdown',e=>{ on=true; sx=e.clientX; sy=e.clientY;
+    el.classList.add('active'); try{el.setPointerCapture(e.pointerId);}catch(_){} e.preventDefault(); });
+  el.addEventListener('pointerup',e=>{
+    if(!on) return; on=false; el.classList.remove('active');
+    const dx=e.clientX-sx, dy=e.clientY-sy;
+    if(Math.abs(dy)>=Math.abs(dx)){
+      if(dy<=-45) next(); else if(dy>=45) prev();
+    }else{
+      if(side==='right' && dx<=-45) openPanel('catalog');
+      else if(side==='left' && dx>=45) openPanel('user');
+    }
+  });
+  el.addEventListener('pointercancel',()=>{ on=false; el.classList.remove('active'); });
+}
+attachEdge(document.getElementById('edgeL'),'left');
+attachEdge(document.getElementById('edgeR'),'right');
+
+document.getElementById('btnPrev').addEventListener('click',prev);
+document.getElementById('btnNext').addEventListener('click',next);
+
+/* desktop: wheel + keys */
+let wheelLock=0;
+window.addEventListener('wheel',e=>{
+  if(document.querySelector('.panel.show')) return;
+  const now=Date.now(); if(now-wheelLock<550) return;
+  if(e.deltaY>30){ wheelLock=now; next(); }
+  else if(e.deltaY<-30){ wheelLock=now; prev(); }
+},{passive:true});
+window.addEventListener('keydown',e=>{
+  if(['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) return;
+  if(e.key==='ArrowDown'||e.key==='PageDown') next();
+  else if(e.key==='ArrowUp'||e.key==='PageUp') prev();
+  else if(e.key==='Escape') closePanels();
+});
+
+/* ---------- hint & toast ---------- */
+function toast(t){
+  const el=document.getElementById('toast'); el.textContent=t; el.classList.add('show');
+  clearTimeout(toast._t); toast._t=setTimeout(()=>el.classList.remove('show'),2200);
+}
+const hint=document.getElementById('hint');
+if(!localStorage.getItem(LS.hint)) hint.classList.remove('hide');
+document.getElementById('hintOk').addEventListener('click',()=>{
+  hint.classList.add('hide'); localStorage.setItem(LS.hint,'1');
+});
+
+/* ---------- init ---------- */
+renderChips(); renderCat(); renderStats(); renderHist(); render();
+if(cur>0) toast('已回到上次浏览位置');
+}
+</script>
+</body>
+</html>
