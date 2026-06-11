@@ -2,7 +2,7 @@
  * 策略：App 壳预缓存（离线可用）；manifest.json 网络优先（清单更新及时生效）；
  * 其余同源资源 stale-while-revalidate；跨域请求（线上实验内容）不拦截。
  */
-const VERSION = 'v0.2.0';
+const VERSION = 'v0.3.0';
 const SHELL_CACHE = 'sl-shell-' + VERSION;
 const SHELL = [
   './',
