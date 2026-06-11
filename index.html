@@ -116,9 +116,21 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 .msg.ai{align-self:flex-start;background:var(--panel2);border-bottom-left-radius:4px;}
 #chatBar{display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--line);
   padding-bottom:calc(10px + env(safe-area-inset-bottom));}
-#chatBar input{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+#chatBar input{flex:1;min-width:0;background:var(--panel2);border:1px solid var(--line);border-radius:10px;
   color:var(--txt);padding:9px 12px;font-size:13px;outline:none;}
 #chatBar button{background:var(--acc);border:none;border-radius:10px;color:#fff;padding:0 16px;cursor:pointer;font-size:13px;}
+#chatBar button:disabled{opacity:.4;}
+#chatBar #aiGear{background:var(--panel2);border:1px solid var(--line);color:var(--txt2);padding:0 12px;}
+#aiSettings{border-bottom:1px solid var(--line);padding:12px;display:flex;flex-direction:column;gap:8px;}
+#aiSettings.hide{display:none;}
+#aiSettings label{font-size:12px;color:var(--txt2);display:flex;flex-direction:column;gap:4px;}
+#aiSettings input{background:var(--panel2);border:1px solid var(--line);border-radius:8px;
+  color:var(--txt);padding:7px 10px;font-size:12.5px;outline:none;}
+#aiSettings .row{display:flex;gap:8px;}
+#aiSettings .row button{flex:1;padding:8px;border:none;border-radius:8px;background:var(--acc);color:#fff;font-size:12.5px;cursor:pointer;}
+#aiSettings .row button.ghost{background:var(--panel2);border:1px solid var(--line);color:var(--txt2);}
+#aiSettings p{font-size:11px;color:var(--txt2);line-height:1.6;}
+.msg.ai.err{border:1px solid #b4554d;color:#f0b6b0;}
 /* hint */
 #hint{position:fixed;inset:0;z-index:80;background:#000a;display:flex;align-items:center;
   justify-content:center;backdrop-filter:blur(3px);}
@@ -198,8 +210,18 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
     <div class="body" id="histList"><div class="empty">还没有浏览记录</div></div>
   </div>
   <div class="tabpane" data-pane="ai">
-    <div id="chatLog"><div class="msg ai">你好，我是实验助手（占位界面，后端尚未接入）。接入后我可以围绕当前实验答疑。</div></div>
-    <div id="chatBar"><input id="chatInput" placeholder="围绕当前实验提问…"><button id="chatSend">发送</button></div>
+    <div id="aiSettings" class="hide">
+      <label>接口地址<input id="aiEndpoint" placeholder="https://api.deepseek.com/chat/completions"></label>
+      <label>模型<input id="aiModel" placeholder="deepseek-chat"></label>
+      <label>API Key<input id="aiKey" type="password" placeholder="sk-…（仅存本机浏览器）"></label>
+      <div class="row">
+        <button id="aiSave">保存</button>
+        <button id="aiClearChat" class="ghost">清空对话</button>
+      </div>
+      <p>Key 只保存在本设备 localStorage，不会上传到仓库或服务器。共用设备请勿填写。</p>
+    </div>
+    <div id="chatLog"><div class="msg ai">你好，我是实验助手。点击下方 ⚙ 填入 DeepSeek API Key 后，我就能围绕当前实验答疑。</div></div>
+    <div id="chatBar"><button id="aiGear" title="设置">⚙</button><input id="chatInput" placeholder="围绕当前实验提问…"><button id="chatSend">发送</button></div>
   </div>
 </aside>
 
@@ -217,7 +239,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 const qs = new URLSearchParams(location.search);
 /* 内容源：默认线上站；与内容站同域时用相对路径；本地联调可用 ?base=/HTML-/ 覆盖 */
 const CONTENT_BASE = qs.get('base') ?? (location.hostname === 'html.xingnian.net.cn' ? '' : 'https://html.xingnian.net.cn/');
-const LS = { idx:'expfeed.idx', hist:'expfeed.hist', hint:'expfeed.hint' };
+const LS = { idx:'expfeed.idx', hist:'expfeed.hist', hint:'expfeed.hint', ai:'expfeed.ai' };
 
 fetch('manifest.json').then(r=>r.json()).then(boot).catch(e=>{
   document.body.insertAdjacentHTML('beforeend','<div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#93a1bd;font-size:14px;z-index:99;background:#0b0f17">实验清单加载失败：'+e+'</div>');
@@ -373,21 +395,94 @@ document.querySelectorAll('.tabs button').forEach(b=>b.addEventListener('click',
   document.querySelectorAll('.tabpane').forEach(p=>p.classList.toggle('on',p.dataset.pane===b.dataset.tab));
 }));
 
-/* ---------- AI chat (placeholder) ---------- */
+/* ---------- AI chat (DeepSeek / OpenAI 兼容接口) ---------- */
 const chatLog=document.getElementById('chatLog');
-function sendChat(){
+const AI_DEFAULTS={endpoint:'https://api.deepseek.com/chat/completions',model:'deepseek-chat',key:''};
+function aiCfg(){
+  try{ return Object.assign({},AI_DEFAULTS,JSON.parse(localStorage.getItem(LS.ai)||'{}')); }
+  catch(e){ return Object.assign({},AI_DEFAULTS); }
+}
+let chatHistory=[], chatBusy=false;
+function addMsg(cls,text){
+  const d=document.createElement('div'); d.className='msg '+cls; d.textContent=text;
+  chatLog.appendChild(d); chatLog.scrollTop=chatLog.scrollHeight; return d;
+}
+async function sendChat(){
+  if(chatBusy) return;
   const inp=document.getElementById('chatInput'), t=inp.value.trim(); if(!t) return;
-  inp.value='';
-  const me=document.createElement('div'); me.className='msg me'; me.textContent=t; chatLog.appendChild(me);
-  setTimeout(()=>{
-    const ai=document.createElement('div'); ai.className='msg ai';
-    ai.textContent='（占位回复）当前实验是「'+MANIFEST[cur].title+'」。AI 后端尚未接入，接入后我会基于实验内容回答你的问题。';
-    chatLog.appendChild(ai); chatLog.scrollTop=chatLog.scrollHeight;
-  },400);
-  chatLog.scrollTop=chatLog.scrollHeight;
+  const cfg=aiCfg();
+  if(!cfg.key){
+    addMsg('ai err','还没有配置 API Key。点击左下角 ⚙，粘贴你的 DeepSeek API Key（仅保存在本设备）。');
+    document.getElementById('aiSettings').classList.remove('hide');
+    return;
+  }
+  inp.value=''; addMsg('me',t);
+  chatHistory.push({role:'user',content:t});
+  const it=MANIFEST[cur];
+  const sys='你是"实验馆"App 内嵌的实验学习助手。用户当前正在看的实验是「'+it.title+'」（'+it.subject+' · '+it.level+'）。'
+    +'请围绕该实验用中文答疑：解释原理、实验步骤、现象与结论，面向中学生，简洁清晰，必要时分步说明。与实验无关的问题可以简短回答并引导回实验。';
+  const aiDiv=addMsg('ai','…');
+  chatBusy=true; document.getElementById('chatSend').disabled=true;
+  try{
+    const res=await fetch(cfg.endpoint,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.key},
+      body:JSON.stringify({model:cfg.model,stream:true,messages:[{role:'system',content:sys},...chatHistory.slice(-12)]})
+    });
+    if(!res.ok){
+      const txt=await res.text().catch(()=>'');
+      throw new Error('HTTP '+res.status+(txt?' · '+txt.slice(0,160):''));
+    }
+    const reader=res.body.getReader(), dec=new TextDecoder();
+    let acc='', buf='';
+    for(;;){
+      const {done,value}=await reader.read(); if(done) break;
+      buf+=dec.decode(value,{stream:true});
+      const lines=buf.split('\n'); buf=lines.pop();
+      for(const line of lines){
+        const s=line.trim();
+        if(!s.startsWith('data:')) continue;
+        const payload=s.slice(5).trim();
+        if(payload==='[DONE]') continue;
+        try{
+          const delta=JSON.parse(payload).choices?.[0]?.delta?.content;
+          if(delta){ acc+=delta; aiDiv.textContent=acc; chatLog.scrollTop=chatLog.scrollHeight; }
+        }catch(e){}
+      }
+    }
+    if(!acc){ aiDiv.textContent='（空回复）'; }
+    chatHistory.push({role:'assistant',content:acc});
+  }catch(err){
+    aiDiv.className='msg ai err';
+    aiDiv.textContent='请求失败：'+err.message+'\n如果是网络/CORS 问题，可按 README 部署 Cloudflare Worker 代理后，把接口地址改为代理地址。';
+    chatHistory.pop();
+  }finally{
+    chatBusy=false; document.getElementById('chatSend').disabled=false;
+  }
 }
 document.getElementById('chatSend').addEventListener('click',sendChat);
 document.getElementById('chatInput').addEventListener('keydown',e=>{ if(e.key==='Enter') sendChat(); });
+/* 设置面板 */
+const aiPanel=document.getElementById('aiSettings');
+document.getElementById('aiGear').addEventListener('click',()=>{
+  const cfg=aiCfg();
+  document.getElementById('aiEndpoint').value=cfg.endpoint;
+  document.getElementById('aiModel').value=cfg.model;
+  document.getElementById('aiKey').value=cfg.key;
+  aiPanel.classList.toggle('hide');
+});
+document.getElementById('aiSave').addEventListener('click',()=>{
+  localStorage.setItem(LS.ai,JSON.stringify({
+    endpoint:document.getElementById('aiEndpoint').value.trim()||AI_DEFAULTS.endpoint,
+    model:document.getElementById('aiModel').value.trim()||AI_DEFAULTS.model,
+    key:document.getElementById('aiKey').value.trim()
+  }));
+  aiPanel.classList.add('hide'); toast('AI 设置已保存');
+});
+document.getElementById('aiClearChat').addEventListener('click',()=>{
+  chatHistory=[]; chatLog.innerHTML='';
+  addMsg('ai','对话已清空。当前实验：「'+MANIFEST[cur].title+'」，随时提问。');
+});
 
 /* ---------- gestures ---------- */
 function attachEdge(el, side){

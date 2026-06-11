@@ -42,6 +42,15 @@ git add manifest.json && git commit -m "chore: 更新实验清单" && git push
 
 新增内容目录（学科/学段）时，先在 `tools/build-manifest.py` 的 `DIRS` 中登记。
 
+## AI 问答
+
+"我的"侧栏 → AI 问答，使用 DeepSeek（OpenAI 兼容协议），系统提示自动注入当前实验的标题/学科/学段。
+
+两种接入方式：
+
+1. **浏览器直连（默认，个人使用）**：聊天框左下 ⚙ → 粘贴 DeepSeek API Key。Key 只存本设备 localStorage，不进仓库、不上传。共用设备勿填。
+2. **Worker 代理（对外分发时用）**：按 `server/cloudflare-worker.js` 头部注释部署，key 存在 Worker Secret 里；然后在 ⚙ 设置中把接口地址改为 Worker 地址、Key 留空。直连遇到 CORS 报错时也用此方案。
+
 ## 本地开发
 
 ```
