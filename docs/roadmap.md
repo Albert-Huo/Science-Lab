@@ -9,11 +9,12 @@
 - [x] manifest.json 与生成脚本，内容与 App 解耦
 - [ ] 启用 GitHub Pages 部署
 
-## v0.2 PWA 化
+## v0.2 PWA 化（当前）
 
-- [ ] manifest.webmanifest + 图标，可安装到手机/平板主屏
-- [ ] Service Worker：App 壳离线可用，实验页网络优先缓存
-- [ ] iOS Safari 全屏与安全区细节适配
+- [x] manifest.webmanifest + 图标（192/512/maskable/apple-touch），可安装到手机/平板主屏
+- [x] Service Worker：App 壳预缓存离线可用，manifest.json 网络优先，跨域实验内容不拦截
+- [x] iOS meta（standalone、状态栏、主屏标题）与安全区适配
+- [ ] iOS Safari 真机回归（添加到主屏幕后全屏/手势确认）
 
 ## v0.3 平板 / 桌面适配
 

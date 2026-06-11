@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>实验馆 · 沉浸式实验流</title>
+<meta name="theme-color" content="#0b0f17">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="实验馆">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="assets/icons/icon-192.png">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
 <style>
 :root{
   --bg:#0b0f17; --panel:#121826; --panel2:#1a2234; --line:#26314a;
@@ -418,6 +425,12 @@ document.getElementById('hintOk').addEventListener('click',()=>{
 /* ---------- init ---------- */
 renderChips(); renderCat(); renderStats(); renderHist(); render();
 if(cur>0) toast('已回到上次浏览位置');
+}
+
+/* ---------- PWA ---------- */
+if('serviceWorker' in navigator &&
+   (location.protocol==='https:' || ['127.0.0.1','localhost'].includes(location.hostname))){
+  addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
 }
 </script>
 </body>
