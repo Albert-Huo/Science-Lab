@@ -59,9 +59,9 @@ MIT 许可只覆盖本仓库中的 App 壳、清单、Service Worker、图标、
 
 API Key、模型服务凭证和已部署 Worker Secret 不属于仓库内容，不能提交到 Git。
 
-## 云同步（可选）
+## 云同步（可选，自托管）
 
-「我的」→ 云同步，用 Supabase 实现账号登录与浏览进度跨设备同步。BYOK：自建 Supabase 项目，把 Project URL 和公开 anon key 填进 ⚙，邮箱魔法链接登录。未配置时纯本地，行为不变。配置步骤见 `docs/supabase-setup.md`。
+「我的」→ 云同步，账号登录 + 浏览进度跨设备同步，后端自托管在自己的服务器（Node/Express + MySQL），代码见 `server/api/`。在 ⚙ 填入部署好的 https 接口地址，邮箱密码注册/登录即可。未配置时纯本地，行为不变。部署步骤见 `docs/aliyun-deploy.md`。
 
 ## 本地开发
 
