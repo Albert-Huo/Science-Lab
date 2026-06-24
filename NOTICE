@@ -1,0 +1,15 @@
+Science-Lab
+Copyright (c) 2026 Albert-Huo
+
+Science-Lab is licensed under the MIT License. See LICENSE.
+
+This license applies to the Science-Lab application shell, including the app
+HTML, manifest files, service worker, build script, icons, and Cloudflare
+Worker example in this repository.
+
+The interactive experiment HTML files loaded by the app are stored in the
+separate Albert-Huo/HTML- repository and are not licensed by this repository's
+MIT License. Their own license and notices apply.
+
+API keys, model provider credentials, and deployed worker secrets are not part
+of this repository and must not be committed.

@@ -131,6 +131,25 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 #aiSettings .row button.ghost{background:var(--panel2);border:1px solid var(--line);color:var(--txt2);}
 #aiSettings p{font-size:11px;color:var(--txt2);line-height:1.6;}
 .msg.ai.err{border:1px solid #b4554d;color:#f0b6b0;}
+/* cloud sync */
+.sync-box{margin:0 16px 16px;border:1px solid var(--line);border-radius:12px;overflow:hidden;}
+.sync-head{display:flex;align-items:center;gap:8px;padding:11px 12px;background:var(--panel2);font-size:13px;}
+.sync-head>span:first-child{flex:1;font-weight:600;}
+.sync-state{font-size:11px;color:var(--txt2);}
+.sync-state.on{color:var(--acc2);}
+.sync-head .gear{background:none;border:none;color:var(--txt2);cursor:pointer;font-size:14px;padding:0;}
+#syncSettings,#syncLogin,#syncAccount{display:flex;flex-direction:column;gap:8px;padding:12px;}
+#syncSettings.hide,#syncLogin.hide,#syncAccount.hide{display:none;}
+.sync-box label{font-size:12px;color:var(--txt2);display:flex;flex-direction:column;gap:4px;}
+.sync-box input{background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--txt);padding:7px 10px;font-size:12.5px;outline:none;}
+.sync-box .row{display:flex;gap:8px;}
+.sync-box .row button{flex:1;padding:8px;border:none;border-radius:8px;background:var(--acc);color:#fff;font-size:12.5px;cursor:pointer;}
+.sync-box .row button.ghost{background:var(--panel2);border:1px solid var(--line);color:var(--txt2);}
+.sync-box .row button:disabled{opacity:.45;}
+.sync-box p{font-size:11px;color:var(--txt2);line-height:1.6;}
+.sync-msg{min-height:0;}
+.sync-msg.err{color:#f0b6b0;}
+.sync-msg.ok{color:var(--acc2);}
 /* hint */
 #hint{position:fixed;inset:0;z-index:80;background:#000a;display:flex;align-items:center;
   justify-content:center;backdrop-filter:blur(3px);}
@@ -197,13 +216,42 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
   </div>
   <div class="tabpane on" data-pane="profile">
     <div id="userCard">
-      <div class="avatar">A</div>
-      <div class="meta"><b>Albert</b><p>实验探索者 · 本地账户</p></div>
+      <div class="avatar" id="avatar">A</div>
+      <div class="meta"><b id="userName">访客</b><p id="userSub">实验探索者 · 本地账户</p></div>
     </div>
     <div class="stat-row">
       <div class="stat"><b id="stTotal">0</b><span>实验总数</span></div>
       <div class="stat"><b id="stSeen">0</b><span>已浏览</span></div>
       <div class="stat"><b id="stPct">0%</b><span>探索进度</span></div>
+    </div>
+
+    <div class="sync-box">
+      <div class="sync-head">
+        <span>云同步</span>
+        <span id="syncState" class="sync-state">未启用</span>
+        <button id="syncGear" class="gear" title="设置">⚙</button>
+      </div>
+
+      <div id="syncSettings" class="hide">
+        <label>Supabase URL<input id="sbUrl" placeholder="https://xxxx.supabase.co"></label>
+        <label>anon key（公开密钥）<input id="sbKey" placeholder="eyJ…（可公开，受 RLS 保护）"></label>
+        <div class="row"><button id="sbSave">保存</button><button id="sbForget" class="ghost">清除配置</button></div>
+        <p>anon key 是 Supabase 设计为可公开的前端密钥，数据由行级安全策略（RLS）保护。配置步骤见仓库 docs/supabase-setup.md。</p>
+      </div>
+
+      <div id="syncLogin" class="hide">
+        <label>邮箱<input id="sbEmail" type="email" placeholder="you@example.com"></label>
+        <div class="row"><button id="sbSendLink">发送登录链接</button></div>
+        <p id="syncMsg" class="sync-msg"></p>
+      </div>
+
+      <div id="syncAccount" class="hide">
+        <div class="row">
+          <button id="sbSyncNow">立即同步</button>
+          <button id="sbLogout" class="ghost">退出登录</button>
+        </div>
+        <p id="syncMsg2" class="sync-msg"></p>
+      </div>
     </div>
   </div>
   <div class="tabpane" data-pane="history">
@@ -239,7 +287,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 const qs = new URLSearchParams(location.search);
 /* 内容源：默认线上站；与内容站同域时用相对路径；本地联调可用 ?base=/HTML-/ 覆盖 */
 const CONTENT_BASE = qs.get('base') ?? (location.hostname === 'html.xingnian.net.cn' ? '' : 'https://html.xingnian.net.cn/');
-const LS = { idx:'expfeed.idx', hist:'expfeed.hist', hint:'expfeed.hint', ai:'expfeed.ai' };
+const LS = { idx:'expfeed.idx', hist:'expfeed.hist', hint:'expfeed.hint', ai:'expfeed.ai', sb:'expfeed.sb' };
 
 fetch('manifest.json').then(r=>r.json()).then(boot).catch(e=>{
   document.body.insertAdjacentHTML('beforeend','<div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#93a1bd;font-size:14px;z-index:99;background:#0b0f17">实验清单加载失败：'+e+'</div>');
@@ -315,6 +363,7 @@ function markHistory(it){
   if(h.length>100) h.length=100;
   localStorage.setItem(LS.hist, JSON.stringify(h));
   renderStats(); renderHist();
+  if(window.Sync) window.Sync.schedulePush();
 }
 function renderStats(){
   const h=loadHist();
@@ -536,6 +585,126 @@ document.getElementById('hintOk').addEventListener('click',()=>{
 /* ---------- init ---------- */
 renderChips(); renderCat(); renderStats(); renderHist(); render();
 if(cur>0) toast('已回到上次浏览位置');
+
+/* ---------- 云同步（Supabase，可选 BYOK） ---------- */
+window.Sync = (function(){
+  const SDK='https://esm.sh/@supabase/supabase-js@2';
+  let sb=null, uid=null, email=null, pushTimer=null;
+  const $=id=>document.getElementById(id);
+
+  function cfg(){ try{return JSON.parse(localStorage.getItem(LS.sb)||'{}');}catch(e){return {};} }
+  function configured(){ const c=cfg(); return !!(c.url&&c.key); }
+
+  function setState(txt,on){ const el=$('syncState'); if(el){el.textContent=txt; el.classList.toggle('on',!!on);} }
+  function msg(elId,txt,kind){ const el=$(elId); if(!el)return; el.textContent=txt||''; el.className='sync-msg'+(kind?' '+kind:''); }
+  function show(which){ // 'settings' | 'login' | 'account'
+    ['syncSettings','syncLogin','syncAccount'].forEach(id=>$(id)&&$(id).classList.add('hide'));
+    const map={settings:'syncSettings',login:'syncLogin',account:'syncAccount'};
+    if(map[which]) $(map[which]).classList.remove('hide');
+  }
+
+  async function ensureClient(){
+    if(sb) return sb;
+    if(!configured()) return null;
+    const c=cfg();
+    const { createClient } = await import(SDK);
+    sb = createClient(c.url, c.key, { auth:{ persistSession:true, detectSessionInUrl:true } });
+    sb.auth.onAuthStateChange((_e,session)=>{ onSession(session); });
+    return sb;
+  }
+
+  function mergeHist(a,b){
+    const m=new Map();
+    [...(a||[]),...(b||[])].forEach(x=>{
+      if(!x||!x.path) return;
+      const cur=m.get(x.path);
+      if(!cur||(x.ts||0)>(cur.ts||0)) m.set(x.path,{path:x.path,title:x.title,ts:x.ts||0});
+    });
+    return [...m.values()].sort((x,y)=>(y.ts||0)-(x.ts||0)).slice(0,100);
+  }
+
+  async function pull(){
+    const { data, error } = await sb.from('progress').select('history').eq('user_id',uid).maybeSingle();
+    if(error) throw error;
+    return (data&&data.history)||[];
+  }
+  async function pushNow(){
+    if(!sb||!uid) return;
+    const local=JSON.parse(localStorage.getItem(LS.hist)||'[]');
+    const { error } = await sb.from('progress').upsert({ user_id:uid, history:local, updated_at:new Date().toISOString() });
+    if(error){ msg('syncMsg2','同步失败：'+error.message,'err'); return; }
+    msg('syncMsg2','已同步 · '+new Date().toLocaleTimeString().slice(0,5),'ok');
+  }
+  function schedulePush(){ if(!sb||!uid) return; clearTimeout(pushTimer); pushTimer=setTimeout(pushNow,2500); }
+
+  async function syncMerge(){
+    msg('syncMsg2','同步中…');
+    const cloud=await pull().catch(e=>{msg('syncMsg2','拉取失败：'+e.message,'err');return null;});
+    if(cloud===null) return;
+    const local=JSON.parse(localStorage.getItem(LS.hist)||'[]');
+    const merged=mergeHist(local,cloud);
+    localStorage.setItem(LS.hist,JSON.stringify(merged));
+    renderStats(); renderHist();
+    await pushNow();
+  }
+
+  async function onSession(session){
+    if(session&&session.user){
+      uid=session.user.id; email=session.user.email;
+      $('userName').textContent=email?email.split('@')[0]:'已登录';
+      $('userSub').textContent='云同步账户 · '+(email||'');
+      $('avatar').textContent=(email||'U')[0].toUpperCase();
+      setState('已登录',true); show('account');
+      try{ await syncMerge(); }catch(e){ msg('syncMsg2','同步失败：'+e.message,'err'); }
+    }else{
+      uid=null; email=null;
+      $('userName').textContent='访客'; $('userSub').textContent='实验探索者 · 本地账户'; $('avatar').textContent='A';
+      setState(configured()?'未登录':'未启用',false);
+      show(configured()?'login':'settings');
+    }
+  }
+
+  // 事件绑定
+  function bind(){
+    $('syncGear').addEventListener('click',()=>{
+      const c=cfg(); $('sbUrl').value=c.url||''; $('sbKey').value=c.key||'';
+      const s=$('syncSettings'); s.classList.toggle('hide');
+    });
+    $('sbSave').addEventListener('click',async()=>{
+      const url=$('sbUrl').value.trim().replace(/\/$/,''), key=$('sbKey').value.trim();
+      if(!url||!key){ alert('请填写 Supabase URL 和 anon key'); return; }
+      localStorage.setItem(LS.sb,JSON.stringify({url,key}));
+      sb=null; toast('云同步配置已保存'); await init();
+    });
+    $('sbForget').addEventListener('click',async()=>{
+      if(sb){ try{await sb.auth.signOut();}catch(e){} }
+      localStorage.removeItem(LS.sb); sb=null; uid=null;
+      setState('未启用',false); show('settings'); toast('已清除云同步配置');
+    });
+    $('sbSendLink').addEventListener('click',async()=>{
+      const em=$('sbEmail').value.trim(); if(!em){msg('syncMsg','请输入邮箱','err');return;}
+      const c=await ensureClient(); if(!c){msg('syncMsg','请先配置 Supabase','err');return;}
+      msg('syncMsg','发送中…');
+      const { error } = await c.auth.signInWithOtp({ email:em, options:{ emailRedirectTo: location.href.split('#')[0] } });
+      msg('syncMsg', error?('发送失败：'+error.message):'登录链接已发送，请到邮箱点击链接（同一浏览器打开）。', error?'err':'ok');
+    });
+    $('sbLogout').addEventListener('click',async()=>{ if(sb){await sb.auth.signOut();} });
+    $('sbSyncNow').addEventListener('click',()=>{ syncMerge().catch(e=>msg('syncMsg2','失败：'+e.message,'err')); });
+  }
+
+  async function init(){
+    if(!configured()){ setState('未启用',false); show('settings'); return; }
+    setState('连接中…',false);
+    try{
+      const c=await ensureClient();
+      const { data:{ session } } = await c.auth.getSession();
+      onSession(session);
+    }catch(e){ setState('配置错误',false); show('settings'); console.warn(e); }
+  }
+
+  bind(); init();
+  return { schedulePush };
+})();
 }
 
 /* ---------- PWA ---------- */

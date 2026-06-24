@@ -51,6 +51,18 @@ git add manifest.json && git commit -m "chore: 更新实验清单" && git push
 1. **浏览器直连（默认，个人使用）**：聊天框左下 ⚙ → 粘贴 DeepSeek API Key。Key 只存本设备 localStorage，不进仓库、不上传。共用设备勿填。
 2. **Worker 代理（对外分发时用）**：按 `server/cloudflare-worker.js` 头部注释部署，key 存在 Worker Secret 里；然后在 ⚙ 设置中把接口地址改为 Worker 地址、Key 留空。直连遇到 CORS 报错时也用此方案。
 
+## 版权与许可
+
+Science-Lab App 壳使用 MIT License，详见 `LICENSE` 和 `NOTICE`。
+
+MIT 许可只覆盖本仓库中的 App 壳、清单、Service Worker、图标、构建脚本和 Worker 示例代码。App 加载的实验 HTML 来自独立的 `Albert-Huo/HTML-` 仓库，不由本仓库的 MIT 许可授权；使用或改编实验内容时，请遵守 `HTML-` 仓库自己的许可和署名要求。
+
+API Key、模型服务凭证和已部署 Worker Secret 不属于仓库内容，不能提交到 Git。
+
+## 云同步（可选）
+
+「我的」→ 云同步，用 Supabase 实现账号登录与浏览进度跨设备同步。BYOK：自建 Supabase 项目，把 Project URL 和公开 anon key 填进 ⚙，邮箱魔法链接登录。未配置时纯本地，行为不变。配置步骤见 `docs/supabase-setup.md`。
+
 ## 本地开发
 
 ```
