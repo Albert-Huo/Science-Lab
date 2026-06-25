@@ -233,9 +233,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
       </div>
 
       <div id="syncSettings" class="hide">
-        <label>同步服务地址<input id="apiUrl" placeholder="https://api.你的域名"></label>
-        <div class="row"><button id="apiSave">保存</button><button id="apiForget" class="ghost">清除配置</button></div>
-        <p>填写部署在你服务器上的同步接口地址（须为 https）。配置步骤见仓库 docs/aliyun-deploy.md。</p>
+        <label>同步服务地址（可选）<input id="apiUrl" placeholder="留空则用本站 /api"></label>
+        <div class="row"><button id="apiSave">保存</button><button id="apiForget" class="ghost">恢复默认</button></div>
+        <p>App 与接口部署在同一域名时无需填写，默认调用本站 /api。仅当接口在其它域名（须 https）时才填。部署步骤见仓库 docs/aliyun-deploy.md。</p>
       </div>
 
       <div id="syncLogin" class="hide">
@@ -592,7 +592,13 @@ window.Sync = (function(){
   const $=id=>document.getElementById(id);
 
   function cfg(){ try{return JSON.parse(localStorage.getItem(LS.sb)||'{}');}catch(e){return {};} }
-  function apiBase(){ const c=cfg(); return (c.url||'').replace(/\/$/,''); }
+  // 同源默认：页面部署在自己的域名（非 GitHub Pages/file）时，接口默认用本站 /api，无需手填
+  function defaultBase(){
+    if(!/^https?:$/.test(location.protocol)) return '';
+    if(/\.github\.io$/.test(location.hostname)) return '';
+    return location.origin + '/api';
+  }
+  function apiBase(){ const c=cfg(); return (c.url ? c.url.replace(/\/$/,'') : defaultBase()); }
   function configured(){ return !!apiBase(); }
 
   function setState(txt,on){ const el=$('syncState'); if(el){el.textContent=txt; el.classList.toggle('on',!!on);} }
@@ -687,13 +693,17 @@ window.Sync = (function(){
     });
     $('apiSave').addEventListener('click',()=>{
       const url=$('apiUrl').value.trim().replace(/\/$/,'');
-      if(!/^https:\/\//.test(url)){ alert('请填写 https 开头的同步服务地址'); return; }
-      const c=cfg(); c.url=url; localStorage.setItem(LS.sb,JSON.stringify(c));
-      toast('同步地址已保存'); init();
+      const c=cfg();
+      if(url){
+        if(!/^https:\/\//.test(url)){ alert('自定义接口地址须以 https:// 开头'); return; }
+        c.url=url;
+      } else { delete c.url; } // 留空 → 用本站 /api 默认
+      localStorage.setItem(LS.sb,JSON.stringify(c));
+      toast('已保存'); init();
     });
     $('apiForget').addEventListener('click',()=>{
       localStorage.removeItem(LS.sb); token=null; email=null;
-      setState('未启用',false); show('settings'); toast('已清除云同步配置');
+      init(); toast('已恢复默认');
     });
     $('btnLogin').addEventListener('click',()=>doAuth('login'));
     $('btnRegister').addEventListener('click',()=>doAuth('register'));
