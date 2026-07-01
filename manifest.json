@@ -1,29 +1,5 @@
 [
  {
-  "path": "physics-middle/einstein-relativity-level-1-simultaneity.html",
-  "title": "同时性实验室：闪电列车（相对论）",
-  "subject": "物理",
-  "level": "初中"
- },
- {
-  "path": "physics-middle/relativity-emc2-intuition-lab.html",
-  "title": "第三关：终极实验室 E=mc² 直觉引擎（极简版）",
-  "subject": "物理",
-  "level": "初中"
- },
- {
-  "path": "physics-middle/relativity-light-clock-lab.html",
-  "title": "第三关：飞船光钟实验室",
-  "subject": "物理",
-  "level": "初中"
- },
- {
-  "path": "physics-middle/初中物理实验 12-cc.html",
-  "title": "初中物理实验 12-cc｜探究液体压强与哪些因素有关（交互版）",
-  "subject": "物理",
-  "level": "初中"
- },
- {
   "path": "physics-middle/初中物理实验1.html",
   "title": "初中物理实验1｜用常见温度计测量温度（交互版）",
   "subject": "物理",
@@ -288,8 +264,14 @@
   "level": "初中"
  },
  {
+  "path": "physics-middle/初中物理实验49-1.html",
+  "title": "初中物理实验49-1｜演示电动机换向器原理",
+  "subject": "物理",
+  "level": "初中"
+ },
+ {
   "path": "physics-middle/初中物理实验49.html",
-  "title": "初中物理实验49｜设计与制作简易直流电动机模型",
+  "title": "初中物理实验49｜制作简易直流电动机",
   "subject": "物理",
   "level": "初中"
  },
@@ -436,6 +418,24 @@
   "title": "初中物理实验9｜比较不同材料的导热性（交互闯关版）",
   "subject": "物理",
   "level": "初中"
+ },
+ {
+  "path": "physics-high/einstein-relativity-level-1-simultaneity.html",
+  "title": "同时性实验室：闪电列车（相对论）",
+  "subject": "物理",
+  "level": "高中"
+ },
+ {
+  "path": "physics-high/relativity-emc2-intuition-lab.html",
+  "title": "第三关：终极实验室 E=mc² 直觉引擎（极简版）",
+  "subject": "物理",
+  "level": "高中"
+ },
+ {
+  "path": "physics-high/relativity-light-clock-lab.html",
+  "title": "第三关：飞船光钟实验室",
+  "subject": "物理",
+  "level": "高中"
  },
  {
   "path": "physics-high/伽利略斜面实验.html",
