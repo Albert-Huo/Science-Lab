@@ -11,6 +11,11 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="assets/icons/icon-192.png">
 <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<script>
+if (location.hostname === 'albert-huo.github.io' && location.pathname.startsWith('/Science-Lab')) {
+  location.replace('https://lab.xingnian.net.cn/' + location.search + location.hash);
+}
+</script>
 <style>
 :root{
   --bg:#0b0f17; --panel:#121826; --panel2:#1a2234; --line:#26314a;
