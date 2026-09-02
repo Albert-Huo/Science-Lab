@@ -289,10 +289,11 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 <div id="toast"></div>
 
 <script src="catalog-control.js"></script>
+<script src="content-source.js"></script>
 <script>
 const qs = new URLSearchParams(location.search);
-/* 内容源：默认线上站；与内容站同域时用相对路径；本地联调可用 ?base=/HTML-/ 覆盖 */
-const CONTENT_BASE = qs.get('base') ?? (location.hostname === 'html.xingnian.net.cn' ? '' : 'https://html.xingnian.net.cn/');
+/* 内容源：生产固定线上站；与内容站同域时用相对路径；仅本地联调接受根相对 ?base= */
+const CONTENT_BASE=ContentSource.resolve({hostname:location.hostname,requestedBase:qs.get('base')});
 const LS = { idx:'expfeed.idx', current:'expfeed.currentPath', hist:'expfeed.hist', hint:'expfeed.hint', ai:'expfeed.ai', chat:'expfeed.chat', install:'expfeed.install.dismissed' };
 try{ localStorage.removeItem('expfeed.sb'); }
 catch(e){ console.warn('旧登录数据清理失败：浏览器存储不可用'); }
