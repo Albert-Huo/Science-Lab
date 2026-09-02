@@ -3,6 +3,9 @@
   "categories": {
     "physics-high": {
       "state": "hidden"
+    },
+    "biology-high": {
+      "state": "hidden"
     }
   },
   "experiments": {}

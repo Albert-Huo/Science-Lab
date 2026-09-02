@@ -62,13 +62,14 @@ git add manifest.json && git commit -m "chore: 更新实验清单" && git push
 | `hidden` | 隐藏 | 保留，并标注“已从目录隐藏” |
 | `disabled` | 隐藏 | 保留，并标注“暂不可用” |
 
-当前预览配置把“物理 · 高中”设为隐藏：
+当前预览配置把“物理 · 高中”和“生物 · 高中”设为隐藏：
 
 ```json
 {
   "version": 1,
   "categories": {
-    "physics-high": { "state": "hidden" }
+    "physics-high": { "state": "hidden" },
+    "biology-high": { "state": "hidden" }
   },
   "experiments": {}
 }
