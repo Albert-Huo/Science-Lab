@@ -5,35 +5,61 @@ const path = require('path');
 const vm = require('vm');
 
 const html = fs.readFileSync(path.resolve(__dirname, '../../../index.html'), 'utf8');
-const start = html.indexOf('const CHAT_TOTAL_MAX=200');
-const end = html.indexOf("let chatPath='', chatHistory=[], chatBusy=false;", start);
-assert.ok(start >= 0 && end > start, '找不到 index.html 中的 AI 存储逻辑');
-const source = html.slice(start, end) + '\nthis.chatApi={loadChatStore,persistChat,toAiMessages};';
+const storageStart = html.indexOf('let storageWarningShown=false');
+const storageEnd = html.indexOf('function fetchJson', storageStart);
+assert.ok(storageStart >= 0 && storageEnd > storageStart, '找不到 index.html 中的安全存储辅助函数');
+const storageSource = html.slice(storageStart, storageEnd);
+const aiStart = html.indexOf('const CHAT_TOTAL_MAX=200');
+const aiEnd = html.indexOf("let chatPath='', chatHistory=[], chatBusy=false;", aiStart);
+assert.ok(aiStart >= 0 && aiEnd > aiStart, '找不到 index.html 中的 AI 存储逻辑');
+const source = storageSource + '\n' + html.slice(aiStart, aiEnd) +
+  '\nthis.storageApi={safeGet,safeSet,safeRemove};this.chatApi={loadChatStore,persistChat,toAiMessages};';
 
 function harness(initial) {
   const values = new Map(Object.entries(initial || {}));
-  const control = { failChatWrites: false };
+  const control = { failReads: false, failWrites: false, failRemoves: false, failChatWrites: false };
   const toasts = [];
+  const warnings = [];
   const localStorage = {
-    getItem(key) { return values.has(key) ? values.get(key) : null; },
+    getItem(key) {
+      if (control.failReads) throw new Error('read_blocked');
+      return values.has(key) ? values.get(key) : null;
+    },
     setItem(key, value) {
-      if (control.failChatWrites && key === 'expfeed.chat') throw new Error('quota_exceeded');
+      if (control.failWrites || (control.failChatWrites && key === 'expfeed.chat')) throw new Error('quota_exceeded');
       values.set(key, String(value));
     },
-    removeItem(key) { values.delete(key); },
+    removeItem(key) {
+      if (control.failRemoves) throw new Error('remove_blocked');
+      values.delete(key);
+    },
   };
   const context = vm.createContext({
     localStorage,
     location: { protocol: 'https:', hostname: 'lab.example', origin: 'https://lab.example' },
     LS: { ai: 'expfeed.ai', chat: 'expfeed.chat' },
+    console: { warn(message) { warnings.push(String(message)); } },
     toast(message) { toasts.push(message); },
   });
   vm.runInContext(source, context);
-  return { api: context.chatApi, localStorage, control, toasts };
+  return { api: context.chatApi, storageApi: context.storageApi, localStorage, control, toasts, warnings };
 }
 
 let pass = 0;
 const ok = name => { console.log('  ✓', name); pass++; };
+
+{
+  const test = harness();
+  test.control.failReads = true;
+  test.control.failWrites = true;
+  test.control.failRemoves = true;
+  assert.strictEqual(test.storageApi.safeGet('missing', 'fallback'), 'fallback');
+  assert.strictEqual(test.storageApi.safeSet('key', 'value'), false);
+  assert.strictEqual(test.storageApi.safeRemove('key'), false);
+  assert.strictEqual(test.warnings.length, 1);
+  assert.ok(test.warnings[0].includes('浏览器存储不可用'));
+  ok('浏览器存储失败时返回安全结果且只警告一次');
+}
 
 {
   const test = harness({ 'expfeed.chat': '{bad json' });
@@ -83,5 +109,10 @@ const ok = name => { console.log('  ✓', name); pass++; };
 }
 
 assert.ok(html.includes("model:'deepseek-v4-flash'"), '前端默认模型必须使用 DeepSeek V4 Flash');
+const runtimeWithoutStorageHelper = html.slice(0, storageStart) + html.slice(storageEnd);
+assert.ok(
+  !/localStorage\.(?:getItem|setItem|removeItem)\s*\(/.test(runtimeWithoutStorageHelper),
+  'localStorage 原始调用只能出现在安全存储辅助函数中'
+);
 
 console.log('\n前端存储测试通过：' + pass + ' 项');

@@ -295,8 +295,27 @@ const qs = new URLSearchParams(location.search);
 /* 内容源：生产固定线上站；与内容站同域时用相对路径；仅本地联调接受根相对 ?base= */
 const CONTENT_BASE=ContentSource.resolve({hostname:location.hostname,requestedBase:qs.get('base')});
 const LS = { idx:'expfeed.idx', current:'expfeed.currentPath', hist:'expfeed.hist', hint:'expfeed.hint', ai:'expfeed.ai', chat:'expfeed.chat', install:'expfeed.install.dismissed' };
-try{ localStorage.removeItem('expfeed.sb'); }
-catch(e){ console.warn('旧登录数据清理失败：浏览器存储不可用'); }
+let storageWarningShown=false;
+function warnStorage(operation,error){
+  if(storageWarningShown) return;
+  storageWarningShown=true;
+  console.warn('浏览器存储不可用（'+operation+'）：'+(error&&error.message?error.message:String(error)));
+}
+function safeGet(key,fallback=null){
+  try{
+    const value=localStorage.getItem(key);
+    return value===null?fallback:value;
+  }catch(error){ warnStorage('读取 '+key,error); return fallback; }
+}
+function safeSet(key,value){
+  try{ localStorage.setItem(key,value); return true; }
+  catch(error){ warnStorage('写入 '+key,error); return false; }
+}
+function safeRemove(key){
+  try{ localStorage.removeItem(key); return true; }
+  catch(error){ warnStorage('删除 '+key,error); return false; }
+}
+safeRemove('expfeed.sb');
 
 function fetchJson(url,options){
   return fetch(url,options).then(response=>{
@@ -313,11 +332,8 @@ Promise.all([
 ]).then(([sourceManifest,control])=>{
   if(!Array.isArray(sourceManifest)) throw new Error('实验清单格式错误');
   const catalog=CatalogControl.apply(sourceManifest,control);
-  let savedPath='',savedIndex=0;
-  try{
-    savedPath=localStorage.getItem(LS.current)||'';
-    savedIndex=parseInt(localStorage.getItem(LS.idx)||'0',10)||0;
-  }catch(error){ console.warn('浏览位置读取失败：浏览器存储不可用'); }
+  const savedPath=safeGet(LS.current,'');
+  const savedIndex=parseInt(safeGet(LS.idx,'0'),10)||0;
   const initialIndex=CatalogControl.initialIndex(sourceManifest,catalog.experiments,savedPath,savedIndex);
   boot(catalog.experiments,catalog.states,initialIndex);
 }).catch(e=>{
@@ -388,8 +404,8 @@ function render(){
   document.getElementById('hudIdx').textContent = (cur+1)+'/'+MANIFEST.length;
   document.getElementById('btnPrev').disabled = cur===0;
   document.getElementById('btnNext').disabled = cur===MANIFEST.length-1;
-  localStorage.setItem(LS.idx, cur);
-  localStorage.setItem(LS.current, it.path);
+  safeSet(LS.idx, cur);
+  safeSet(LS.current, it.path);
   markHistory(it);
   highlightCat();
   renderChatForCurrent();
@@ -402,12 +418,18 @@ function next(){ goTo(cur+1); }
 function prev(){ goTo(cur-1); }
 
 /* ---------- history ---------- */
-function loadHist(){ try{return JSON.parse(localStorage.getItem(LS.hist)||'[]');}catch(e){return [];} }
+function loadHist(){
+  try{
+    const history=JSON.parse(safeGet(LS.hist,'[]'));
+    if(!Array.isArray(history)) throw new Error('invalid_history');
+    return history;
+  }catch(error){ safeRemove(LS.hist); return []; }
+}
 function markHistory(it){
   let h=loadHist().filter(x=>x.path!==it.path);
   h.unshift({path:it.path,title:it.title,ts:Date.now()});
   if(h.length>100) h.length=100;
-  localStorage.setItem(LS.hist, JSON.stringify(h));
+  safeSet(LS.hist, JSON.stringify(h));
   renderStats(); renderHist();
 }
 function renderStats(){
@@ -509,11 +531,11 @@ function defaultBase(){
 }
 function aiCfg(){
   try{
-    const saved=JSON.parse(localStorage.getItem(LS.ai)||'{}');
+    const saved=JSON.parse(safeGet(LS.ai,'{}'));
     if(!saved||typeof saved!=='object'||Array.isArray(saved)) throw new Error('invalid_ai_settings');
     return Object.assign({},AI_DEFAULTS,saved,{byok:saved.byok===true});
-  }catch(e){
-    try{ localStorage.removeItem(LS.ai); }catch(storageError){ return Object.assign({},AI_DEFAULTS); }
+  }catch(error){
+    safeRemove(LS.ai);
     return Object.assign({},AI_DEFAULTS);
   }
 }
@@ -521,12 +543,11 @@ function toAiMessages(messages){
   return messages.slice(-12).map(({role,content})=>({role,content:String(content).slice(0,AI_MESSAGE_CONTENT_MAX)}));
 }
 function resetChatStore(){
-  try{ localStorage.setItem(LS.chat,'{}'); return true; }
-  catch(e){ return false; }
+  return safeSet(LS.chat,'{}');
 }
 function loadChatStore(){
   try{
-    const raw=localStorage.getItem(LS.chat);
+    const raw=safeGet(LS.chat);
     if(!raw) return {};
     const parsed=JSON.parse(raw);
     if(!parsed||typeof parsed!=='object'||Array.isArray(parsed)) throw new Error('invalid_chat_history');
@@ -564,14 +585,12 @@ function persistChat(path,messages){
     store[path]=messages.map(msg=>({role:msg.role,content:String(msg.content).slice(0,CHAT_CONTENT_MAX),ts:msg.ts||Date.now()}));
   }else delete store[path];
   pruneChatStore(store);
-  try{
-    localStorage.setItem(LS.chat,JSON.stringify(store));
+  if(safeSet(LS.chat,JSON.stringify(store))){
     chatStorageWarned=false;
     return true;
-  }catch(e){
-    if(!chatStorageWarned){ chatStorageWarned=true; toast('对话记录保存失败，原有记录已保留'); }
-    return false;
   }
+  if(!chatStorageWarned){ chatStorageWarned=true; toast('对话记录保存失败，原有记录已保留'); }
+  return false;
 }
 let chatPath='', chatHistory=[], chatBusy=false;
 function addMsg(cls,text){
@@ -684,8 +703,7 @@ document.getElementById('aiSave').addEventListener('click',()=>{
     model:document.getElementById('aiModel').value.trim()||AI_DEFAULTS.model,
     key:document.getElementById('aiKey').value.trim()
   };
-  try{ localStorage.setItem(LS.ai,JSON.stringify(saved)); }
-  catch(e){ toast('AI 设置保存失败：浏览器存储不可用'); return; }
+  if(!safeSet(LS.ai,JSON.stringify(saved))){ toast('AI 设置保存失败：浏览器存储不可用'); return; }
   aiPanel.classList.add('hide'); toast(saved.byok?'已启用自己的 API Key':'已启用内置 AI 助手');
 });
 document.getElementById('aiClearChat').addEventListener('click',()=>{
@@ -738,9 +756,9 @@ function toast(t){
   clearTimeout(toast._t); toast._t=setTimeout(()=>el.classList.remove('show'),2200);
 }
 const hint=document.getElementById('hint');
-if(!localStorage.getItem(LS.hint)) hint.classList.remove('hide');
+if(!safeGet(LS.hint)) hint.classList.remove('hide');
 document.getElementById('hintOk').addEventListener('click',()=>{
-  hint.classList.add('hide'); localStorage.setItem(LS.hint,'1');
+  hint.classList.add('hide'); safeSet(LS.hint,'1');
 });
 
 /* ---------- init ---------- */
@@ -756,8 +774,7 @@ function isStandalone(){ return matchMedia('(display-mode: standalone)').matches
 function hideInstallGuide(){ installGuide.classList.add('hide'); }
 function installDismissed(){
   if(installGuide.dataset.dismissed==='session') return true;
-  try{ return !!localStorage.getItem(LS.install); }
-  catch(e){ return false; }
+  return !!safeGet(LS.install);
 }
 function installGuideCopy(userAgent,platform,maxTouchPoints){
   const ua=userAgent||'';
@@ -807,7 +824,7 @@ function initInstallGuide(){
   installGuide.classList.remove('hide');
 }
 document.getElementById('installClose').addEventListener('click',()=>{
-  try{ localStorage.setItem(LS.install,'1'); }catch(e){ installGuide.dataset.dismissed='session'; }
+  if(!safeSet(LS.install,'1')) installGuide.dataset.dismissed='session';
   hideInstallGuide();
 });
 addEventListener('beforeinstallprompt',e=>{
