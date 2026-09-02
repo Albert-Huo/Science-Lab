@@ -47,6 +47,48 @@ function harness(initial) {
 
 let pass = 0;
 const ok = name => { console.log('  ✓', name); pass++; };
+function assertSingleStorageWarning(warnings, operation, key, error) {
+  assert.strictEqual(warnings.length, 1);
+  assert.ok(warnings[0].includes(operation), '警告缺少存储操作');
+  assert.ok(warnings[0].includes(key), '警告缺少存储键');
+  assert.ok(warnings[0].includes(error), '警告缺少底层错误');
+}
+
+{
+  const test = harness({ removable: 'old' });
+  test.control.failReads = true;
+  assert.strictEqual(test.storageApi.safeGet('read-key', 'fallback'), 'fallback');
+  assert.strictEqual(test.storageApi.safeSet('write-key', 'value'), true);
+  assert.strictEqual(test.storageApi.safeRemove('removable'), true);
+  test.control.failReads = false;
+  assert.strictEqual(test.localStorage.getItem('write-key'), 'value');
+  assert.strictEqual(test.localStorage.getItem('removable'), null);
+  assertSingleStorageWarning(test.warnings, '读取', 'read-key', 'read_blocked');
+  ok('读取失败不影响写入和删除');
+}
+
+{
+  const test = harness({ 'read-key': 'stored', removable: 'old' });
+  test.control.failWrites = true;
+  assert.strictEqual(test.storageApi.safeSet('write-key', 'value'), false);
+  assert.strictEqual(test.storageApi.safeGet('read-key', 'fallback'), 'stored');
+  assert.strictEqual(test.storageApi.safeRemove('removable'), true);
+  assert.strictEqual(test.localStorage.getItem('removable'), null);
+  assertSingleStorageWarning(test.warnings, '写入', 'write-key', 'quota_exceeded');
+  ok('写入失败不影响读取和删除');
+}
+
+{
+  const test = harness({ 'read-key': 'stored', removable: 'old' });
+  test.control.failRemoves = true;
+  assert.strictEqual(test.storageApi.safeRemove('removable'), false);
+  assert.strictEqual(test.storageApi.safeGet('read-key', 'fallback'), 'stored');
+  assert.strictEqual(test.storageApi.safeSet('write-key', 'value'), true);
+  assert.strictEqual(test.localStorage.getItem('removable'), 'old');
+  assert.strictEqual(test.localStorage.getItem('write-key'), 'value');
+  assertSingleStorageWarning(test.warnings, '删除', 'removable', 'remove_blocked');
+  ok('删除失败不影响读取和写入');
+}
 
 {
   const test = harness();
@@ -58,7 +100,7 @@ const ok = name => { console.log('  ✓', name); pass++; };
   assert.strictEqual(test.storageApi.safeRemove('key'), false);
   assert.strictEqual(test.warnings.length, 1);
   assert.ok(test.warnings[0].includes('浏览器存储不可用'));
-  ok('浏览器存储失败时返回安全结果且只警告一次');
+  ok('同一页面发生多种存储失败时只警告一次');
 }
 
 {
