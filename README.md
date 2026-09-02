@@ -6,6 +6,8 @@
 
 实验馆面向学习者免费使用，无需注册或登录。浏览历史和 AI 问答记录只保存在当前设备的浏览器 `localStorage`，不会同步到云端；清除浏览器数据、更换浏览器或更换设备后，这些记录会丢失且无法恢复。
 
+这里的“免登录”仅指当前 `index.html` 前端体验：页面不展示或调用注册、登录、云同步功能。为兼容已有部署，`server/api/` 仍保留旧账号与进度接口，但当前前端不会使用它们。
+
 ## 交互设计
 
 - 全屏单实验展示，一页一个交互实验（iframe，仅挂载当前 ±1，懒加载）
@@ -22,6 +24,8 @@
 | 文件 | 说明 |
 | --- | --- |
 | `index.html` | App 壳，单文件无依赖 |
+| `catalog-control.json` | 目录与单个实验的发布状态开关 |
+| `catalog-control.js` | 发布状态解析、统计与浏览位置兼容逻辑 |
 | `manifest.json` | 实验清单（由脚本生成，勿手改） |
 | `tools/build-manifest.py` | 扫描 `HTML-` 仓库生成清单 |
 | `docs/roadmap.md` | 演进计划 |
@@ -46,6 +50,47 @@ git add manifest.json && git commit -m "chore: 更新实验清单" && git push
 
 新增内容目录（学科/学段）时，先在 `tools/build-manifest.py` 的 `DIRS` 中登记。
 
+## 目录发布控制
+
+不要从 `manifest.json` 删除临时下线的内容；在 `catalog-control.json` 中调整状态即可恢复和审查。目录使用实验路径的第一段作为稳定标识，例如 `physics-high/einstein-relativity-level-1-simultaneity.html` 对应目录 ID `physics-high`。
+
+支持三种状态：
+
+| 状态 | App 目录与实验流 | 已有历史记录 |
+| --- | --- | --- |
+| `published` | 正常显示 | 可以打开 |
+| `hidden` | 隐藏 | 保留，并标注“已从目录隐藏” |
+| `disabled` | 隐藏 | 保留，并标注“暂不可用” |
+
+当前预览配置把“物理 · 高中”设为隐藏：
+
+```json
+{
+  "version": 1,
+  "categories": {
+    "physics-high": { "state": "hidden" }
+  },
+  "experiments": {}
+}
+```
+
+恢复目录时把状态改为 `published`。单个实验可按完整路径写入 `experiments`，且优先级高于目录状态：
+
+```json
+{
+  "categories": {
+    "physics-high": { "state": "hidden" }
+  },
+  "experiments": {
+    "physics-high/example.html": { "state": "published" }
+  }
+}
+```
+
+发布新的控制文件后无需重启 Node 服务；页面会优先从网络读取配置，离线时回退到最后一次缓存。配置缺失、加载失败或状态拼写不合法时，系统默认保持内容为 `published`，避免误关全部实验。
+
+这里的 `disabled` 是 App 侧发布状态，不能阻止用户直接打开独立内容站 `html.xingnian.net.cn` 上的已知实验网址。涉及版权、安全或强制下线时，还必须在内容站 nginx 或应用服务同步拒绝该路径。
+
 ## AI 问答
 
 "我的"侧栏 → AI 问答，使用 DeepSeek（OpenAI 兼容协议），系统提示自动注入当前实验的标题/学科/学段。
@@ -67,6 +112,8 @@ API Key、模型服务凭证和已部署 Worker Secret 不属于仓库内容，�
 ## 旧接口兼容
 
 `server/api/` 仍保留旧版 `/auth/register`、`/auth/login` 和 `/progress` 接口及 MySQL 数据结构，以免破坏已有部署和历史数据；当前免登录前端不会调用这些接口。内置 AI 代理也由该 Node 服务提供，部署步骤见 `docs/aliyun-deploy.md`。
+
+仓库审查只能确认本次改造没有修改 `server/api/db.js`、`server/api/schema.sql` 和旧接口行为，不能替代对生产 MySQL 内容的核验。升级已有部署前应先备份数据库，并按部署文档记录升级前后的用户数、进度记录数和最近更新时间。
 
 ## 本地开发
 

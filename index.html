@@ -35,6 +35,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
   align-items:center;justify-content:center;color:var(--txt2);font-size:14px;}
 .page .ph .dot{width:34px;height:34px;border-radius:50%;border:3px solid var(--line);
   border-top-color:var(--acc);animation:spin 1s linear infinite;}
+.empty-feed{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:8px;color:var(--txt2);font-size:14px;}
+.empty-feed b{color:var(--txt);font-size:18px;}
 @keyframes spin{to{transform:rotate(360deg)}}
 /* ---------- HUD ---------- */
 #hud{position:fixed;top:0;left:0;right:0;height:var(--hud-h);z-index:40;display:flex;
@@ -278,29 +281,65 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 
 <div id="installGuide" class="hide" role="status">
   <div class="install-icon">＋</div>
-  <div class="install-copy"><b>添加到主屏幕</b><span id="installText"></span></div>
+  <div class="install-copy"><b id="installTitle">添加到主屏幕</b><span id="installText"></span></div>
   <button id="installAction">立即添加</button>
   <button id="installClose" aria-label="永久关闭安装引导">✕</button>
 </div>
 
 <div id="toast"></div>
 
+<script src="catalog-control.js"></script>
 <script>
 const qs = new URLSearchParams(location.search);
 /* 内容源：默认线上站；与内容站同域时用相对路径；本地联调可用 ?base=/HTML-/ 覆盖 */
 const CONTENT_BASE = qs.get('base') ?? (location.hostname === 'html.xingnian.net.cn' ? '' : 'https://html.xingnian.net.cn/');
-const LS = { idx:'expfeed.idx', hist:'expfeed.hist', hint:'expfeed.hint', ai:'expfeed.ai', chat:'expfeed.chat', install:'expfeed.install.dismissed' };
+const LS = { idx:'expfeed.idx', current:'expfeed.currentPath', hist:'expfeed.hist', hint:'expfeed.hint', ai:'expfeed.ai', chat:'expfeed.chat', install:'expfeed.install.dismissed' };
 try{ localStorage.removeItem('expfeed.sb'); }
 catch(e){ console.warn('旧登录数据清理失败：浏览器存储不可用'); }
 
-fetch('manifest.json').then(r=>r.json()).then(boot).catch(e=>{
+function fetchJson(url,options){
+  return fetch(url,options).then(response=>{
+    if(!response.ok) throw new Error(url+' 请求失败（'+response.status+'）');
+    return response.json();
+  });
+}
+Promise.all([
+  fetchJson('manifest.json'),
+  fetchJson('catalog-control.json',{cache:'no-store'}).catch(error=>{
+    console.warn('目录发布控制加载失败，使用全部发布：'+error.message);
+    return {};
+  })
+]).then(([sourceManifest,control])=>{
+  if(!Array.isArray(sourceManifest)) throw new Error('实验清单格式错误');
+  const catalog=CatalogControl.apply(sourceManifest,control);
+  let savedPath='',savedIndex=0;
+  try{
+    savedPath=localStorage.getItem(LS.current)||'';
+    savedIndex=parseInt(localStorage.getItem(LS.idx)||'0',10)||0;
+  }catch(error){ console.warn('浏览位置读取失败：浏览器存储不可用'); }
+  const initialIndex=CatalogControl.initialIndex(sourceManifest,catalog.experiments,savedPath,savedIndex);
+  boot(catalog.experiments,catalog.states,initialIndex);
+}).catch(e=>{
   document.body.insertAdjacentHTML('beforeend','<div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#93a1bd;font-size:14px;z-index:99;background:#0b0f17">实验清单加载失败：'+e+'</div>');
 });
 
-function boot(MANIFEST){
+function boot(MANIFEST,PUBLISHING_STATES,initialIndex){
 
 const track = document.getElementById('track');
-let cur = Math.min(parseInt(localStorage.getItem(LS.idx)||'0',10)||0, MANIFEST.length-1);
+if(!MANIFEST.length){
+  track.innerHTML='<div class="empty-feed"><b>暂无开放实验</b><span>请稍后再试</span></div>';
+  document.getElementById('hudTag').textContent='实验馆';
+  document.getElementById('hudTitle').textContent='暂无开放实验';
+  document.getElementById('hudIdx').textContent='0/0';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=true;
+  document.getElementById('stTotal').textContent='0';
+  document.getElementById('stSeen').textContent='0';
+  document.getElementById('stPct').textContent='0%';
+  document.getElementById('catList').innerHTML='<div class="empty">暂无开放实验</div>';
+  return;
+}
+let cur = initialIndex>=0&&initialIndex<MANIFEST.length?initialIndex:0;
 let order = MANIFEST.map((_,i)=>i);   // current play order (filterable later)
 let animating = false;
 
@@ -349,6 +388,7 @@ function render(){
   document.getElementById('btnPrev').disabled = cur===0;
   document.getElementById('btnNext').disabled = cur===MANIFEST.length-1;
   localStorage.setItem(LS.idx, cur);
+  localStorage.setItem(LS.current, it.path);
   markHistory(it);
   highlightCat();
   renderChatForCurrent();
@@ -371,23 +411,31 @@ function markHistory(it){
 }
 function renderStats(){
   const h=loadHist();
-  document.getElementById('stTotal').textContent=MANIFEST.length;
-  document.getElementById('stSeen').textContent=h.length;
-  document.getElementById('stPct').textContent=Math.round(h.length/MANIFEST.length*100)+'%';
+  const stats=CatalogControl.stats(MANIFEST,h);
+  document.getElementById('stTotal').textContent=stats.total;
+  document.getElementById('stSeen').textContent=stats.seen;
+  document.getElementById('stPct').textContent=stats.percent+'%';
 }
 function renderHist(){
   const el=document.getElementById('histList'), h=loadHist();
   if(!h.length){ el.innerHTML='<div class="empty">还没有浏览记录</div>'; return; }
   el.innerHTML=h.map(x=>{
     const i=MANIFEST.findIndex(m=>m.path===x.path);
+    const state=PUBLISHING_STATES[x.path]||'published';
+    const unavailable=i>=0?'':state==='disabled'?'暂不可用':state==='hidden'?'已从目录隐藏':'已从目录移除';
     const t=new Date(x.ts);
     const time=(t.getMonth()+1)+'月'+t.getDate()+'日 '+String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0');
-    return '<div class="hist-item" data-i="'+i+'"><span>'+esc(x.title)+'</span><small>'+time+'</small></div>';
+    return '<div class="hist-item" data-i="'+i+'" data-state="'+state+'"><span>'+esc(x.title)+'</span><small>'+time+(unavailable?' · '+unavailable:'')+'</small></div>';
   }).join('');
 }
 document.getElementById('histList').addEventListener('click',e=>{
   const it=e.target.closest('.hist-item'); if(!it) return;
-  goTo(+it.dataset.i); closePanels();
+  const index=+it.dataset.i;
+  if(index<0){
+    toast(it.dataset.state==='disabled'?'该实验暂不可用':it.dataset.state==='hidden'?'该实验已从目录隐藏':'该实验已从目录移除');
+    return;
+  }
+  goTo(index); closePanels();
 });
 
 /* ---------- catalog ---------- */
@@ -707,17 +755,51 @@ function installDismissed(){
   try{ return !!localStorage.getItem(LS.install); }
   catch(e){ return false; }
 }
+function installGuideCopy(userAgent,platform,maxTouchPoints){
+  const ua=userAgent||'';
+  const ios=/iPad|iPhone|iPod/.test(ua)||(platform==='MacIntel'&&maxTouchPoints>1);
+  const iosSafari=ios&&/Safari/.test(ua)&&!/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
+  const androidChrome=/Android/.test(ua)&&/Chrome\//.test(ua)&&!/EdgA|OPR\//.test(ua);
+  const macSafari=/Macintosh/.test(ua)&&/Safari/.test(ua)&&!/Chrome|Chromium|Edg\/|OPR\//.test(ua);
+  const inApp=/MicroMessenger|Weibo|QQ\/|MQQBrowser|DingTalk|AlipayClient|FBAN|FBAV|Instagram|Line\/|TikTok|BytedanceWebview/i.test(ua);
+
+  if(inApp&&ios){
+    return {
+      title:'请用 Safari 打开',
+      text:'当前应用内浏览器不支持直接安装。请用 Safari 打开本站，再点“分享”→“添加到主屏幕”。'
+    };
+  }
+  if(inApp){
+    return {
+      title:'请用系统浏览器打开',
+      text:'当前应用内浏览器不支持直接安装。请用系统 Chrome 或 Edge 打开本站。'
+    };
+  }
+  if(iosSafari){
+    return {title:'添加到主屏幕',text:'点 Safari 底部“分享”，再选“添加到主屏幕”。'};
+  }
+  if(ios){
+    return {
+      title:'请用 Safari 打开',
+      text:'请用 Safari 打开本站，再点“分享”→“添加到主屏幕”。'
+    };
+  }
+  if(androidChrome){
+    return {title:'添加到主屏幕',text:'点 Chrome 右上角 ⋮，选择“安装应用”或“添加到主屏幕”。'};
+  }
+  if(macSafari){
+    return {title:'添加到 Dock',text:'点 Safari 工具栏“分享”或“文件”菜单，再选“添加到 Dock”。'};
+  }
+  return {
+    title:'安装实验馆',
+    text:'若未出现“立即添加”按钮，请用系统浏览器菜单选择“安装应用”或“添加到主屏幕”。'
+  };
+}
 function initInstallGuide(){
   if(isStandalone()||installDismissed()) return;
-  const ua=navigator.userAgent;
-  const ios=/iPad|iPhone|iPod/.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
-  const iosSafari=ios&&/Safari/.test(ua)&&!/CriOS|FxiOS|EdgiOS/.test(ua);
-  const androidChrome=/Android/.test(ua)&&/Chrome\//.test(ua)&&!/EdgA|OPR\//.test(ua);
-  document.getElementById('installText').textContent=iosSafari
-    ? '点 Safari 底部“分享”，再选“添加到主屏幕”。'
-    : androidChrome
-      ? '点 Chrome 右上角 ⋮，选择“安装应用”或“添加到主屏幕”。'
-      : '打开浏览器菜单，选择“安装应用”或“添加到主屏幕”。';
+  const copy=installGuideCopy(navigator.userAgent,navigator.platform,navigator.maxTouchPoints);
+  document.getElementById('installTitle').textContent=copy.title;
+  document.getElementById('installText').textContent=copy.text;
   installGuide.classList.remove('hide');
 }
 document.getElementById('installClose').addEventListener('click',()=>{

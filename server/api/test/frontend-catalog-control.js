@@ -1,0 +1,146 @@
+'use strict';
+
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+
+const CatalogControl = require(path.resolve(__dirname, '../../../catalog-control.js'));
+
+const fixtures = [
+  { path: 'physics-middle/a.html', title: '初中实验 A', subject: '物理', level: '初中' },
+  { path: 'physics-high/off.html', title: '高中实验 B', subject: '物理', level: '高中' },
+  { path: 'physics-high/keep.html', title: '高中实验 C', subject: '物理', level: '高中' }
+];
+
+{
+  const result = CatalogControl.apply(fixtures, {});
+  assert.deepStrictEqual(result.experiments, fixtures, '缺少配置时应保持全部实验发布');
+  assert.deepStrictEqual(result.states, {
+    'physics-middle/a.html': 'published',
+    'physics-high/off.html': 'published',
+    'physics-high/keep.html': 'published'
+  });
+}
+
+{
+  const result = CatalogControl.apply(fixtures, {
+    categories: { 'physics-high': { state: 'hidden' } },
+    experiments: { 'physics-high/keep.html': { state: 'published' } }
+  });
+  assert.deepStrictEqual(
+    result.experiments.map((item) => item.path),
+    ['physics-middle/a.html', 'physics-high/keep.html'],
+    '实验级规则应覆盖目录级规则'
+  );
+  assert.strictEqual(result.states['physics-high/off.html'], 'hidden');
+}
+
+{
+  const result = CatalogControl.apply(fixtures, {
+    experiments: { 'physics-high/off.html': { state: 'disabled' } }
+  });
+  assert.strictEqual(result.states['physics-high/off.html'], 'disabled');
+  assert.ok(!result.experiments.some((item) => item.path === 'physics-high/off.html'));
+}
+
+{
+  const result = CatalogControl.apply(fixtures, {
+    categories: { 'physics-high': { state: 'typo' } },
+    experiments: { 'physics-middle/a.html': null }
+  });
+  assert.strictEqual(result.experiments.length, fixtures.length, '非法状态应安全降级为 published');
+}
+
+{
+  const result = CatalogControl.apply(fixtures, null);
+  assert.strictEqual(result.experiments.length, fixtures.length, '损坏或空控制对象不应关闭已有内容');
+}
+
+{
+  const visible = fixtures.slice(0, 2);
+  const history = [
+    { path: 'physics-middle/a.html' },
+    { path: 'physics-middle/a.html' },
+    { path: 'physics-high/keep.html' }
+  ];
+  assert.deepStrictEqual(CatalogControl.stats(visible, history), {
+    total: 2,
+    seen: 1,
+    percent: 50
+  });
+  assert.deepStrictEqual(CatalogControl.stats([], history), {
+    total: 0,
+    seen: 0,
+    percent: 0
+  });
+}
+
+{
+  const source = [
+    fixtures[0],
+    fixtures[1],
+    fixtures[2],
+    { path: 'physics-demos/d.html', title: '科普实验 D', subject: '物理', level: '科普演示' }
+  ];
+  const visible = [source[0], source[3]];
+  assert.strictEqual(
+    CatalogControl.initialIndex(source, visible, 'physics-middle/a.html', 0),
+    0,
+    '仍发布的已保存路径应精确恢复'
+  );
+  assert.strictEqual(
+    CatalogControl.initialIndex(source, visible, 'physics-high/off.html', 1),
+    1,
+    '已隐藏的当前实验应前进到后续最近的可用实验'
+  );
+  assert.strictEqual(
+    CatalogControl.initialIndex(source, visible, '', 99),
+    1,
+    '旧序号超出范围时应回退到最后一个可用实验'
+  );
+  assert.strictEqual(CatalogControl.initialIndex(source, [], '', 0), -1);
+}
+
+{
+  const html = fs.readFileSync(path.resolve(__dirname, '../../../index.html'), 'utf8');
+  assert.ok(html.includes('<script src="catalog-control.js"></script>'), '首页应加载目录发布控制模块');
+  assert.ok(
+    /fetchJson\('catalog-control\.json',\{cache:'no-store'\}\)/.test(html),
+    '控制文件请求应绕过 HTTP 缓存'
+  );
+  assert.ok(
+    html.includes('CatalogControl.apply(sourceManifest,control)'),
+    '首页应在启动前应用目录发布控制'
+  );
+  assert.ok(
+    html.includes("暂无开放实验"),
+    '全部关闭时应显示稳定空状态'
+  );
+  assert.ok(html.includes('已从目录隐藏'), '旧历史中的 hidden 实验应有明确状态');
+  assert.ok(html.includes('暂不可用'), '旧历史中的 disabled 实验应有明确状态');
+  assert.ok(
+    html.includes('CatalogControl.stats(MANIFEST,h)'),
+    '学习统计应只计算当前发布的实验'
+  );
+}
+
+{
+  const root = path.resolve(__dirname, '../../..');
+  const serviceWorker = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
+  const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
+  const packageJson = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../package.json'), 'utf8'));
+  assert.ok(serviceWorker.includes("const VERSION = 'v0.7.0'"), '发布控制上线时应刷新 App 壳缓存');
+  assert.ok(serviceWorker.includes("'./catalog-control.js'"), '发布控制模块应进入离线 App 壳');
+  assert.ok(serviceWorker.includes("'./catalog-control.json'"), '发布控制配置应提供离线回退');
+  assert.ok(
+    serviceWorker.includes("url.pathname.endsWith('/catalog-control.json')"),
+    '发布控制配置应使用网络优先策略'
+  );
+  assert.ok(readme.includes('## 目录发布控制'), 'README 应记录目录开关操作方法');
+  assert.ok(
+    packageJson.scripts.test.includes('node test/frontend-catalog-control.js'),
+    '统一测试命令应包含目录发布控制回归测试'
+  );
+}
+
+console.log('✓ 目录发布控制 7 组解析/定位场景、7 项页面接入及缓存文档检查通过');

@@ -15,6 +15,8 @@
 - Node ≥ 18；可用的 MySQL（自建或阿里云 RDS）。
 - 防火墙只放行 443（与现网所需端口）；Node 端口（默认 8970）仅监听 127.0.0.1。
 
+> “本次没有修改数据库代码或表结构”不等于“生产数据已经验证完好”。升级已有部署时，必须先完成下面的备份和只读基线核验；新建部署可跳过旧数据核验。
+
 ## 1. 建库与表
 
 ```sql
@@ -27,6 +29,22 @@ FLUSH PRIVILEGES;
 ```bash
 mysql -u sciencelab -p sciencelab < server/api/schema.sql
 ```
+
+### 升级已有部署：备份与基线核验
+
+以下命令不会修改表数据。备份文件应放在仅管理员可读、且不位于 Git 仓库和 Web 根目录的位置：
+
+```bash
+sudo install -d -m 700 /var/backups/science-lab
+SCIENCE_LAB_BACKUP_TAG=$(date '+%Y%m%d-%H%M%S')
+sudo sh -c "umask 077; mysqldump -u sciencelab -p --single-transaction --routines --triggers sciencelab > /var/backups/science-lab/sciencelab-${SCIENCE_LAB_BACKUP_TAG}.sql"
+sudo sh -c "umask 077; sha256sum /var/backups/science-lab/sciencelab-${SCIENCE_LAB_BACKUP_TAG}.sql > /var/backups/science-lab/sciencelab-${SCIENCE_LAB_BACKUP_TAG}.sql.sha256"
+
+mysql -u sciencelab -p -N sciencelab -e \
+  "SELECT 'users', COUNT(*) FROM users; SELECT 'progress', COUNT(*) FROM progress; SELECT 'latest_progress', COALESCE(MAX(updated_at), 'none') FROM progress;"
+```
+
+记录 `SCIENCE_LAB_BACKUP_TAG` 和三项查询输出。部署后再次执行相同的只读查询；若用户数、进度记录数意外减少，立即停止验证和写操作，保留现场并回滚应用。不要在原因不明时导入备份覆盖现库。
 
 ## 2. 部署 Node API 服务
 
@@ -138,7 +156,25 @@ nginx -t && nginx -s reload
 
 ## 更新发布
 
+升级前先保存当前应用文件，数据库备份与应用文件备份分开生成：
+
+```bash
+sudo tar -C /opt -czf /var/backups/science-lab/science-lab-api-${SCIENCE_LAB_BACKUP_TAG}.tgz science-lab-api
+sudo tar -C /var/www -czf /var/backups/science-lab/science-lab-web-${SCIENCE_LAB_BACKUP_TAG}.tgz science-lab
+```
+
 改了前端后，重新拷贝静态文件到站点根即可；`sw.js` 里的版本号每次发布我会递增，用户端会自动更新。后端改动则 `pm2 restart science-lab-api`。
+
+如新版本健康检查或真实 AI 验证失败，先确认当前 shell 中的 `SCIENCE_LAB_BACKUP_TAG` 与备份时记录一致（新会话需重新赋值），再执行：
+
+```bash
+sudo tar -C /opt -xzf /var/backups/science-lab/science-lab-api-${SCIENCE_LAB_BACKUP_TAG}.tgz
+sudo tar -C /var/www -xzf /var/backups/science-lab/science-lab-web-${SCIENCE_LAB_BACKUP_TAG}.tgz
+pm2 restart science-lab-api --update-env
+nginx -t && nginx -s reload
+```
+
+本次没有数据库迁移，不要为应用回滚而重建或回滚数据库结构。
 
 ## 接口一览
 
@@ -163,3 +199,13 @@ nginx -t && nginx -s reload
 - 同源部署天然规避跨站；如分域部署再依赖 `CORS_ORIGINS` 白名单。
 - 当前限流计数保存在单个 Node 进程内。若用 PM2 cluster、多个容器或多台机器，实际总额度会按实例放大，应改用共享 Redis store 或在网关/WAF 再加全局限流。
 - CORS 不是滥用防护。上线后应监控 429、502、调用量与供应商费用；遭遇攻击时先在 nginx/WAF 封禁异常来源并下调限额。
+
+## 上线风险解除清单
+
+- **匿名费用风险**：使用服务端专用 Key，并将供应商账户的可用余额或预算控制在可承受范围；监控 429、502 和调用量。CORS 不是访问控制，不能阻止脚本或 `curl` 调用。
+- **共享出口 IP**：学校或宿舍用户可能共用一个公网 IP。先保持默认限额；只有确认正常课堂流量出现大量 429 后，才逐步上调分钟上限，同时保留每日费用边界。
+- **多实例限流**：未接入 Redis store 或网关全局限流前，只运行一个 PM2 fork 实例，不启用 cluster 或横向副本。
+- **真实上游**：配置费用控制后只做一次小额 `curl -N` 验证，确认持续输出和 `[DONE]` 正常结束；失败时先停用 Key，不连续重试。
+- **生产数据**：上线前后比较 `users`、`progress` 数量和 `MAX(updated_at)`；仓库文件未变不代表生产数据已经核验。
+- **多标签页覆盖**：当前接受极少数同时写入覆盖的边缘风险。若出现真实反馈，再单独设计基于 `storage` 事件和版本戳的合并机制。
+- **回归保护**：每次发布前运行 `cd server/api && npm test`，必须同时通过旧接口、AI 边缘行为和前端本地存储测试。
