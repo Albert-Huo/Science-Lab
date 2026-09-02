@@ -176,16 +176,31 @@ sudo tar -C /opt -czf /var/backups/science-lab/science-lab-api-${SCIENCE_LAB_BAC
 
 前端更新重复执行第 3 节的 release 创建、校验和链接切换流程；`sw.js` 里的版本号每次发布递增。后端改动执行 `npm ci --omit=dev` 后再 `pm2 restart science-lab-api`。
 
-如新版本页面验证失败，确认 `SCIENCE_LAB_PREVIOUS_RELEASE` 是发布前记录的绝对目录，再原子切回；如 API 验证失败，确认 `SCIENCE_LAB_BACKUP_TAG` 与备份时记录一致，再恢复 API：
+按故障范围只执行对应回滚，不要因为单一组件失败而同时回滚另一个组件。
+
+### 仅回滚静态页面
+
+如新版本页面验证失败，确认 `SCIENCE_LAB_PREVIOUS_RELEASE` 是发布前记录的绝对目录，再原子切回：
 
 ```bash
 test -d "$SCIENCE_LAB_PREVIOUS_RELEASE"
 sudo ln -sfn "$SCIENCE_LAB_PREVIOUS_RELEASE" /var/www/science-lab-next
 sudo mv -Tf /var/www/science-lab-next /var/www/science-lab-current
+```
+
+静态文件由 nginx 直接读取新链接，无需重启 Node API 或恢复 API 备份。切换后重新验证首页、`manifest.json`、`catalog-control.json` 和 `sw.js`。
+
+### 仅回滚 Node API
+
+如 API 验证失败，确认 `SCIENCE_LAB_BACKUP_TAG` 与备份时记录一致，再恢复 API：
+
+```bash
+test -f "/var/backups/science-lab/science-lab-api-${SCIENCE_LAB_BACKUP_TAG}.tgz"
 sudo tar -C /opt -xzf /var/backups/science-lab/science-lab-api-${SCIENCE_LAB_BACKUP_TAG}.tgz
 pm2 restart science-lab-api --update-env
-nginx -t && nginx -s reload
 ```
+
+恢复后重新验证 `/api/health` 和 AI SSE；无需切换静态 release 或重载 nginx。
 
 本次没有数据库迁移，不要为应用回滚而重建或回滚数据库结构。
 
