@@ -50,6 +50,7 @@ const NEW_RELEASE_LINK =
 const CURRENT_RELEASE_SWITCH =
   'sudo mv -Tf /var/www/science-lab-next /var/www/science-lab-current';
 const CANONICAL_AI_PROXY = 'proxy_pass http://127.0.0.1:8970/ai/chat/completions;';
+const AI_RATE_ZONE = 'limit_req_zone $binary_remote_addr zone=science_lab_ai:10m rate=10r/m;';
 const CANONICAL_AI_DIRECTIVES = [
   'limit_req zone=science_lab_ai burst=3 nodelay;',
   'limit_req_status 429;',
@@ -95,6 +96,22 @@ function assertCanonicalAiLocation(nginxBlock) {
     assert.ok(canonicalAiBlock.includes(directive), `AI 精确 location 缺少活动指令 ${directive}`);
   });
   return canonicalAiBlock;
+}
+
+function assertActiveRateZonePlacement(nginxBlock) {
+  const activeNginxBlock = activeConfig(nginxBlock);
+  const firstServer = activeNginxBlock.match(/^server \{/m);
+  assert.ok(firstServer, 'nginx 示例必须包含活动的 server 配置');
+  const activeHttpContext = activeNginxBlock.slice(0, firstServer.index);
+  assert.strictEqual(
+    occurrenceCount(activeNginxBlock, AI_RATE_ZONE),
+    1,
+    'AI 限流区必须只定义一次活动指令'
+  );
+  assert.ok(
+    activeHttpContext.includes(AI_RATE_ZONE),
+    'AI 限流区必须位于活动的 http 上下文并先于 server 配置'
+  );
 }
 
 {
@@ -317,16 +334,22 @@ function assertCanonicalAiLocation(nginxBlock) {
   assert.ok(deployGuide.includes('/var/www/science-lab-current'), 'nginx 必须指向原子切换的 release 链接');
   const nginxBlock = fencedBlock(deployGuide, 'nginx', 'server_name lab.xingnian.net.cn');
   const activeNginxBlock = activeConfig(nginxBlock);
-  const rateZone = 'limit_req_zone $binary_remote_addr zone=science_lab_ai:10m rate=10r/m;';
   const firstServer = nginxBlock.match(/^server \{/m);
   assert.ok(firstServer, 'nginx 示例必须包含 server 配置');
   const httpContextSnippet = nginxBlock.slice(0, firstServer.index);
-  assert.strictEqual(occurrenceCount(activeNginxBlock, rateZone), 1, 'AI 限流区必须只定义一次活动指令');
   assert.ok(
     httpContextSnippet.includes('http {}') &&
-      httpContextSnippet.includes('server {} 之外') &&
-      httpContextSnippet.includes(rateZone),
-    'AI 限流区必须位于 http 上下文片段并先于 server 配置'
+      httpContextSnippet.includes('server {} 之外'),
+    'nginx 注释必须说明限流区属于 http 上下文且位于 server 之外'
+  );
+  assertActiveRateZonePlacement(nginxBlock);
+  const nginxWithZoneInsideServer = nginxBlock
+    .replace(AI_RATE_ZONE, `# ${AI_RATE_ZONE}`)
+    .replace(/^server \{$/m, `server {\n    ${AI_RATE_ZONE}`);
+  assert.throws(
+    () => assertActiveRateZonePlacement(nginxWithZoneInsideServer),
+    /AI 限流区必须位于活动的 http 上下文并先于 server 配置/,
+    '仅在 server 内定义活动限流区时契约测试必须失败'
   );
   assertCanonicalAiLocation(nginxBlock);
   const nginxWithCommentedCanonicalProxy = nginxBlock.replace(
