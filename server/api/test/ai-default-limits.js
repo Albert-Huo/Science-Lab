@@ -7,6 +7,16 @@ delete process.env.AI_RATE_LIMIT_DAY_MAX;
 process.env.DEEPSEEK_API_KEY = 'test-deepseek-key';
 
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+
+const envExample = fs.readFileSync(path.resolve(__dirname, '../.env.example'), 'utf8');
+assert.match(
+  envExample,
+  /^AI_RATE_LIMIT_DAY_MAX=20$/m,
+  '.env.example 必须与代码默认的每 IP 每 24 小时 20 次保持一致'
+);
+
 const nativeFetch = global.fetch.bind(globalThis);
 global.fetch = async () => new Response('data: [DONE]\n\n', {
   status: 200,
