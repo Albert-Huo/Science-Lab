@@ -51,7 +51,7 @@ mysql -u sciencelab -p -N sciencelab -e \
 ```bash
 # 把仓库 server/api 传到服务器，例如 /opt/science-lab-api
 cd /opt/science-lab-api
-npm install --omit=dev
+npm ci --omit=dev
 cp .env.example .env
 # 编辑 .env：
 #   JWT_SECRET: node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
@@ -74,20 +74,27 @@ pm2 save && pm2 startup    # 按提示执行输出命令，开机自启
 
 ## 3. 部署 App 静态页面
 
-把仓库根目录这些文件放到该子域名的站点根（如 `/var/www/science-lab`）：
+每次把仓库根目录这些文件放到一个新的只读 release 目录，再原子切换 `/var/www/science-lab-current` 符号链接：
 
 ```
-index.html  catalog-control.js  catalog-control.json  manifest.json  manifest.webmanifest  sw.js  assets/
+index.html  catalog-control.js  content-source.js  catalog-control.json  manifest.json  manifest.webmanifest  sw.js  assets/
 ```
 
 ```bash
-mkdir -p /var/www/science-lab
-# 从仓库根拷贝（按实际路径）
-cp index.html catalog-control.js catalog-control.json manifest.json manifest.webmanifest sw.js /var/www/science-lab/
-cp -r assets /var/www/science-lab/
+# 在仓库根目录执行。每次发布都生成一个新目录，不覆盖正在服务的版本。
+SCIENCE_LAB_RELEASE_ID=$(date '+%Y%m%d-%H%M%S')
+SCIENCE_LAB_RELEASE_DIR="/var/www/science-lab-releases/${SCIENCE_LAB_RELEASE_ID}"
+sudo install -d -m 755 "$SCIENCE_LAB_RELEASE_DIR"
+sudo install -m 644 index.html catalog-control.js content-source.js catalog-control.json manifest.json manifest.webmanifest sw.js "$SCIENCE_LAB_RELEASE_DIR/"
+sudo cp -a assets "$SCIENCE_LAB_RELEASE_DIR/"
+
+# 切换前确认关键文件齐全；任一检查失败都不要切换。
+test -f "$SCIENCE_LAB_RELEASE_DIR/index.html" && test -f "$SCIENCE_LAB_RELEASE_DIR/catalog-control.json" && test -f "$SCIENCE_LAB_RELEASE_DIR/sw.js"
+sudo ln -sfn "$SCIENCE_LAB_RELEASE_DIR" /var/www/science-lab-next
+sudo mv -Tf /var/www/science-lab-next /var/www/science-lab-current
 ```
 
-`server/`、`docs/`、`tools/` 不用上传，它们不是网页运行所需。
+`/var/www/science-lab-current` 必须保持为指向某个 release 目录的符号链接。`server/`、`docs/`、`tools/` 不用上传，它们不是网页运行所需。
 
 ## 4. nginx：一个 server 同时托管页面与接口
 
@@ -99,7 +106,7 @@ server {
     ssl_certificate     /etc/nginx/ssl/lab.crt;
     ssl_certificate_key /etc/nginx/ssl/lab.key;
 
-    root /var/www/science-lab;
+    root /var/www/science-lab-current;
     index index.html;
 
     # 接口反代：/api/ → 本机 Node（末尾斜杠会去掉 /api 前缀）
@@ -118,11 +125,14 @@ server {
         proxy_read_timeout 300s;
     }
 
-    # Service Worker 不缓存，保证更新及时
-    location = /sw.js { add_header Cache-Control "no-cache"; }
+    # Service Worker 不缓存，保证更新及时；文件缺失必须返回 404
+    location = /sw.js {
+        try_files $uri =404;
+        add_header Cache-Control "no-cache" always;
+    }
 
-    # 静态页面
-    location / { try_files $uri $uri/ /index.html; }
+    # 纯静态站没有前端路由；缺失的 JSON/JS/图标不能回退成 index.html
+    location / { try_files $uri $uri/ =404; }
 }
 
 server {                                          # 80 跳 443
@@ -143,7 +153,7 @@ nginx -t && nginx -s reload
   ```bash
   curl -N https://lab.xingnian.net.cn/api/ai/chat/completions \
     -H 'Content-Type: application/json' \
-    -d '{"model":"deepseek-chat","messages":[{"role":"user","content":"用一句话解释惯性"}]}'
+    -d '{"model":"deepseek-v4-flash","messages":[{"role":"user","content":"用一句话解释惯性"}]}'
   ```
 
 - 浏览器打开 `https://lab.xingnian.net.cn/` 看到 App
@@ -156,20 +166,23 @@ nginx -t && nginx -s reload
 
 ## 更新发布
 
-升级前先保存当前应用文件，数据库备份与应用文件备份分开生成：
+升级前记录当前静态 release，并保存 Node API；数据库备份仍按前文单独生成：
 
 ```bash
+SCIENCE_LAB_PREVIOUS_RELEASE=$(readlink -f /var/www/science-lab-current)
+test -d "$SCIENCE_LAB_PREVIOUS_RELEASE"
 sudo tar -C /opt -czf /var/backups/science-lab/science-lab-api-${SCIENCE_LAB_BACKUP_TAG}.tgz science-lab-api
-sudo tar -C /var/www -czf /var/backups/science-lab/science-lab-web-${SCIENCE_LAB_BACKUP_TAG}.tgz science-lab
 ```
 
-改了前端后，重新拷贝静态文件到站点根即可；`sw.js` 里的版本号每次发布我会递增，用户端会自动更新。后端改动则 `pm2 restart science-lab-api`。
+前端更新重复执行第 3 节的 release 创建、校验和链接切换流程；`sw.js` 里的版本号每次发布递增。后端改动执行 `npm ci --omit=dev` 后再 `pm2 restart science-lab-api`。
 
-如新版本健康检查或真实 AI 验证失败，先确认当前 shell 中的 `SCIENCE_LAB_BACKUP_TAG` 与备份时记录一致（新会话需重新赋值），再执行：
+如新版本页面验证失败，确认 `SCIENCE_LAB_PREVIOUS_RELEASE` 是发布前记录的绝对目录，再原子切回；如 API 验证失败，确认 `SCIENCE_LAB_BACKUP_TAG` 与备份时记录一致，再恢复 API：
 
 ```bash
+test -d "$SCIENCE_LAB_PREVIOUS_RELEASE"
+sudo ln -sfn "$SCIENCE_LAB_PREVIOUS_RELEASE" /var/www/science-lab-next
+sudo mv -Tf /var/www/science-lab-next /var/www/science-lab-current
 sudo tar -C /opt -xzf /var/backups/science-lab/science-lab-api-${SCIENCE_LAB_BACKUP_TAG}.tgz
-sudo tar -C /var/www -xzf /var/backups/science-lab/science-lab-web-${SCIENCE_LAB_BACKUP_TAG}.tgz
 pm2 restart science-lab-api --update-env
 nginx -t && nginx -s reload
 ```
@@ -193,7 +206,7 @@ nginx -t && nginx -s reload
 - 注册/登录限流（15 分钟 30 次/IP）。
 - AI 路由叠加每分钟和每 24 小时两级 IP 限流，默认分别为 10 次和 20 次，可用 `AI_RATE_LIMIT_MINUTE_MAX`、`AI_RATE_LIMIT_DAY_MAX` 调整。
 - AI 上游请求默认在 120 秒后中止，客户端断开连接时也会中止；可用 `AI_UPSTREAM_TIMEOUT_MS` 调整总超时。
-- AI 请求仅接受最多 20 条 `messages`；角色和单条长度受限；模型仅允许 `deepseek-chat`；服务端强制流式响应、`max_tokens ≤ 2048`、`temperature ∈ [0,2]`，其他字段不会透传。
+- AI 请求仅接受最多 20 条 `messages`；角色和单条长度受限；模型仅允许 `deepseek-v4-flash`；服务端强制流式响应、关闭思考模式、`max_tokens ≤ 2048`、`temperature ∈ [0,2]`，其他字段不会透传。
 - `DEEPSEEK_API_KEY` 只放在服务端 `.env`。错误响应不会回显 Key 或 DeepSeek 原始错误正文；建议同时设置 DeepSeek 账户预算告警并定期轮换 Key。
 - Node 仅监听 127.0.0.1，对外只经 nginx 443。
 - 同源部署天然规避跨站；如分域部署再依赖 `CORS_ORIGINS` 白名单。

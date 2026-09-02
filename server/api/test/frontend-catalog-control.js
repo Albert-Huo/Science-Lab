@@ -139,9 +139,16 @@ const fixtures = [
     '发布控制配置应使用网络优先策略'
   );
   assert.ok(readme.includes('## 目录发布控制'), 'README 应记录目录开关操作方法');
+  assert.ok(deployGuide.includes('npm ci --omit=dev'), '生产依赖必须从 lock 文件安装');
+  assert.ok(deployGuide.includes('content-source.js'), '内容源模块必须进入静态发布清单');
+  assert.ok(deployGuide.includes('try_files $uri =404;'), '缺失静态资源必须返回 404');
+  assert.ok(!deployGuide.includes('try_files $uri $uri/ /index.html;'), '静态站不得把缺失 JSON 回退为首页');
+  assert.ok(deployGuide.includes('/var/www/science-lab-current'), 'nginx 必须指向原子切换的 release 链接');
+  assert.ok(deployGuide.includes('science-lab-next'), '发布步骤必须先创建下一版本链接再原子替换');
+  assert.ok(deployGuide.includes('deepseek-v4-flash'), '真实 AI 验证必须使用当前模型');
   assert.ok(
-    /cp index\.html catalog-control\.js catalog-control\.json manifest\.json manifest\.webmanifest sw\.js/.test(deployGuide),
-    '部署命令必须复制目录发布控制文件'
+    /install -m 644 index\.html catalog-control\.js content-source\.js catalog-control\.json manifest\.json manifest\.webmanifest sw\.js/.test(deployGuide),
+    '原子发布必须复制全部 App 壳文件'
   );
   assert.ok(
     packageJson.scripts.test.includes('node test/frontend-catalog-control.js'),
@@ -149,4 +156,4 @@ const fixtures = [
   );
 }
 
-console.log('✓ 目录发布控制 7 组解析/定位场景、8 项页面接入及缓存文档检查通过');
+console.log('✓ 目录发布控制解析、页面接入、缓存与发布契约检查通过');
