@@ -549,3 +549,371 @@ Apply the `requesting-code-review` checklist to `main...HEAD`. Do not broaden sc
 - [ ] **Step 5: Present the deployment-readiness verdict**
 
 Report test/audit/browser evidence, remaining accepted risks, commit list, and the exact worktree path. Do not merge, push, deploy, or use a real DeepSeek Key without a new explicit user instruction.
+
+---
+
+## Round 2 Verification Addendum
+
+### Task 7: Make browser storage failures non-fatal
+
+**Files:**
+- Modify: `server/api/test/frontend-storage.js`
+- Modify: `index.html:297-320,380-410,510-568,680-688,741-759,809-810`
+
+- [ ] **Step 1: Extend the real-source storage harness and add failing exception tests**
+
+In `server/api/test/frontend-storage.js`, extract the storage helpers before the existing chat functions and expose both APIs from the same VM context:
+
+```js
+const storageStart = html.indexOf('let storageWarningShown=false');
+const storageEnd = html.indexOf('function fetchJson', storageStart);
+const chatStart = html.indexOf('const CHAT_TOTAL_MAX=200');
+const chatEnd = html.indexOf("let chatPath='', chatHistory=[], chatBusy=false;", chatStart);
+assert.ok(storageStart >= 0 && storageEnd > storageStart, '找不到 index.html 中的安全存储逻辑');
+assert.ok(chatStart >= 0 && chatEnd > chatStart, '找不到 index.html 中的 AI 存储逻辑');
+const source = html.slice(storageStart, storageEnd) + '\n' +
+  html.slice(chatStart, chatEnd) +
+  '\nthis.storageApi={safeGet,safeSet,safeRemove};this.chatApi={loadChatStore,persistChat,toAiMessages};';
+```
+
+Give the harness independent read, write, and remove failure switches and capture warnings:
+
+```js
+const control = { failReads: false, failWrites: false, failRemoves: false, failChatWrites: false };
+const warnings = [];
+const localStorage = {
+  getItem(key) {
+    if (control.failReads) throw new Error('storage_read_blocked');
+    return values.has(key) ? values.get(key) : null;
+  },
+  setItem(key, value) {
+    if (control.failWrites || (control.failChatWrites && key === 'expfeed.chat')) throw new Error('quota_exceeded');
+    values.set(key, String(value));
+  },
+  removeItem(key) {
+    if (control.failRemoves) throw new Error('storage_remove_blocked');
+    values.delete(key);
+  },
+};
+```
+
+Add `console: { warn(message) { warnings.push(message); } }` to the context, return `storageApi` and `warnings`, then add:
+
+```js
+{
+  const test = harness({ existing: 'value' });
+  test.control.failReads = true;
+  test.control.failWrites = true;
+  test.control.failRemoves = true;
+  assert.strictEqual(test.storageApi.safeGet('existing', 'fallback'), 'fallback');
+  assert.strictEqual(test.storageApi.safeSet('existing', 'new'), false);
+  assert.strictEqual(test.storageApi.safeRemove('existing'), false);
+  assert.strictEqual(test.warnings.length, 1, '存储不可用警告每页只记录一次');
+  ok('本地存储读写删除异常均安全降级');
+}
+
+const helperRange = html.slice(storageStart, storageEnd);
+const runtimeOutsideHelpers = html.slice(0, storageStart) + html.slice(storageEnd);
+assert.match(helperRange, /localStorage\.getItem/);
+assert.match(helperRange, /localStorage\.setItem/);
+assert.match(helperRange, /localStorage\.removeItem/);
+assert.ok(!/localStorage\.(getItem|setItem|removeItem)/.test(runtimeOutsideHelpers), '运行代码不得绕过安全存储入口');
+```
+
+- [ ] **Step 2: Run the targeted test and verify RED**
+
+Run:
+
+```bash
+cd server/api
+node test/frontend-storage.js
+```
+
+Expected: FAIL with `找不到 index.html 中的安全存储逻辑` because the helpers do not exist yet.
+
+- [ ] **Step 3: Add the minimal safe storage boundary**
+
+Immediately after `const LS = ...` in `index.html`, add:
+
+```js
+let storageWarningShown=false;
+function warnStorage(operation,error){
+  if(storageWarningShown) return;
+  storageWarningShown=true;
+  console.warn('浏览器本地存储不可用（'+operation+'）：'+(error&&error.name?error.name:'unknown'));
+}
+function safeGet(key,fallback=null){
+  try{
+    const value=localStorage.getItem(key);
+    return value===null?fallback:value;
+  }catch(error){ warnStorage('读取',error); return fallback; }
+}
+function safeSet(key,value){
+  try{ localStorage.setItem(key,value); return true; }
+  catch(error){ warnStorage('写入',error); return false; }
+}
+function safeRemove(key){
+  try{ localStorage.removeItem(key); return true; }
+  catch(error){ warnStorage('删除',error); return false; }
+}
+```
+
+Replace every direct storage call outside these helpers with the safe API. The resulting call sites must be:
+
+```js
+safeRemove('expfeed.sb');
+savedPath=safeGet(LS.current,'');
+savedIndex=parseInt(safeGet(LS.idx,'0'),10)||0;
+safeSet(LS.idx,cur);
+safeSet(LS.current,it.path);
+function loadHist(){ try{return JSON.parse(safeGet(LS.hist,'[]'));}catch(error){safeRemove(LS.hist);return [];} }
+safeSet(LS.hist,JSON.stringify(h));
+const saved=JSON.parse(safeGet(LS.ai,'{}'));
+safeRemove(LS.ai);
+function resetChatStore(){ return safeSet(LS.chat,'{}'); }
+const raw=safeGet(LS.chat,'');
+if(safeSet(LS.chat,JSON.stringify(store))){
+  chatStorageWarned=false;
+  return true;
+}
+if(!chatStorageWarned){ chatStorageWarned=true; toast('对话记录保存失败，原有记录已保留'); }
+return false;
+if(!safeSet(LS.ai,JSON.stringify(saved))){ toast('AI 设置保存失败：浏览器存储不可用'); return; }
+if(!safeGet(LS.hint,'')) hint.classList.remove('hide');
+hint.classList.add('hide'); safeSet(LS.hint,'1');
+function installDismissed(){ return installGuide.dataset.dismissed==='session'||!!safeGet(LS.install,''); }
+if(!safeSet(LS.install,'1')) installGuide.dataset.dismissed='session';
+```
+
+- [ ] **Step 4: Run targeted and complete tests to verify GREEN**
+
+Run:
+
+```bash
+cd server/api
+node test/frontend-storage.js
+npm test
+```
+
+Expected: the new storage exception case passes and the complete suite exits 0.
+
+- [ ] **Step 5: Commit Task 7**
+
+```bash
+git add index.html server/api/test/frontend-storage.js
+git commit -m "fix(web): tolerate unavailable browser storage"
+```
+
+### Task 8: Make the release contract version-independent and complete
+
+**Files:**
+- Modify: `server/api/test/frontend-catalog-control.js:127-158`
+- Modify: `server/api/test/service-worker-cache.js:8-35`
+- Modify: `sw.js:6`
+- Modify: `docs/aliyun-deploy.md:75-147,220-239`
+
+- [ ] **Step 1: Add failing deployment contract assertions and remove fixed-version assumptions**
+
+Replace the fixed version assertion in `frontend-catalog-control.js` with:
+
+```js
+assert.match(serviceWorker, /const VERSION = 'v\d+\.\d+\.\d+';/, 'App 壳缓存版本必须使用语义化版本');
+assert.ok(serviceWorker.includes('const SHELL_CACHE = CACHE_PREFIX + VERSION;'), '缓存名必须由当前版本生成');
+```
+
+Add these deployment assertions:
+
+```js
+assert.ok(deployGuide.includes('set -euo pipefail'), '静态发布必须遇错即停');
+for (const file of [
+  'index.html', 'catalog-control.js', 'content-source.js', 'catalog-control.json',
+  'manifest.json', 'manifest.webmanifest', 'assets/icons/icon-192.png',
+  'assets/icons/icon-512.png', 'assets/icons/icon-maskable-512.png',
+  'assets/icons/apple-touch-icon.png'
+]) assert.ok(deployGuide.includes(file), '发布校验缺少 App 壳文件：' + file);
+assert.ok(deployGuide.includes('JSON.parse'), '发布前必须解析两个动态 JSON');
+assert.ok(deployGuide.includes('location = /catalog-control.json'), '目录控制 JSON 必须使用精确 nginx 规则');
+assert.ok(deployGuide.includes('location = /manifest.json'), '实验清单 JSON 必须使用精确 nginx 规则');
+assert.ok(deployGuide.includes('limit_req_zone $binary_remote_addr zone=science_lab_ai:10m rate=10r/m;'), 'nginx 必须定义 AI 突发限流区');
+assert.ok(deployGuide.includes('location = /api/ai/chat/completions'), 'AI 限流必须只作用于精确路由');
+assert.ok(deployGuide.includes('limit_req zone=science_lab_ai burst=3 nodelay;'), 'AI 精确路由必须启用限流');
+```
+
+In `service-worker-cache.js`, read the worker source once and derive the current cache name instead of hardcoding it:
+
+```js
+const serviceWorkerSource = fs.readFileSync(path.resolve(__dirname, '../../../sw.js'), 'utf8');
+const versionMatch = serviceWorkerSource.match(/const VERSION = '(v\d+\.\d+\.\d+)'/);
+assert.ok(versionMatch, 'Service Worker 版本格式无效');
+const currentCache = 'sl-shell-' + versionMatch[1];
+```
+
+Use `currentCache` in `caches.keys()` and pass `serviceWorkerSource` to `vm.runInContext`.
+
+- [ ] **Step 2: Run the deployment contract test and verify RED**
+
+Run:
+
+```bash
+cd server/api
+node test/frontend-catalog-control.js
+```
+
+Expected: FAIL with `静态发布必须遇错即停` because the guide has not yet added strict release validation.
+
+- [ ] **Step 3: Implement strict shell validation and JSON cache headers**
+
+In the static deployment block, begin with `set -euo pipefail` and validate all ten physical files before the atomic link switch:
+
+```bash
+set -euo pipefail
+SCIENCE_LAB_SHELL_FILES=(
+  index.html catalog-control.js content-source.js catalog-control.json manifest.json manifest.webmanifest
+  assets/icons/icon-192.png assets/icons/icon-512.png assets/icons/icon-maskable-512.png assets/icons/apple-touch-icon.png
+)
+for SCIENCE_LAB_SHELL_FILE in "${SCIENCE_LAB_SHELL_FILES[@]}"; do
+  test -f "$SCIENCE_LAB_RELEASE_DIR/$SCIENCE_LAB_SHELL_FILE"
+done
+node -e "const fs=require('fs');for(const file of process.argv.slice(1))JSON.parse(fs.readFileSync(file,'utf8'))" \
+  "$SCIENCE_LAB_RELEASE_DIR/catalog-control.json" "$SCIENCE_LAB_RELEASE_DIR/manifest.json"
+```
+
+Add exact JSON locations before the general static location:
+
+```nginx
+location = /catalog-control.json {
+    try_files $uri =404;
+    add_header Cache-Control "no-cache" always;
+}
+
+location = /manifest.json {
+    try_files $uri =404;
+    add_header Cache-Control "no-cache" always;
+}
+```
+
+After switching the release, add these checks for the root URL, all ten physical shell URLs, both JSON response policies, and 404 semantics:
+
+```bash
+SCIENCE_LAB_PUBLIC_URL='https://lab.xingnian.net.cn'
+SCIENCE_LAB_SHELL_URLS=(
+  / /index.html /catalog-control.js /content-source.js /catalog-control.json /manifest.json /manifest.webmanifest
+  /assets/icons/icon-192.png /assets/icons/icon-512.png /assets/icons/icon-maskable-512.png /assets/icons/apple-touch-icon.png
+)
+for SCIENCE_LAB_SHELL_URL in "${SCIENCE_LAB_SHELL_URLS[@]}"; do
+  curl -fsS -o /dev/null "$SCIENCE_LAB_PUBLIC_URL$SCIENCE_LAB_SHELL_URL"
+done
+for SCIENCE_LAB_JSON_URL in /catalog-control.json /manifest.json; do
+  SCIENCE_LAB_JSON_HEADERS=$(curl -fsSI "$SCIENCE_LAB_PUBLIC_URL$SCIENCE_LAB_JSON_URL" | tr -d '\r')
+  grep -qi '^content-type: application/json' <<<"$SCIENCE_LAB_JSON_HEADERS"
+  grep -qi '^cache-control: no-cache' <<<"$SCIENCE_LAB_JSON_HEADERS"
+done
+test "$(curl -sS -o /dev/null -w '%{http_code}' "$SCIENCE_LAB_PUBLIC_URL/__missing__.json")" = '404'
+```
+
+- [ ] **Step 4: Add the anonymous AI nginx burst boundary**
+
+Document this directive in nginx's `http {}` context:
+
+```nginx
+limit_req_zone $binary_remote_addr zone=science_lab_ai:10m rate=10r/m;
+```
+
+Add an exact location before the general `/api/` location:
+
+```nginx
+location = /api/ai/chat/completions {
+    limit_req zone=science_lab_ai burst=3 nodelay;
+    limit_req_status 429;
+    proxy_pass http://127.0.0.1:8970/ai/chat/completions;
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_buffering off;
+    proxy_cache off;
+    proxy_read_timeout 300s;
+}
+```
+
+State next to the config that this is burst protection, not authentication or a global spending cap. Keep the existing Node 10/minute and 20/day limits and require a dedicated low-balance DeepSeek account before enabling the real Key.
+
+- [ ] **Step 5: Bump the shell version and verify GREEN**
+
+Change `sw.js` to:
+
+```js
+const VERSION = 'v0.7.2';
+```
+
+Run:
+
+```bash
+cd server/api
+node test/frontend-catalog-control.js
+node test/service-worker-cache.js
+npm test
+```
+
+Expected: all release-contract, Service Worker behavior, and complete regression tests exit 0 without any test hardcoding `v0.7.2`.
+
+- [ ] **Step 6: Commit Task 8**
+
+```bash
+git add sw.js docs/aliyun-deploy.md server/api/test/frontend-catalog-control.js server/api/test/service-worker-cache.js
+git commit -m "fix(release): harden shell and AI gateway checks"
+```
+
+### Task 9: Verify, update the existing PR, and synchronize local main
+
+**Files:**
+- Verify only; no planned product edits
+
+- [ ] **Step 1: Run final automated verification**
+
+```bash
+cd server/api
+npm test
+npm audit --omit=dev
+cd ../..
+for file in content-source.js catalog-control.js sw.js server/api/db.js server/api/server.js server/cloudflare-worker.js $(rg --files server/api/test -g '*.js'); do node --check "$file"; done
+jq empty catalog-control.json manifest.json manifest.webmanifest server/api/package.json server/api/package-lock.json
+python3 -c 'from pathlib import Path; p=Path("tools/build-manifest.py"); compile(p.read_text(), str(p), "exec")'
+zsh -n /Users/lx100/projects/HTML-GitHub/Science-Lab/push.command
+git diff --check 2c1bd8d...HEAD
+```
+
+Expected: all commands exit 0, audit reports zero vulnerabilities, and no diff whitespace errors appear.
+
+- [ ] **Step 2: Confirm scope and secrets**
+
+```bash
+git status --short --branch
+git diff --stat 2c1bd8d...HEAD
+if git grep -I -l -E '(sk-[A-Za-z0-9_-]{20,}|DEEPSEEK_API_KEY=[A-Za-z0-9_-]{16,})' -- .; then exit 1; fi
+```
+
+Expected: the branch is clean after commits; only Task 7-8 files and the approved spec/plan changed; the credential scan returns no matches; `catalog-control.json` remains unchanged.
+
+- [ ] **Step 3: Push the existing feature branch and inspect PR #2**
+
+```bash
+git push origin codex/predeployment-hardening
+GH_PROMPT_DISABLED=1 gh pr view 2 --json number,state,isDraft,url,headRefOid
+```
+
+Expected: PR #2 remains open as a draft and its head points to the new final commit.
+
+- [ ] **Step 4: Fast-forward the already selected local integration**
+
+From `/Users/lx100/projects/HTML-GitHub/Science-Lab`, first confirm only the user's known untracked files are present, then run:
+
+```bash
+git merge --ff-only codex/predeployment-hardening
+cd server/api
+npm test
+```
+
+Expected: local `main` advances without touching `.DS_Store` or either untracked review report, and the post-merge suite exits 0. Do not push `main` and do not deploy.
