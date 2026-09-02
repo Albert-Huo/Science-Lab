@@ -130,8 +130,9 @@ const fixtures = [
   const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
   const deployGuide = fs.readFileSync(path.join(root, 'docs/aliyun-deploy.md'), 'utf8');
   const packageJson = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../package.json'), 'utf8'));
-  assert.ok(serviceWorker.includes("const VERSION = 'v0.7.0'"), '发布控制上线时应刷新 App 壳缓存');
+  assert.ok(serviceWorker.includes("const VERSION = 'v0.7.1'"), '部署前加固上线时应刷新 App 壳缓存');
   assert.ok(serviceWorker.includes("'./catalog-control.js'"), '发布控制模块应进入离线 App 壳');
+  assert.ok(serviceWorker.includes("'./content-source.js'"), '内容源解析模块应进入离线 App 壳');
   assert.ok(serviceWorker.includes("'./catalog-control.json'"), '发布控制配置应提供离线回退');
   assert.ok(
     serviceWorker.includes("url.pathname.endsWith('/catalog-control.json')"),

@@ -6,7 +6,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node test/smoke.js && node test/ai-edge-cases.js && node test/ai-default-limits.js && node test/frontend-storage.js && node test/frontend-install-guide.js && node test/frontend-catalog-control.js && node test/frontend-content-source.js"
+    "test": "node test/smoke.js && node test/ai-edge-cases.js && node test/ai-default-limits.js && node test/frontend-storage.js && node test/frontend-install-guide.js && node test/frontend-catalog-control.js && node test/frontend-content-source.js && node test/service-worker-cache.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

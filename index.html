@@ -829,7 +829,7 @@ initInstallGuide();
 /* ---------- PWA ---------- */
 if('serviceWorker' in navigator &&
    (location.protocol==='https:' || ['127.0.0.1','localhost'].includes(location.hostname))){
-  addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
+  addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js').catch(error=>console.warn('Service Worker 注册失败：'+error.message)); });
 }
 </script>
 </body>
