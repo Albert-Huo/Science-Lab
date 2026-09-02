@@ -257,7 +257,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
       </div>
       <div id="aiAdvanced" class="hide">
         <label>接口地址<input id="aiEndpoint" placeholder="https://api.deepseek.com/chat/completions"></label>
-        <label>模型<input id="aiModel" placeholder="deepseek-chat"></label>
+        <label>模型<input id="aiModel" placeholder="deepseek-v4-flash"></label>
         <label>API Key<input id="aiKey" type="password" placeholder="sk-…（仅存本机浏览器）"></label>
       </div>
       <div class="row">
@@ -499,9 +499,9 @@ document.querySelectorAll('.tabs button').forEach(b=>b.addEventListener('click',
 
 /* ---------- AI chat（默认同源代理，可选 BYOK） ---------- */
 const chatLog=document.getElementById('chatLog');
-const CHAT_TOTAL_MAX=200, CHAT_CONTENT_MAX=6000;
+const CHAT_TOTAL_MAX=200, CHAT_CONTENT_MAX=6000, AI_MESSAGE_CONTENT_MAX=4000;
 let chatStorageWarned=false;
-const AI_DEFAULTS={byok:false,endpoint:'https://api.deepseek.com/chat/completions',model:'deepseek-chat',key:''};
+const AI_DEFAULTS={byok:false,endpoint:'https://api.deepseek.com/chat/completions',model:'deepseek-v4-flash',key:''};
 function defaultBase(){
   if(!/^https?:$/.test(location.protocol)) return '';
   if(/\.github\.io$/.test(location.hostname)) return '';
@@ -516,6 +516,9 @@ function aiCfg(){
     try{ localStorage.removeItem(LS.ai); }catch(storageError){ return Object.assign({},AI_DEFAULTS); }
     return Object.assign({},AI_DEFAULTS);
   }
+}
+function toAiMessages(messages){
+  return messages.slice(-12).map(({role,content})=>({role,content:String(content).slice(0,AI_MESSAGE_CONTENT_MAX)}));
 }
 function resetChatStore(){
   try{ localStorage.setItem(LS.chat,'{}'); return true; }
@@ -614,7 +617,7 @@ async function sendChat(){
     if(cfg.byok) headers.Authorization='Bearer '+cfg.key;
     const res=await fetch(endpoint,{
       method:'POST',headers,
-      body:JSON.stringify({model:cfg.model,stream:true,messages:[{role:'system',content:sys},...conversation.slice(-12).map(({role,content})=>({role,content}))]})
+      body:JSON.stringify({model:cfg.model,stream:true,messages:[{role:'system',content:sys},...toAiMessages(conversation)]})
     });
     if(!res.ok){
       let detail='HTTP '+res.status;

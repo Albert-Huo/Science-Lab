@@ -8,7 +8,7 @@ const html = fs.readFileSync(path.resolve(__dirname, '../../../index.html'), 'ut
 const start = html.indexOf('const CHAT_TOTAL_MAX=200');
 const end = html.indexOf("let chatPath='', chatHistory=[], chatBusy=false;", start);
 assert.ok(start >= 0 && end > start, '找不到 index.html 中的 AI 存储逻辑');
-const source = html.slice(start, end) + '\nthis.chatApi={loadChatStore,persistChat};';
+const source = html.slice(start, end) + '\nthis.chatApi={loadChatStore,persistChat,toAiMessages};';
 
 function harness(initial) {
   const values = new Map(Object.entries(initial || {}));
@@ -69,5 +69,19 @@ const ok = name => { console.log('  ✓', name); pass++; };
   assert.deepStrictEqual(test.toasts, ['对话记录保存失败，原有记录已保留']);
   ok('写入失败时保留旧记录并提示');
 }
+
+{
+  const test = harness();
+  const input = Array.from({ length: 13 }, (_, index) => ({
+    role: index % 2 ? 'assistant' : 'user',
+    content: 'x'.repeat(5000),
+  }));
+  const sent = JSON.parse(JSON.stringify(test.api.toAiMessages(input)));
+  assert.strictEqual(sent.length, 12);
+  assert.strictEqual(sent[0].content.length, 4000);
+  ok('发往内置 AI 的历史限制为最近 12 条且每条不超过 4000 字符');
+}
+
+assert.ok(html.includes("model:'deepseek-v4-flash'"), '前端默认模型必须使用 DeepSeek V4 Flash');
 
 console.log('\n前端存储测试通过：' + pass + ' 项');
