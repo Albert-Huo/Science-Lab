@@ -89,6 +89,9 @@ SCIENCE_LAB_RELEASE_DIR="/var/www/science-lab-releases/${SCIENCE_LAB_RELEASE_ID}
 sudo install -d -m 755 "$SCIENCE_LAB_RELEASE_DIR"
 sudo install -m 644 index.html catalog-control.js content-source.js catalog-control.json manifest.json manifest.webmanifest sw.js "$SCIENCE_LAB_RELEASE_DIR/"
 sudo cp -a assets "$SCIENCE_LAB_RELEASE_DIR/"
+sudo chown -R root:root "$SCIENCE_LAB_RELEASE_DIR"
+sudo find "$SCIENCE_LAB_RELEASE_DIR" -type d -exec chmod 755 {} +
+sudo find "$SCIENCE_LAB_RELEASE_DIR" -type f -exec chmod 644 {} +
 
 # 根 URL 与 index.html 是同一份内容，因此 App 壳有以下十个物理文件。
 SCIENCE_LAB_SHELL_FILES=(
@@ -107,32 +110,56 @@ SCIENCE_LAB_SHELL_FILES=(
 # 切换前确认全部 App 壳文件和 Service Worker 齐全，并实际解析两个 JSON；任一检查失败都不要切换。
 for SCIENCE_LAB_SHELL_FILE in "${SCIENCE_LAB_SHELL_FILES[@]}"; do
   test -f "$SCIENCE_LAB_RELEASE_DIR/$SCIENCE_LAB_SHELL_FILE"
+  test -r "$SCIENCE_LAB_RELEASE_DIR/$SCIENCE_LAB_SHELL_FILE"
 done
 test -f "$SCIENCE_LAB_RELEASE_DIR/sw.js"
+test -r "$SCIENCE_LAB_RELEASE_DIR/sw.js"
+
+SCIENCE_LAB_UNREADABLE_FILE=$(find "$SCIENCE_LAB_RELEASE_DIR" -type f ! -readable -print -quit)
+test -z "$SCIENCE_LAB_UNREADABLE_FILE"
 
 for SCIENCE_LAB_JSON_FILE in "catalog-control.json" "manifest.json"; do
   node -e 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))' \
     "$SCIENCE_LAB_RELEASE_DIR/$SCIENCE_LAB_JSON_FILE"
 done
 
+# 已有部署先持久保存当前 release。readlink -f 解析后的绝对路径必须位于 release 根目录下；
+# 初次部署没有 science-lab-current 符号链接时会跳过此段。
+if [ -L /var/www/science-lab-current ]; then
+  SCIENCE_LAB_PREVIOUS_RELEASE=$(readlink -f /var/www/science-lab-current)
+  case "$SCIENCE_LAB_PREVIOUS_RELEASE" in
+    /var/www/science-lab-releases/*) ;;
+    *) echo "拒绝保存 release 根目录之外的回滚目标" >&2; exit 1 ;;
+  esac
+  test -d "$SCIENCE_LAB_PREVIOUS_RELEASE"
+  sudo ln -sfn "$SCIENCE_LAB_PREVIOUS_RELEASE" /var/www/science-lab-previous-next
+  sudo chown -h root:root /var/www/science-lab-previous-next
+  sudo mv -Tf /var/www/science-lab-previous-next /var/www/science-lab-previous
+fi
+
 sudo ln -sfn "$SCIENCE_LAB_RELEASE_DIR" /var/www/science-lab-next
 sudo mv -Tf /var/www/science-lab-next /var/www/science-lab-current
 
 # 切换后验证首页与十个物理 App 壳 URL。
 SCIENCE_LAB_PUBLIC_URL="https://lab.xingnian.net.cn"
-curl --fail --silent --show-error "$SCIENCE_LAB_PUBLIC_URL/" --output /dev/null
+SCIENCE_LAB_HTTP_STATUS=$(curl --silent --show-error \
+  --output /dev/null --write-out '%{http_code}' "$SCIENCE_LAB_PUBLIC_URL/")
+test "$SCIENCE_LAB_HTTP_STATUS" = "200"
 for SCIENCE_LAB_SHELL_FILE in "${SCIENCE_LAB_SHELL_FILES[@]}"; do
-  curl --fail --silent --show-error \
-    "$SCIENCE_LAB_PUBLIC_URL/$SCIENCE_LAB_SHELL_FILE" --output /dev/null
+  SCIENCE_LAB_HTTP_STATUS=$(curl --silent --show-error \
+    --output /dev/null --write-out '%{http_code}' \
+    "$SCIENCE_LAB_PUBLIC_URL/$SCIENCE_LAB_SHELL_FILE")
+  test "$SCIENCE_LAB_HTTP_STATUS" = "200"
 done
 
 # 两个 JSON 必须返回 JSON/no-cache；故意不存在的 JSON 必须保持 404。
 SCIENCE_LAB_HEADER_FILE=$(mktemp)
 trap 'rm -f "$SCIENCE_LAB_HEADER_FILE"' EXIT
 for SCIENCE_LAB_JSON_FILE in "catalog-control.json" "manifest.json"; do
-  curl --fail --silent --show-error \
+  SCIENCE_LAB_HTTP_STATUS=$(curl --silent --show-error \
     --dump-header "$SCIENCE_LAB_HEADER_FILE" --output /dev/null \
-    "$SCIENCE_LAB_PUBLIC_URL/$SCIENCE_LAB_JSON_FILE"
+    --write-out '%{http_code}' "$SCIENCE_LAB_PUBLIC_URL/$SCIENCE_LAB_JSON_FILE")
+  test "$SCIENCE_LAB_HTTP_STATUS" = "200"
   grep -Eiq '^Content-Type:[[:space:]]*application/json([;[:space:]]|$)' "$SCIENCE_LAB_HEADER_FILE"
   grep -Eiq '^Cache-Control:[[:space:]]*no-cache([,[:space:]]|$)' "$SCIENCE_LAB_HEADER_FILE"
 done
@@ -183,6 +210,9 @@ server {
         proxy_read_timeout 300s;
     }
 
+    # nginx 精确匹配优先，因此上面的规范路径正常代理；大小写或尾斜杠变体在此拒绝。
+    location ~* ^/api/ai/chat/completions/?$ { return 404; }
+
     # 接口反代：/api/ → 本机 Node（末尾斜杠会去掉 /api 前缀）
     location /api/ {
         proxy_pass http://127.0.0.1:8970/;
@@ -230,7 +260,7 @@ server {                                          # 80 跳 443
 ```
 
 ```bash
-nginx -t && nginx -s reload
+sudo nginx -t && sudo systemctl reload nginx
 ```
 
 验证：
@@ -253,11 +283,9 @@ nginx -t && nginx -s reload
 
 ## 更新发布
 
-升级前记录当前静态 release，并保存 Node API；数据库备份仍按前文单独生成：
+第 3 节的发布命令会在切换前把当前静态 release 原子保存为 root 所有的 `/var/www/science-lab-previous` 符号链接，不依赖当前终端中的变量。Node API 备份和数据库备份仍按前文单独生成：
 
 ```bash
-SCIENCE_LAB_PREVIOUS_RELEASE=$(readlink -f /var/www/science-lab-current)
-test -d "$SCIENCE_LAB_PREVIOUS_RELEASE"
 sudo tar -C /opt -czf /var/backups/science-lab/science-lab-api-${SCIENCE_LAB_BACKUP_TAG}.tgz science-lab-api
 ```
 
@@ -267,9 +295,18 @@ sudo tar -C /opt -czf /var/backups/science-lab/science-lab-api-${SCIENCE_LAB_BAC
 
 ### 仅回滚静态页面
 
-如新版本页面验证失败，确认 `SCIENCE_LAB_PREVIOUS_RELEASE` 是发布前记录的绝对目录，再原子切回：
+如新版本页面验证失败，从持久的 previous 链接重新读取回滚目录，确认链接由 root 所有、解析后的绝对路径位于 release 根目录内，再原子切回：
 
 ```bash
+set -euo pipefail
+
+test -L /var/www/science-lab-previous
+test "$(stat -c '%U:%G' /var/www/science-lab-previous)" = "root:root"
+SCIENCE_LAB_PREVIOUS_RELEASE=$(readlink -f /var/www/science-lab-previous)
+case "$SCIENCE_LAB_PREVIOUS_RELEASE" in
+  /var/www/science-lab-releases/*) ;;
+  *) echo "拒绝回滚到 release 根目录之外" >&2; exit 1 ;;
+esac
 test -d "$SCIENCE_LAB_PREVIOUS_RELEASE"
 sudo ln -sfn "$SCIENCE_LAB_PREVIOUS_RELEASE" /var/www/science-lab-next
 sudo mv -Tf /var/www/science-lab-next /var/www/science-lab-current
@@ -318,7 +355,7 @@ pm2 restart science-lab-api --update-env
 ## 上线风险解除清单
 
 - **匿名费用风险**：使用服务端专用 Key 和专用低余额账户，关闭不受控自动充值；监控 429、502、调用量与余额。CORS 不是访问控制，不能阻止脚本或 `curl` 调用。
-- **共享出口 IP**：学校或宿舍用户可能共用一个公网 IP。先保持默认限额；只有确认正常课堂流量出现大量 429 后，才逐步上调分钟上限，同时保留每日费用边界。
+- **共享出口 IP**：学校或宿舍用户可能共用一个公网 IP。先保持默认限额；只有确认正常课堂流量出现大量 429 后，才逐步上调分钟上限，同时保留 Node 的每 IP 每 24 小时请求上限。它不是全局费用边界，分布式 IP 或多实例会放大总调用量。
 - **多实例限流**：未接入 Redis store 或网关全局限流前，只运行一个 PM2 fork 实例，不启用 cluster 或横向副本。
 - **真实上游**：配置费用控制后只做一次小额 `curl -N` 验证，确认持续输出和 `[DONE]` 正常结束；失败时先停用 Key，不连续重试。
 - **生产数据**：上线前后比较 `users`、`progress` 数量和 `MAX(updated_at)`；仓库文件未变不代表生产数据已经核验。

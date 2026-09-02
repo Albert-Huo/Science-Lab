@@ -12,6 +12,31 @@ const fixtures = [
   { path: 'physics-high/keep.html', title: '高中实验 C', subject: '物理', level: '高中' }
 ];
 
+function fencedBlock(markdown, language, marker) {
+  const pattern = new RegExp('```' + language + '\\n([\\s\\S]*?)\\n```', 'g');
+  for (const match of markdown.matchAll(pattern)) {
+    if (match[1].includes(marker)) return match[1];
+  }
+  assert.fail(`缺少 ${language} 代码块：${marker}`);
+}
+
+function braceBlock(source, opening, message) {
+  const start = source.indexOf(opening);
+  assert.notStrictEqual(start, -1, message);
+  const openingBrace = source.indexOf('{', start);
+  let depth = 0;
+  for (let index = openingBrace; index < source.length; index += 1) {
+    if (source[index] === '{') depth += 1;
+    if (source[index] === '}') depth -= 1;
+    if (depth === 0) return source.slice(start, index + 1);
+  }
+  assert.fail(`${message}（块未闭合）`);
+}
+
+function occurrenceCount(source, value) {
+  return source.split(value).length - 1;
+}
+
 {
   const result = CatalogControl.apply(fixtures, {});
   assert.deepStrictEqual(result.experiments, fixtures, '缺少配置时应保持全部实验发布');
@@ -148,13 +173,7 @@ const fixtures = [
   );
   assert.ok(readme.includes('## 目录发布控制'), 'README 应记录目录开关操作方法');
   assert.ok(deployGuide.includes('npm ci --omit=dev'), '生产依赖必须从 lock 文件安装');
-  assert.ok(deployGuide.includes('set -euo pipefail'), '静态发布必须遇错即停');
-  assert.ok(deployGuide.includes('content-source.js'), '内容源模块必须进入静态发布清单');
-  assert.ok(
-    deployGuide.includes('SCIENCE_LAB_SHELL_FILES=('),
-    '静态发布必须定义完整的物理 App 壳文件清单'
-  );
-  [
+  const shellFiles = [
     'index.html',
     'catalog-control.js',
     'content-source.js',
@@ -165,41 +184,155 @@ const fixtures = [
     'assets/icons/icon-512.png',
     'assets/icons/icon-maskable-512.png',
     'assets/icons/apple-touch-icon.png'
-  ].forEach((shellFile) => {
-    assert.ok(
-      deployGuide.includes(`"${shellFile}"`),
-      `静态发布校验清单必须包含 ${shellFile}`
-    );
-  });
+  ];
+  const staticDeployBlock = fencedBlock(deployGuide, 'bash', '# 在仓库根目录执行');
+  assert.ok(staticDeployBlock.includes('set -euo pipefail'), '静态发布必须遇错即停');
+  const shellArray = staticDeployBlock.match(/SCIENCE_LAB_SHELL_FILES=\(\n([\s\S]*?)\n\)/);
+  assert.ok(shellArray, '静态发布必须定义完整的物理 App 壳文件清单');
+  const documentedShellFiles = Array.from(shellArray[1].matchAll(/^\s+"([^"]+)"$/gm), (match) => match[1]);
+  assert.deepStrictEqual(documentedShellFiles, shellFiles, '静态发布校验清单必须精确包含十个物理壳文件');
   assert.ok(
-    /for SCIENCE_LAB_SHELL_FILE in "\$\{SCIENCE_LAB_SHELL_FILES\[@\]\}"; do[\s\S]*?test -f "\$SCIENCE_LAB_RELEASE_DIR\/\$SCIENCE_LAB_SHELL_FILE"[\s\S]*?done/.test(deployGuide),
+    /for SCIENCE_LAB_SHELL_FILE in "\$\{SCIENCE_LAB_SHELL_FILES\[@\]\}"; do[\s\S]*?test -f "\$SCIENCE_LAB_RELEASE_DIR\/\$SCIENCE_LAB_SHELL_FILE"[\s\S]*?done/.test(staticDeployBlock),
     '静态发布切换前必须逐个校验物理 App 壳文件'
   );
-  assert.ok(deployGuide.includes('JSON.parse'), '静态发布切换前必须解析 JSON 文件');
+  assert.ok(staticDeployBlock.includes('JSON.parse'), '静态发布切换前必须解析 JSON 文件');
+  const previousCapture = staticDeployBlock.indexOf('if [ -L /var/www/science-lab-current ]; then');
+  const currentSwitch = staticDeployBlock.indexOf(
+    'sudo mv -Tf /var/www/science-lab-next /var/www/science-lab-current'
+  );
+  assert.ok(previousCapture >= 0 && previousCapture < currentSwitch, '切换前必须持久保存现有静态 release');
+  const previousPersistBlock = staticDeployBlock.slice(previousCapture, currentSwitch);
+  assert.ok(
+    previousPersistBlock.includes('readlink -f /var/www/science-lab-current') &&
+      previousPersistBlock.includes('/var/www/science-lab-releases/*') &&
+      previousPersistBlock.includes('test -d "$SCIENCE_LAB_PREVIOUS_RELEASE"'),
+    '旧 release 必须解析并限制在 release 根目录内'
+  );
+  assert.ok(
+    previousPersistBlock.includes('sudo ln -sfn "$SCIENCE_LAB_PREVIOUS_RELEASE" /var/www/science-lab-previous-next') &&
+      previousPersistBlock.includes('sudo chown -h root:root /var/www/science-lab-previous-next') &&
+      previousPersistBlock.includes('sudo mv -Tf /var/www/science-lab-previous-next /var/www/science-lab-previous'),
+    '旧 release 必须通过临时符号链接原子持久化'
+  );
+  assert.ok(
+    staticDeployBlock.includes('sudo chown -R root:root "$SCIENCE_LAB_RELEASE_DIR"') &&
+      staticDeployBlock.includes('-type d -exec chmod 755') &&
+      staticDeployBlock.includes('-type f -exec chmod 644'),
+    '静态 release 必须统一为 root:root、目录 755、文件 644'
+  );
+  assert.ok(
+    staticDeployBlock.includes('test -r "$SCIENCE_LAB_RELEASE_DIR/$SCIENCE_LAB_SHELL_FILE"') &&
+      staticDeployBlock.includes('SCIENCE_LAB_UNREADABLE_FILE='),
+    '切换前必须验证 App 壳和全部 release 文件可读'
+  );
+
+  const postSwitchBlock = staticDeployBlock.slice(currentSwitch);
+  assert.ok(postSwitchBlock.includes('SCIENCE_LAB_PUBLIC_URL="https://lab.xingnian.net.cn"'));
+  assert.ok(
+    postSwitchBlock.includes('"$SCIENCE_LAB_PUBLIC_URL/"') &&
+      postSwitchBlock.includes('test "$SCIENCE_LAB_HTTP_STATUS" = "200"'),
+    '切换后首页必须精确返回 HTTP 200'
+  );
+  assert.ok(
+    /for SCIENCE_LAB_SHELL_FILE in "\$\{SCIENCE_LAB_SHELL_FILES\[@\]\}"; do[\s\S]*?"\$SCIENCE_LAB_PUBLIC_URL\/\$SCIENCE_LAB_SHELL_FILE"[\s\S]*?test "\$SCIENCE_LAB_HTTP_STATUS" = "200"[\s\S]*?done/.test(postSwitchBlock),
+    '切换后十个物理 App 壳 URL 必须逐个精确返回 HTTP 200'
+  );
+  assert.ok(
+    /for SCIENCE_LAB_JSON_FILE in "catalog-control\.json" "manifest\.json"; do[\s\S]*?Content-Type:[\s\S]*?application\/json[\s\S]*?Cache-Control:[\s\S]*?no-cache[\s\S]*?done/.test(postSwitchBlock),
+    '切换后两个 JSON 必须校验类型与 no-cache'
+  );
+  assert.ok(
+    postSwitchBlock.includes('"$SCIENCE_LAB_PUBLIC_URL/__science-lab-missing.json"') &&
+      postSwitchBlock.includes('test "$SCIENCE_LAB_MISSING_JSON_STATUS" = "404"'),
+    '切换后必须确认缺失 JSON 返回 404'
+  );
+
   assert.ok(deployGuide.includes('try_files $uri =404;'), '缺失静态资源必须返回 404');
   assert.ok(!deployGuide.includes('try_files $uri $uri/ /index.html;'), '静态站不得把缺失 JSON 回退为首页');
   assert.ok(deployGuide.includes('/var/www/science-lab-current'), 'nginx 必须指向原子切换的 release 链接');
-  assert.ok(deployGuide.includes('science-lab-next'), '发布步骤必须先创建下一版本链接再原子替换');
+  const nginxBlock = fencedBlock(deployGuide, 'nginx', 'server_name lab.xingnian.net.cn');
+  const rateZone = 'limit_req_zone $binary_remote_addr zone=science_lab_ai:10m rate=10r/m;';
+  const firstServer = nginxBlock.match(/^server \{/m);
+  assert.ok(firstServer, 'nginx 示例必须包含 server 配置');
+  const httpContextSnippet = nginxBlock.slice(0, firstServer.index);
+  assert.strictEqual(occurrenceCount(deployGuide, rateZone), 1, 'AI 限流区必须只定义一次');
   assert.ok(
-    deployGuide.includes('limit_req_zone $binary_remote_addr zone=science_lab_ai:10m rate=10r/m;'),
-    'nginx http 上下文必须定义 AI 突发限流区'
+    httpContextSnippet.includes('http {}') &&
+      httpContextSnippet.includes('server {} 之外') &&
+      httpContextSnippet.includes(rateZone),
+    'AI 限流区必须位于 http 上下文片段并先于 server 配置'
   );
-  assert.ok(
-    deployGuide.includes('location = /api/ai/chat/completions {'),
+  const canonicalAiBlock = braceBlock(
+    nginxBlock,
+    'location = /api/ai/chat/completions {',
     'nginx 必须为匿名 AI 接口定义精确 location'
   );
+  [
+    'limit_req zone=science_lab_ai burst=3 nodelay;',
+    'limit_req_status 429;',
+    'proxy_pass http://127.0.0.1:8970/ai/chat/completions;',
+    'proxy_http_version 1.1;',
+    'proxy_set_header Connection "";',
+    'proxy_set_header Host $host;',
+    'proxy_set_header X-Real-IP $remote_addr;',
+    'proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;',
+    'proxy_set_header X-Forwarded-Proto $scheme;',
+    'proxy_buffering off;',
+    'proxy_cache off;',
+    'proxy_read_timeout 300s;'
+  ].forEach((directive) => {
+    assert.ok(canonicalAiBlock.includes(directive), `AI 精确 location 缺少 ${directive}`);
+  });
+  const variantAiBlock = braceBlock(
+    nginxBlock,
+    'location ~* ^/api/ai/chat/completions/?$ {',
+    'nginx 必须拒绝 AI 路径大小写和尾斜杠变体'
+  );
+  assert.ok(variantAiBlock.includes('return 404;'), 'AI 路径变体必须返回 404');
   assert.ok(
-    deployGuide.includes('limit_req zone=science_lab_ai burst=3 nodelay;'),
-    'nginx AI 精确 location 必须启用突发保护'
+    nginxBlock.includes('nginx 精确匹配优先') && nginxBlock.includes('大小写或尾斜杠变体'),
+    'nginx 示例必须解释规范路径优先且变体被拒绝'
   );
   assert.ok(
-    deployGuide.includes('location = /catalog-control.json {'),
-    'nginx 必须为目录控制 JSON 定义精确 location'
+    nginxBlock.indexOf('location = /api/ai/chat/completions {') <
+      nginxBlock.indexOf('location ~* ^/api/ai/chat/completions/?$ {') &&
+      nginxBlock.indexOf('location ~* ^/api/ai/chat/completions/?$ {') <
+      nginxBlock.indexOf('location /api/ {'),
+    'AI 精确 location 和变体 guard 必须位于通用 /api/ 之前'
+  );
+  ['/catalog-control.json', '/manifest.json'].forEach((jsonPath) => {
+    const jsonBlock = braceBlock(
+      nginxBlock,
+      `location = ${jsonPath} {`,
+      `nginx 必须为 ${jsonPath} 定义精确 location`
+    );
+    assert.ok(jsonBlock.includes('try_files $uri =404;'), `${jsonPath} 缺失时必须返回 404`);
+    assert.ok(
+      jsonBlock.includes('add_header Cache-Control "no-cache" always;'),
+      `${jsonPath} 必须返回 no-cache`
+    );
+  });
+
+  const rollbackBlock = fencedBlock(deployGuide, 'bash', 'readlink -f /var/www/science-lab-previous');
+  assert.ok(rollbackBlock.includes('test -L /var/www/science-lab-previous'));
+  assert.ok(
+    rollbackBlock.includes("stat -c '%U:%G' /var/www/science-lab-previous"),
+    '静态回滚必须验证 previous 链接由 root 所有'
   );
   assert.ok(
-    deployGuide.includes('location = /manifest.json {'),
-    'nginx 必须为清单 JSON 定义精确 location'
+    rollbackBlock.includes('SCIENCE_LAB_PREVIOUS_RELEASE=$(readlink -f /var/www/science-lab-previous)'),
+    '静态回滚必须重新读取持久 previous 链接'
   );
+  assert.ok(
+    rollbackBlock.includes('/var/www/science-lab-releases/*') &&
+      rollbackBlock.includes('test -d "$SCIENCE_LAB_PREVIOUS_RELEASE"'),
+    '静态回滚必须校验 previous 指向有效 release 目录'
+  );
+  assert.ok(
+    deployGuide.includes('sudo nginx -t && sudo systemctl reload nginx'),
+    'nginx 配置验证和重载必须使用管理员权限'
+  );
+  assert.ok(!deployGuide.includes('每日费用边界'), '每日请求上限不得描述为费用边界');
   assert.ok(deployGuide.includes('### 仅回滚静态页面'), '静态页面回滚必须是独立操作');
   assert.ok(deployGuide.includes('### 仅回滚 Node API'), 'Node API 回滚必须是独立操作');
   assert.ok(deployGuide.includes('deepseek-v4-flash'), '真实 AI 验证必须使用当前模型');
