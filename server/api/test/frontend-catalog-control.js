@@ -37,6 +37,66 @@ function occurrenceCount(source, value) {
   return source.split(value).length - 1;
 }
 
+function activeConfig(source) {
+  return source
+    .split('\n')
+    .map((line) => line.replace(/\s*#.*$/, '').trim())
+    .filter(Boolean)
+    .join('\n');
+}
+
+const NEW_RELEASE_LINK =
+  'sudo ln -sfn "$SCIENCE_LAB_RELEASE_DIR" /var/www/science-lab-next';
+const CURRENT_RELEASE_SWITCH =
+  'sudo mv -Tf /var/www/science-lab-next /var/www/science-lab-current';
+const CANONICAL_AI_PROXY = 'proxy_pass http://127.0.0.1:8970/ai/chat/completions;';
+const CANONICAL_AI_DIRECTIVES = [
+  'limit_req zone=science_lab_ai burst=3 nodelay;',
+  'limit_req_status 429;',
+  CANONICAL_AI_PROXY,
+  'proxy_http_version 1.1;',
+  'proxy_set_header Connection "";',
+  'proxy_set_header Host $host;',
+  'proxy_set_header X-Real-IP $remote_addr;',
+  'proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;',
+  'proxy_set_header X-Forwarded-Proto $scheme;',
+  'proxy_buffering off;',
+  'proxy_cache off;',
+  'proxy_read_timeout 300s;'
+];
+
+function assertAtomicReleaseSwitch(staticDeployBlock) {
+  const activeLines = activeConfig(staticDeployBlock).split('\n');
+  assert.strictEqual(
+    activeLines.filter((line) => line === NEW_RELEASE_LINK).length,
+    1,
+    '静态发布必须创建唯一的新 release 符号链接'
+  );
+  assert.strictEqual(
+    activeLines.filter((line) => line === CURRENT_RELEASE_SWITCH).length,
+    1,
+    '静态发布必须执行唯一的 current 原子切换'
+  );
+  const newReleaseLink = activeLines.indexOf(NEW_RELEASE_LINK);
+  assert.strictEqual(
+    activeLines[newReleaseLink + 1],
+    CURRENT_RELEASE_SWITCH,
+    '新 release 符号链接必须直接馈入 current 原子切换'
+  );
+}
+
+function assertCanonicalAiLocation(nginxBlock) {
+  const canonicalAiBlock = braceBlock(
+    activeConfig(nginxBlock),
+    'location = /api/ai/chat/completions {',
+    'nginx 必须为匿名 AI 接口定义活动的精确 location'
+  );
+  CANONICAL_AI_DIRECTIVES.forEach((directive) => {
+    assert.ok(canonicalAiBlock.includes(directive), `AI 精确 location 缺少活动指令 ${directive}`);
+  });
+  return canonicalAiBlock;
+}
+
 {
   const result = CatalogControl.apply(fixtures, {});
   assert.deepStrictEqual(result.experiments, fixtures, '缺少配置时应保持全部实验发布');
@@ -197,9 +257,7 @@ function occurrenceCount(source, value) {
   );
   assert.ok(staticDeployBlock.includes('JSON.parse'), '静态发布切换前必须解析 JSON 文件');
   const previousCapture = staticDeployBlock.indexOf('if [ -L /var/www/science-lab-current ]; then');
-  const currentSwitch = staticDeployBlock.indexOf(
-    'sudo mv -Tf /var/www/science-lab-next /var/www/science-lab-current'
-  );
+  const currentSwitch = staticDeployBlock.indexOf(CURRENT_RELEASE_SWITCH);
   assert.ok(previousCapture >= 0 && previousCapture < currentSwitch, '切换前必须持久保存现有静态 release');
   const previousPersistBlock = staticDeployBlock.slice(previousCapture, currentSwitch);
   assert.ok(
@@ -224,6 +282,13 @@ function occurrenceCount(source, value) {
     staticDeployBlock.includes('test -r "$SCIENCE_LAB_RELEASE_DIR/$SCIENCE_LAB_SHELL_FILE"') &&
       staticDeployBlock.includes('SCIENCE_LAB_UNREADABLE_FILE='),
     '切换前必须验证 App 壳和全部 release 文件可读'
+  );
+  assertAtomicReleaseSwitch(staticDeployBlock);
+  const deployWithoutNewReleaseLink = staticDeployBlock.replace(NEW_RELEASE_LINK, '');
+  assert.throws(
+    () => assertAtomicReleaseSwitch(deployWithoutNewReleaseLink),
+    /静态发布必须创建唯一的新 release 符号链接/,
+    '删除新 release 符号链接命令时契约测试必须失败'
   );
 
   const postSwitchBlock = staticDeployBlock.slice(currentSwitch);
@@ -251,65 +316,55 @@ function occurrenceCount(source, value) {
   assert.ok(!deployGuide.includes('try_files $uri $uri/ /index.html;'), '静态站不得把缺失 JSON 回退为首页');
   assert.ok(deployGuide.includes('/var/www/science-lab-current'), 'nginx 必须指向原子切换的 release 链接');
   const nginxBlock = fencedBlock(deployGuide, 'nginx', 'server_name lab.xingnian.net.cn');
+  const activeNginxBlock = activeConfig(nginxBlock);
   const rateZone = 'limit_req_zone $binary_remote_addr zone=science_lab_ai:10m rate=10r/m;';
   const firstServer = nginxBlock.match(/^server \{/m);
   assert.ok(firstServer, 'nginx 示例必须包含 server 配置');
   const httpContextSnippet = nginxBlock.slice(0, firstServer.index);
-  assert.strictEqual(occurrenceCount(deployGuide, rateZone), 1, 'AI 限流区必须只定义一次');
+  assert.strictEqual(occurrenceCount(activeNginxBlock, rateZone), 1, 'AI 限流区必须只定义一次活动指令');
   assert.ok(
     httpContextSnippet.includes('http {}') &&
       httpContextSnippet.includes('server {} 之外') &&
       httpContextSnippet.includes(rateZone),
     'AI 限流区必须位于 http 上下文片段并先于 server 配置'
   );
-  const canonicalAiBlock = braceBlock(
-    nginxBlock,
-    'location = /api/ai/chat/completions {',
-    'nginx 必须为匿名 AI 接口定义精确 location'
+  assertCanonicalAiLocation(nginxBlock);
+  const nginxWithCommentedCanonicalProxy = nginxBlock.replace(
+    CANONICAL_AI_PROXY,
+    `# ${CANONICAL_AI_PROXY}`
   );
-  [
-    'limit_req zone=science_lab_ai burst=3 nodelay;',
-    'limit_req_status 429;',
-    'proxy_pass http://127.0.0.1:8970/ai/chat/completions;',
-    'proxy_http_version 1.1;',
-    'proxy_set_header Connection "";',
-    'proxy_set_header Host $host;',
-    'proxy_set_header X-Real-IP $remote_addr;',
-    'proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;',
-    'proxy_set_header X-Forwarded-Proto $scheme;',
-    'proxy_buffering off;',
-    'proxy_cache off;',
-    'proxy_read_timeout 300s;'
-  ].forEach((directive) => {
-    assert.ok(canonicalAiBlock.includes(directive), `AI 精确 location 缺少 ${directive}`);
-  });
+  assert.throws(
+    () => assertCanonicalAiLocation(nginxWithCommentedCanonicalProxy),
+    /AI 精确 location 缺少活动指令 proxy_pass/,
+    '注释 canonical proxy_pass 时契约测试必须失败'
+  );
   const variantAiBlock = braceBlock(
-    nginxBlock,
+    activeNginxBlock,
     'location ~* ^/api/ai/chat/completions/?$ {',
-    'nginx 必须拒绝 AI 路径大小写和尾斜杠变体'
+    'nginx 必须通过活动 guard 拒绝 AI 路径大小写和尾斜杠变体'
   );
-  assert.ok(variantAiBlock.includes('return 404;'), 'AI 路径变体必须返回 404');
+  assert.ok(variantAiBlock.includes('return 404;'), 'AI 路径变体必须通过活动指令返回 404');
   assert.ok(
     nginxBlock.includes('nginx 精确匹配优先') && nginxBlock.includes('大小写或尾斜杠变体'),
     'nginx 示例必须解释规范路径优先且变体被拒绝'
   );
   assert.ok(
-    nginxBlock.indexOf('location = /api/ai/chat/completions {') <
-      nginxBlock.indexOf('location ~* ^/api/ai/chat/completions/?$ {') &&
-      nginxBlock.indexOf('location ~* ^/api/ai/chat/completions/?$ {') <
-      nginxBlock.indexOf('location /api/ {'),
+    activeNginxBlock.indexOf('location = /api/ai/chat/completions {') <
+      activeNginxBlock.indexOf('location ~* ^/api/ai/chat/completions/?$ {') &&
+      activeNginxBlock.indexOf('location ~* ^/api/ai/chat/completions/?$ {') <
+      activeNginxBlock.indexOf('location /api/ {'),
     'AI 精确 location 和变体 guard 必须位于通用 /api/ 之前'
   );
   ['/catalog-control.json', '/manifest.json'].forEach((jsonPath) => {
     const jsonBlock = braceBlock(
-      nginxBlock,
+      activeNginxBlock,
       `location = ${jsonPath} {`,
-      `nginx 必须为 ${jsonPath} 定义精确 location`
+      `nginx 必须为 ${jsonPath} 定义活动的精确 location`
     );
-    assert.ok(jsonBlock.includes('try_files $uri =404;'), `${jsonPath} 缺失时必须返回 404`);
+    assert.ok(jsonBlock.includes('try_files $uri =404;'), `${jsonPath} 缺少活动的 try_files 404`);
     assert.ok(
       jsonBlock.includes('add_header Cache-Control "no-cache" always;'),
-      `${jsonPath} 必须返回 no-cache`
+      `${jsonPath} 缺少活动的 no-cache 响应头`
     );
   });
 
