@@ -22,7 +22,7 @@ function positiveInt(value, fallback) {
 }
 
 const AI_RATE_LIMIT_MINUTE_MAX = positiveInt(process.env.AI_RATE_LIMIT_MINUTE_MAX, 10);
-const AI_RATE_LIMIT_DAY_MAX = positiveInt(process.env.AI_RATE_LIMIT_DAY_MAX, 500);
+const AI_RATE_LIMIT_DAY_MAX = positiveInt(process.env.AI_RATE_LIMIT_DAY_MAX, 20);
 const AI_UPSTREAM_TIMEOUT_MS = positiveInt(process.env.AI_UPSTREAM_TIMEOUT_MS, 120000);
 
 if (!JWT_SECRET || JWT_SECRET.length < 16) {

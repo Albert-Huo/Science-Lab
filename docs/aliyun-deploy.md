@@ -57,7 +57,7 @@ cp .env.example .env
 #   JWT_SECRET: node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 #   DEEPSEEK_API_KEY: 服务端专用 DeepSeek API Key（不要提交到 Git）
 #   AI_RATE_LIMIT_MINUTE_MAX: 单 IP 每分钟上限，默认 10
-#   AI_RATE_LIMIT_DAY_MAX: 单 IP 每日上限，默认 500
+#   AI_RATE_LIMIT_DAY_MAX: 单 IP 每 24 小时上限，默认 20
 #   AI_UPSTREAM_TIMEOUT_MS: DeepSeek 单次请求总超时，默认 120000 毫秒
 #   DB_* 填上面建的库与账号
 #   CORS_ORIGINS: 至少填写前端完整 Origin，例如 https://lab.xingnian.net.cn
@@ -191,7 +191,7 @@ nginx -t && nginx -s reload
 
 - 密码 bcrypt 哈希；登录态 JWT（密钥在 `.env`）。
 - 注册/登录限流（15 分钟 30 次/IP）。
-- AI 路由叠加每分钟和每日两级 IP 限流，默认分别为 10 次和 500 次，可用 `AI_RATE_LIMIT_MINUTE_MAX`、`AI_RATE_LIMIT_DAY_MAX` 调整。
+- AI 路由叠加每分钟和每 24 小时两级 IP 限流，默认分别为 10 次和 20 次，可用 `AI_RATE_LIMIT_MINUTE_MAX`、`AI_RATE_LIMIT_DAY_MAX` 调整。
 - AI 上游请求默认在 120 秒后中止，客户端断开连接时也会中止；可用 `AI_UPSTREAM_TIMEOUT_MS` 调整总超时。
 - AI 请求仅接受最多 20 条 `messages`；角色和单条长度受限；模型仅允许 `deepseek-chat`；服务端强制流式响应、`max_tokens ≤ 2048`、`temperature ∈ [0,2]`，其他字段不会透传。
 - `DEEPSEEK_API_KEY` 只放在服务端 `.env`。错误响应不会回显 Key 或 DeepSeek 原始错误正文；建议同时设置 DeepSeek 账户预算告警并定期轮换 Key。
