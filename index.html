@@ -131,30 +131,28 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 #aiSettings label{font-size:12px;color:var(--txt2);display:flex;flex-direction:column;gap:4px;}
 #aiSettings input{background:var(--panel2);border:1px solid var(--line);border-radius:8px;
   color:var(--txt);padding:7px 10px;font-size:12.5px;outline:none;}
+#aiSettings .mode-row{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--line);
+  border-radius:10px;background:#0b0f1766;}
+#aiSettings .mode-copy{flex:1;min-width:0;}
+#aiSettings .mode-copy b{display:block;font-size:12.5px;color:var(--txt);margin-bottom:3px;}
+#aiSettings .mode-copy span{display:block;font-size:11px;color:var(--txt2);line-height:1.45;}
+#aiSettings .switch{position:relative;display:block;width:38px;height:22px;flex:none;}
+#aiSettings .switch input{position:absolute;opacity:0;pointer-events:none;}
+#aiSettings .switch i{position:absolute;inset:0;border-radius:999px;background:var(--line);transition:.2s;cursor:pointer;}
+#aiSettings .switch i::after{content:"";position:absolute;width:16px;height:16px;left:3px;top:3px;
+  border-radius:50%;background:var(--txt);transition:.2s;}
+#aiSettings .switch input:checked+i{background:var(--acc);}
+#aiSettings .switch input:checked+i::after{transform:translateX(16px);}
+#aiAdvanced{display:flex;flex-direction:column;gap:8px;}
+#aiAdvanced.hide{display:none;}
 #aiSettings .row{display:flex;gap:8px;}
 #aiSettings .row button{flex:1;padding:8px;border:none;border-radius:8px;background:var(--acc);color:#fff;font-size:12.5px;cursor:pointer;}
 #aiSettings .row button.ghost{background:var(--panel2);border:1px solid var(--line);color:var(--txt2);}
 #aiSettings p{font-size:11px;color:var(--txt2);line-height:1.6;}
 .msg.ai.err{border:1px solid #b4554d;color:#f0b6b0;}
-/* cloud sync */
-.sync-box{margin:0 16px 16px;border:1px solid var(--line);border-radius:12px;overflow:hidden;}
-.sync-head{display:flex;align-items:center;gap:8px;padding:11px 12px;background:var(--panel2);font-size:13px;}
-.sync-head>span:first-child{flex:1;font-weight:600;}
-.sync-state{font-size:11px;color:var(--txt2);}
-.sync-state.on{color:var(--acc2);}
-.sync-head .gear{background:none;border:none;color:var(--txt2);cursor:pointer;font-size:14px;padding:0;}
-#syncSettings,#syncLogin,#syncAccount{display:flex;flex-direction:column;gap:8px;padding:12px;}
-#syncSettings.hide,#syncLogin.hide,#syncAccount.hide{display:none;}
-.sync-box label{font-size:12px;color:var(--txt2);display:flex;flex-direction:column;gap:4px;}
-.sync-box input{background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--txt);padding:7px 10px;font-size:12.5px;outline:none;}
-.sync-box .row{display:flex;gap:8px;}
-.sync-box .row button{flex:1;padding:8px;border:none;border-radius:8px;background:var(--acc);color:#fff;font-size:12.5px;cursor:pointer;}
-.sync-box .row button.ghost{background:var(--panel2);border:1px solid var(--line);color:var(--txt2);}
-.sync-box .row button:disabled{opacity:.45;}
-.sync-box p{font-size:11px;color:var(--txt2);line-height:1.6;}
-.sync-msg{min-height:0;}
-.sync-msg.err{color:#f0b6b0;}
-.sync-msg.ok{color:var(--acc2);}
+.local-note{margin:0 16px 16px;padding:11px 12px;border:1px solid var(--line);border-radius:12px;
+  background:#0b0f1766;color:var(--txt2);font-size:11.5px;line-height:1.65;}
+.local-note b{color:var(--acc2);font-size:12.5px;}
 /* hint */
 #hint{position:fixed;inset:0;z-index:80;background:#000a;display:flex;align-items:center;
   justify-content:center;backdrop-filter:blur(3px);}
@@ -164,6 +162,19 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 #hint .card .ok{margin-top:14px;width:100%;padding:10px;border:none;border-radius:10px;
   background:var(--strip);color:#0b0f17;font-weight:700;font-size:14px;cursor:pointer;}
 #hint.hide{display:none;}
+/* install guide */
+#installGuide{position:fixed;left:12px;right:62px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:45;
+  max-width:520px;margin:auto;display:flex;align-items:center;gap:10px;padding:10px 11px 10px 12px;
+  border:1px solid #4f8cff66;border-radius:14px;background:#121826f2;box-shadow:0 10px 28px #0008;
+  backdrop-filter:blur(10px);}
+#installGuide.hide{display:none;}
+#installGuide .install-icon{width:32px;height:32px;border-radius:10px;background:var(--strip);color:#0b0f17;
+  display:flex;align-items:center;justify-content:center;font-weight:800;flex:none;}
+#installGuide .install-copy{flex:1;min-width:0;font-size:11.5px;line-height:1.5;color:var(--txt2);}
+#installGuide .install-copy b{display:block;color:var(--txt);font-size:12.5px;}
+#installAction{display:none;border:0;border-radius:8px;background:var(--acc);color:#fff;padding:7px 9px;font-size:11.5px;cursor:pointer;}
+#installAction.show{display:block;}
+#installClose{width:26px;height:26px;border:0;border-radius:8px;background:var(--panel2);color:var(--txt2);cursor:pointer;flex:none;}
 /* ---------- 宽屏（平板横屏/桌面）：目录常驻左侧栏 ---------- */
 @media (min-width:900px){
   :root{--dock-w:300px;}
@@ -176,6 +187,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
   #panelUser{z-index:60;}
   .page{background:#05070c;}
   .page iframe{max-width:1280px;margin:0 auto;}
+  #installGuide{left:calc(var(--dock-w) + 12px);}
 }
 /* toast */
 #toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:90;background:#121826ee;
@@ -221,60 +233,38 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
   </div>
   <div class="tabpane on" data-pane="profile">
     <div id="userCard">
-      <div class="avatar" id="avatar">A</div>
-      <div class="meta"><b id="userName">访客</b><p id="userSub">实验探索者 · 本地账户</p></div>
+      <div class="avatar">本</div>
+      <div class="meta"><b>本地学习</b><p>无需账号 · 记录仅存本设备</p></div>
     </div>
     <div class="stat-row">
       <div class="stat"><b id="stTotal">0</b><span>实验总数</span></div>
       <div class="stat"><b id="stSeen">0</b><span>已浏览</span></div>
       <div class="stat"><b id="stPct">0%</b><span>探索进度</span></div>
     </div>
-
-    <div class="sync-box">
-      <div class="sync-head">
-        <span>云同步</span>
-        <span id="syncState" class="sync-state">未启用</span>
-        <button id="syncGear" class="gear" title="设置">⚙</button>
-      </div>
-
-      <div id="syncSettings" class="hide">
-        <label>同步服务地址（可选）<input id="apiUrl" placeholder="留空则用本站 /api"></label>
-        <div class="row"><button id="apiSave">保存</button><button id="apiForget" class="ghost">恢复默认</button></div>
-        <p>App 与接口部署在同一域名时无需填写，默认调用本站 /api。仅当接口在其它域名（须 https）时才填。部署步骤见仓库 docs/aliyun-deploy.md。</p>
-      </div>
-
-      <div id="syncLogin" class="hide">
-        <label>邮箱<input id="loginEmail" type="email" placeholder="you@example.com"></label>
-        <label>密码<input id="loginPass" type="password" placeholder="至少 6 位"></label>
-        <div class="row"><button id="btnLogin">登录</button><button id="btnRegister" class="ghost">注册</button></div>
-        <p id="syncMsg" class="sync-msg"></p>
-      </div>
-
-      <div id="syncAccount" class="hide">
-        <div class="row">
-          <button id="btnSyncNow">立即同步</button>
-          <button id="btnLogout" class="ghost">退出登录</button>
-        </div>
-        <p id="syncMsg2" class="sync-msg"></p>
-      </div>
-    </div>
+    <div class="local-note"><b>隐私说明</b><br>浏览历史与 AI 对话只保存在当前浏览器。清除浏览器数据或更换设备后无法恢复。</div>
   </div>
   <div class="tabpane" data-pane="history">
     <div class="body" id="histList"><div class="empty">还没有浏览记录</div></div>
   </div>
   <div class="tabpane" data-pane="ai">
     <div id="aiSettings" class="hide">
-      <label>接口地址<input id="aiEndpoint" placeholder="https://api.deepseek.com/chat/completions"></label>
-      <label>模型<input id="aiModel" placeholder="deepseek-chat"></label>
-      <label>API Key<input id="aiKey" type="password" placeholder="sk-…（仅存本机浏览器）"></label>
+      <div class="mode-row">
+        <div class="mode-copy"><b>内置 AI 助手</b><span>默认使用本站服务，无需配置</span></div>
+        <label class="switch" title="使用自己的 API Key"><input id="aiByok" type="checkbox" aria-label="使用自己的 API Key"><i></i></label>
+      </div>
+      <div id="aiAdvanced" class="hide">
+        <label>接口地址<input id="aiEndpoint" placeholder="https://api.deepseek.com/chat/completions"></label>
+        <label>模型<input id="aiModel" placeholder="deepseek-chat"></label>
+        <label>API Key<input id="aiKey" type="password" placeholder="sk-…（仅存本机浏览器）"></label>
+      </div>
       <div class="row">
         <button id="aiSave">保存</button>
         <button id="aiClearChat" class="ghost">清空对话</button>
       </div>
-      <p>Key 只保存在本设备 localStorage，不会上传到仓库或服务器。共用设备请勿填写。</p>
+      <p id="aiModeNote">开启“使用自己的 API Key”后，接口、模型和 Key 才会保存在本设备。共用设备请勿填写 Key。</p>
     </div>
-    <div id="chatLog"><div class="msg ai">你好，我是实验助手。点击下方 ⚙ 填入 DeepSeek API Key 后，我就能围绕当前实验答疑。</div></div>
-    <div id="chatBar"><button id="aiGear" title="设置">⚙</button><input id="chatInput" placeholder="围绕当前实验提问…"><button id="chatSend">发送</button></div>
+    <div id="chatLog"><div class="msg ai">你好，我是内置实验助手。无需配置，直接围绕当前实验提问即可。</div></div>
+    <div id="chatBar"><button id="aiGear" title="设置">⚙</button><input id="chatInput" maxlength="4000" placeholder="围绕当前实验提问…"><button id="chatSend">发送</button></div>
   </div>
 </aside>
 
@@ -286,13 +276,22 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
   <button class="ok" id="hintOk">开始探索</button>
 </div></div>
 
+<div id="installGuide" class="hide" role="status">
+  <div class="install-icon">＋</div>
+  <div class="install-copy"><b>添加到主屏幕</b><span id="installText"></span></div>
+  <button id="installAction">立即添加</button>
+  <button id="installClose" aria-label="永久关闭安装引导">✕</button>
+</div>
+
 <div id="toast"></div>
 
 <script>
 const qs = new URLSearchParams(location.search);
 /* 内容源：默认线上站；与内容站同域时用相对路径；本地联调可用 ?base=/HTML-/ 覆盖 */
 const CONTENT_BASE = qs.get('base') ?? (location.hostname === 'html.xingnian.net.cn' ? '' : 'https://html.xingnian.net.cn/');
-const LS = { idx:'expfeed.idx', hist:'expfeed.hist', hint:'expfeed.hint', ai:'expfeed.ai', sb:'expfeed.sb' };
+const LS = { idx:'expfeed.idx', hist:'expfeed.hist', hint:'expfeed.hint', ai:'expfeed.ai', chat:'expfeed.chat', install:'expfeed.install.dismissed' };
+try{ localStorage.removeItem('expfeed.sb'); }
+catch(e){ console.warn('旧登录数据清理失败：浏览器存储不可用'); }
 
 fetch('manifest.json').then(r=>r.json()).then(boot).catch(e=>{
   document.body.insertAdjacentHTML('beforeend','<div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#93a1bd;font-size:14px;z-index:99;background:#0b0f17">实验清单加载失败：'+e+'</div>');
@@ -352,6 +351,7 @@ function render(){
   localStorage.setItem(LS.idx, cur);
   markHistory(it);
   highlightCat();
+  renderChatForCurrent();
 }
 function goTo(i){
   if(i<0||i>=MANIFEST.length||i===cur) return;
@@ -368,7 +368,6 @@ function markHistory(it){
   if(h.length>100) h.length=100;
   localStorage.setItem(LS.hist, JSON.stringify(h));
   renderStats(); renderHist();
-  if(window.Sync) window.Sync.schedulePush();
 }
 function renderStats(){
   const h=loadHist();
@@ -449,92 +448,197 @@ document.querySelectorAll('.tabs button').forEach(b=>b.addEventListener('click',
   document.querySelectorAll('.tabpane').forEach(p=>p.classList.toggle('on',p.dataset.pane===b.dataset.tab));
 }));
 
-/* ---------- AI chat (DeepSeek / OpenAI 兼容接口) ---------- */
+/* ---------- AI chat（默认同源代理，可选 BYOK） ---------- */
 const chatLog=document.getElementById('chatLog');
-const AI_DEFAULTS={endpoint:'https://api.deepseek.com/chat/completions',model:'deepseek-chat',key:''};
-function aiCfg(){
-  try{ return Object.assign({},AI_DEFAULTS,JSON.parse(localStorage.getItem(LS.ai)||'{}')); }
-  catch(e){ return Object.assign({},AI_DEFAULTS); }
+const CHAT_TOTAL_MAX=200, CHAT_CONTENT_MAX=6000;
+let chatStorageWarned=false;
+const AI_DEFAULTS={byok:false,endpoint:'https://api.deepseek.com/chat/completions',model:'deepseek-chat',key:''};
+function defaultBase(){
+  if(!/^https?:$/.test(location.protocol)) return '';
+  if(/\.github\.io$/.test(location.hostname)) return '';
+  return location.origin+'/api';
 }
-let chatHistory=[], chatBusy=false;
+function aiCfg(){
+  try{
+    const saved=JSON.parse(localStorage.getItem(LS.ai)||'{}');
+    if(!saved||typeof saved!=='object'||Array.isArray(saved)) throw new Error('invalid_ai_settings');
+    return Object.assign({},AI_DEFAULTS,saved,{byok:saved.byok===true});
+  }catch(e){
+    try{ localStorage.removeItem(LS.ai); }catch(storageError){ return Object.assign({},AI_DEFAULTS); }
+    return Object.assign({},AI_DEFAULTS);
+  }
+}
+function resetChatStore(){
+  try{ localStorage.setItem(LS.chat,'{}'); return true; }
+  catch(e){ return false; }
+}
+function loadChatStore(){
+  try{
+    const raw=localStorage.getItem(LS.chat);
+    if(!raw) return {};
+    const parsed=JSON.parse(raw);
+    if(!parsed||typeof parsed!=='object'||Array.isArray(parsed)) throw new Error('invalid_chat_history');
+    const clean={};
+    Object.entries(parsed).forEach(([path,messages])=>{
+      if(!Array.isArray(messages)) return;
+      const items=messages.reduce((out,msg)=>{
+        if(!msg||!['user','assistant'].includes(msg.role)||typeof msg.content!=='string'||!msg.content) return out;
+        out.push({role:msg.role,content:msg.content.slice(0,CHAT_CONTENT_MAX),ts:Number.isFinite(msg.ts)?msg.ts:0});
+        return out;
+      },[]);
+      if(items.length) clean[path]=items;
+    });
+    return pruneChatStore(clean);
+  }catch(e){
+    resetChatStore();
+    return {};
+  }
+}
+function pruneChatStore(store){
+  const all=[];
+  Object.values(store).forEach(messages=>messages.forEach(msg=>all.push(msg)));
+  if(all.length<=CHAT_TOTAL_MAX) return store;
+  all.sort((a,b)=>(a.ts||0)-(b.ts||0));
+  const drop=new Set(all.slice(0,all.length-CHAT_TOTAL_MAX));
+  Object.keys(store).forEach(path=>{
+    store[path]=store[path].filter(msg=>!drop.has(msg));
+    if(!store[path].length) delete store[path];
+  });
+  return store;
+}
+function persistChat(path,messages){
+  const store=loadChatStore();
+  if(messages.length){
+    store[path]=messages.map(msg=>({role:msg.role,content:String(msg.content).slice(0,CHAT_CONTENT_MAX),ts:msg.ts||Date.now()}));
+  }else delete store[path];
+  pruneChatStore(store);
+  try{
+    localStorage.setItem(LS.chat,JSON.stringify(store));
+    chatStorageWarned=false;
+    return true;
+  }catch(e){
+    if(!chatStorageWarned){ chatStorageWarned=true; toast('对话记录保存失败，原有记录已保留'); }
+    return false;
+  }
+}
+let chatPath='', chatHistory=[], chatBusy=false;
 function addMsg(cls,text){
   const d=document.createElement('div'); d.className='msg '+cls; d.textContent=text;
   chatLog.appendChild(d); chatLog.scrollTop=chatLog.scrollHeight; return d;
+}
+function renderChatForCurrent(){
+  const path=MANIFEST[cur].path;
+  if(chatBusy&&path===chatPath) return;
+  chatPath=path;
+  chatHistory=loadChatStore()[path]||[];
+  chatLog.innerHTML='';
+  if(!chatHistory.length){
+    addMsg('ai','你好，我是内置实验助手。无需配置，直接围绕「'+MANIFEST[cur].title+'」提问即可。');
+    return;
+  }
+  chatHistory.forEach(msg=>addMsg(msg.role==='user'?'me':'ai',msg.content));
 }
 async function sendChat(){
   if(chatBusy) return;
   const inp=document.getElementById('chatInput'), t=inp.value.trim(); if(!t) return;
   const cfg=aiCfg();
-  if(!cfg.key){
-    addMsg('ai err','还没有配置 API Key。点击左下角 ⚙，粘贴你的 DeepSeek API Key（仅保存在本设备）。');
+  if(cfg.byok&&!cfg.key){
+    addMsg('ai err','已开启“使用自己的 API Key”，请先在设置中填写 Key。');
     document.getElementById('aiSettings').classList.remove('hide');
     return;
   }
+  const endpoint=cfg.byok?cfg.endpoint:(defaultBase()+'/ai/chat/completions');
+  if(!endpoint.startsWith('http')){
+    addMsg('ai err','内置 AI 需要通过本站 HTTPS 页面使用；本地文件模式请开启 BYOK。');
+    return;
+  }
+  const it=MANIFEST[cur], path=it.path, conversation=chatHistory;
   inp.value=''; addMsg('me',t);
-  chatHistory.push({role:'user',content:t});
-  const it=MANIFEST[cur];
+  conversation.push({role:'user',content:t,ts:Date.now()});
+  persistChat(path,conversation);
   const sys='你是"实验馆"App 内嵌的实验学习助手。用户当前正在看的实验是「'+it.title+'」（'+it.subject+' · '+it.level+'）。'
     +'请围绕该实验用中文答疑：解释原理、实验步骤、现象与结论，面向中学生，简洁清晰，必要时分步说明。与实验无关的问题可以简短回答并引导回实验。';
   const aiDiv=addMsg('ai','…');
   chatBusy=true; document.getElementById('chatSend').disabled=true;
   try{
-    const res=await fetch(cfg.endpoint,{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.key},
-      body:JSON.stringify({model:cfg.model,stream:true,messages:[{role:'system',content:sys},...chatHistory.slice(-12)]})
+    const headers={'Content-Type':'application/json'};
+    if(cfg.byok) headers.Authorization='Bearer '+cfg.key;
+    const res=await fetch(endpoint,{
+      method:'POST',headers,
+      body:JSON.stringify({model:cfg.model,stream:true,messages:[{role:'system',content:sys},...conversation.slice(-12).map(({role,content})=>({role,content}))]})
     });
     if(!res.ok){
-      const txt=await res.text().catch(()=>'');
-      throw new Error('HTTP '+res.status+(txt?' · '+txt.slice(0,160):''));
+      let detail='HTTP '+res.status;
+      try{ const data=await res.json(); if(data.message||data.error) detail+=' · '+(data.message||data.error); }
+      catch(parseError){ detail+=' · 响应格式异常'; }
+      throw new Error(detail);
     }
+    if(!res.body) throw new Error('服务器未返回流式响应');
     const reader=res.body.getReader(), dec=new TextDecoder();
-    let acc='', buf='';
-    for(;;){
-      const {done,value}=await reader.read(); if(done) break;
-      buf+=dec.decode(value,{stream:true});
-      const lines=buf.split('\n'); buf=lines.pop();
-      for(const line of lines){
-        const s=line.trim();
-        if(!s.startsWith('data:')) continue;
-        const payload=s.slice(5).trim();
-        if(payload==='[DONE]') continue;
-        try{
-          const delta=JSON.parse(payload).choices?.[0]?.delta?.content;
-          if(delta){ acc+=delta; aiDiv.textContent=acc; chatLog.scrollTop=chatLog.scrollHeight; }
-        }catch(e){}
+    let acc='', buf='', streamComplete=false;
+    try{
+      readStream:
+      for(;;){
+        const {done,value}=await reader.read(); if(done) break;
+        buf+=dec.decode(value,{stream:true});
+        const lines=buf.split('\n'); buf=lines.pop();
+        for(const line of lines){
+          const s=line.trim();
+          if(!s.startsWith('data:')) continue;
+          const payload=s.slice(5).trim();
+          if(payload==='[DONE]'){ streamComplete=true; break readStream; }
+          try{
+            const delta=JSON.parse(payload).choices?.[0]?.delta?.content;
+            if(delta){ acc+=delta; aiDiv.textContent=acc; if(aiDiv.isConnected) chatLog.scrollTop=chatLog.scrollHeight; }
+          }catch(parseError){ continue; }
+        }
       }
-    }
-    if(!acc){ aiDiv.textContent='（空回复）'; }
-    chatHistory.push({role:'assistant',content:acc});
+    }finally{ reader.releaseLock(); }
+    if(!streamComplete) throw new Error('流式响应意外中断');
+    const answer=acc||'（空回复）';
+    aiDiv.textContent=answer;
+    conversation.push({role:'assistant',content:answer,ts:Date.now()});
+    persistChat(path,conversation);
   }catch(err){
     aiDiv.className='msg ai err';
-    aiDiv.textContent='请求失败：'+err.message+'\n如果是网络/CORS 问题，可按 README 部署 Cloudflare Worker 代理后，把接口地址改为代理地址。';
-    chatHistory.pop();
+    aiDiv.textContent='请求失败：'+err.message+(cfg.byok?'\n请检查自定义接口、模型和 Key。':'\n请稍后重试；连续失败可联系站点管理员。');
+    conversation.pop();
+    persistChat(path,conversation);
   }finally{
+    const refreshCurrent=!aiDiv.isConnected&&MANIFEST[cur].path===path;
     chatBusy=false; document.getElementById('chatSend').disabled=false;
+    if(refreshCurrent) renderChatForCurrent();
   }
 }
 document.getElementById('chatSend').addEventListener('click',sendChat);
 document.getElementById('chatInput').addEventListener('keydown',e=>{ if(e.key==='Enter') sendChat(); });
 /* 设置面板 */
 const aiPanel=document.getElementById('aiSettings');
+const aiByok=document.getElementById('aiByok');
+function updateAiMode(){ document.getElementById('aiAdvanced').classList.toggle('hide',!aiByok.checked); }
+aiByok.addEventListener('change',updateAiMode);
 document.getElementById('aiGear').addEventListener('click',()=>{
   const cfg=aiCfg();
+  aiByok.checked=cfg.byok;
   document.getElementById('aiEndpoint').value=cfg.endpoint;
   document.getElementById('aiModel').value=cfg.model;
   document.getElementById('aiKey').value=cfg.key;
-  aiPanel.classList.toggle('hide');
+  updateAiMode(); aiPanel.classList.toggle('hide');
 });
 document.getElementById('aiSave').addEventListener('click',()=>{
-  localStorage.setItem(LS.ai,JSON.stringify({
+  const saved={
+    byok:aiByok.checked,
     endpoint:document.getElementById('aiEndpoint').value.trim()||AI_DEFAULTS.endpoint,
     model:document.getElementById('aiModel').value.trim()||AI_DEFAULTS.model,
     key:document.getElementById('aiKey').value.trim()
-  }));
-  aiPanel.classList.add('hide'); toast('AI 设置已保存');
+  };
+  try{ localStorage.setItem(LS.ai,JSON.stringify(saved)); }
+  catch(e){ toast('AI 设置保存失败：浏览器存储不可用'); return; }
+  aiPanel.classList.add('hide'); toast(saved.byok?'已启用自己的 API Key':'已启用内置 AI 助手');
 });
 document.getElementById('aiClearChat').addEventListener('click',()=>{
-  chatHistory=[]; chatLog.innerHTML='';
+  if(chatBusy){ toast('请等待当前回答完成后再清空'); return; }
+  chatHistory=[]; persistChat(MANIFEST[cur].path,chatHistory); chatLog.innerHTML='';
   addMsg('ai','对话已清空。当前实验：「'+MANIFEST[cur].title+'」，随时提问。');
 });
 
@@ -590,144 +694,51 @@ document.getElementById('hintOk').addEventListener('click',()=>{
 /* ---------- init ---------- */
 renderChips(); renderCat(); renderStats(); renderHist(); render();
 if(cur>0) toast('已回到上次浏览位置');
-
-/* ---------- 云同步（自托管 API：邮箱密码 + JWT） ---------- */
-window.Sync = (function(){
-  let token=null, email=null, pushTimer=null;
-  const $=id=>document.getElementById(id);
-
-  function cfg(){ try{return JSON.parse(localStorage.getItem(LS.sb)||'{}');}catch(e){return {};} }
-  // 同源默认：页面部署在自己的域名（非 GitHub Pages/file）时，接口默认用本站 /api，无需手填
-  function defaultBase(){
-    if(!/^https?:$/.test(location.protocol)) return '';
-    if(/\.github\.io$/.test(location.hostname)) return '';
-    return location.origin + '/api';
-  }
-  function apiBase(){ const c=cfg(); return (c.url ? c.url.replace(/\/$/,'') : defaultBase()); }
-  function configured(){ return !!apiBase(); }
-
-  function setState(txt,on){ const el=$('syncState'); if(el){el.textContent=txt; el.classList.toggle('on',!!on);} }
-  function msg(elId,txt,kind){ const el=$(elId); if(!el)return; el.textContent=txt||''; el.className='sync-msg'+(kind?' '+kind:''); }
-  function show(which){ // 'settings' | 'login' | 'account'
-    ['syncSettings','syncLogin','syncAccount'].forEach(id=>$(id)&&$(id).classList.add('hide'));
-    const map={settings:'syncSettings',login:'syncLogin',account:'syncAccount'};
-    if(map[which]) $(map[which]).classList.remove('hide');
-  }
-
-  async function apiFetch(path,opts){
-    opts=opts||{};
-    opts.headers=Object.assign({'Content-Type':'application/json'},opts.headers||{});
-    if(token) opts.headers['Authorization']='Bearer '+token;
-    const res=await fetch(apiBase()+path,opts);
-    let data={}; try{ data=await res.json(); }catch(e){}
-    if(!res.ok){ const err=new Error(data.error||('HTTP '+res.status)); err.status=res.status; throw err; }
-    return data;
-  }
-
-  function mergeHist(a,b){
-    const m=new Map();
-    [...(a||[]),...(b||[])].forEach(x=>{
-      if(!x||!x.path) return;
-      const cur=m.get(x.path);
-      if(!cur||(x.ts||0)>(cur.ts||0)) m.set(x.path,{path:x.path,title:x.title,ts:x.ts||0});
-    });
-    return [...m.values()].sort((x,y)=>(y.ts||0)-(x.ts||0)).slice(0,100);
-  }
-
-  const ERR={ bad_credentials:'邮箱或密码错误', email_taken:'该邮箱已注册，请直接登录',
-    weak_password:'密码至少 6 位', invalid_email:'邮箱格式不正确', invalid_token:'登录已过期，请重新登录' };
-  function human(e){ return ERR[e.message]||e.message; }
-
-  async function pushNow(){
-    if(!token) return;
-    const local=JSON.parse(localStorage.getItem(LS.hist)||'[]');
-    try{
-      const data=await apiFetch('/progress',{method:'PUT',body:JSON.stringify({history:local})});
-      localStorage.setItem(LS.hist,JSON.stringify(data.history));
-      renderStats(); renderHist();
-      msg('syncMsg2','已同步 · '+new Date().toLocaleTimeString().slice(0,5),'ok');
-    }catch(e){ if(e.status===401){ onLogout(true); } else msg('syncMsg2','同步失败：'+human(e),'err'); }
-  }
-  function schedulePush(){ if(!token) return; clearTimeout(pushTimer); pushTimer=setTimeout(pushNow,2500); }
-
-  async function syncMerge(){
-    msg('syncMsg2','同步中…');
-    try{
-      const cloud=await apiFetch('/progress'); // GET
-      const local=JSON.parse(localStorage.getItem(LS.hist)||'[]');
-      const merged=mergeHist(local,cloud.history||[]);
-      localStorage.setItem(LS.hist,JSON.stringify(merged));
-      renderStats(); renderHist();
-      await pushNow();
-    }catch(e){ if(e.status===401){ onLogout(true); } else msg('syncMsg2','同步失败：'+human(e),'err'); }
-  }
-
-  function onLoggedIn(em){
-    email=em;
-    $('userName').textContent=em?em.split('@')[0]:'已登录';
-    $('userSub').textContent='云同步账户 · '+(em||'');
-    $('avatar').textContent=(em||'U')[0].toUpperCase();
-    setState('已登录',true); show('account');
-    syncMerge();
-  }
-  function onLogout(expired){
-    token=null; email=null;
-    const c=cfg(); delete c.token; delete c.email; localStorage.setItem(LS.sb,JSON.stringify(c));
-    $('userName').textContent='访客'; $('userSub').textContent='实验探索者 · 本地账户'; $('avatar').textContent='A';
-    setState('未登录',false); show('login');
-    if(expired) msg('syncMsg','登录已过期，请重新登录','err');
-  }
-
-  async function doAuth(kind){
-    const em=$('loginEmail').value.trim().toLowerCase(), pw=$('loginPass').value;
-    if(!em||!pw){ msg('syncMsg','请输入邮箱和密码','err'); return; }
-    msg('syncMsg', kind==='register'?'注册中…':'登录中…');
-    try{
-      const data=await apiFetch('/auth/'+kind,{method:'POST',body:JSON.stringify({email:em,password:pw})});
-      token=data.token;
-      const c=cfg(); c.token=token; c.email=data.email; localStorage.setItem(LS.sb,JSON.stringify(c));
-      $('loginPass').value=''; msg('syncMsg','');
-      onLoggedIn(data.email);
-    }catch(e){ msg('syncMsg',(kind==='register'?'注册失败：':'登录失败：')+human(e),'err'); }
-  }
-
-  function bind(){
-    $('syncGear').addEventListener('click',()=>{
-      $('apiUrl').value=cfg().url||'';
-      $('syncSettings').classList.toggle('hide');
-    });
-    $('apiSave').addEventListener('click',()=>{
-      const url=$('apiUrl').value.trim().replace(/\/$/,'');
-      const c=cfg();
-      if(url){
-        if(!/^https:\/\//.test(url)){ alert('自定义接口地址须以 https:// 开头'); return; }
-        c.url=url;
-      } else { delete c.url; } // 留空 → 用本站 /api 默认
-      localStorage.setItem(LS.sb,JSON.stringify(c));
-      toast('已保存'); init();
-    });
-    $('apiForget').addEventListener('click',()=>{
-      localStorage.removeItem(LS.sb); token=null; email=null;
-      init(); toast('已恢复默认');
-    });
-    $('btnLogin').addEventListener('click',()=>doAuth('login'));
-    $('btnRegister').addEventListener('click',()=>doAuth('register'));
-    $('loginPass').addEventListener('keydown',e=>{ if(e.key==='Enter') doAuth('login'); });
-    $('btnLogout').addEventListener('click',()=>{ onLogout(false); toast('已退出登录'); });
-    $('btnSyncNow').addEventListener('click',syncMerge);
-  }
-
-  function init(){
-    if(!configured()){ setState('未启用',false); show('settings'); return; }
-    const c=cfg();
-    if(c.token){ token=c.token; onLoggedIn(c.email); }
-    else { setState('未登录',false); show('login'); }
-  }
-
-  bind(); init();
-  return { schedulePush };
-})();
 }
+
+/* ---------- install guide ---------- */
+const installGuide=document.getElementById('installGuide');
+const installAction=document.getElementById('installAction');
+let deferredInstallPrompt=null;
+function isStandalone(){ return matchMedia('(display-mode: standalone)').matches||navigator.standalone===true; }
+function hideInstallGuide(){ installGuide.classList.add('hide'); }
+function installDismissed(){
+  if(installGuide.dataset.dismissed==='session') return true;
+  try{ return !!localStorage.getItem(LS.install); }
+  catch(e){ return false; }
+}
+function initInstallGuide(){
+  if(isStandalone()||installDismissed()) return;
+  const ua=navigator.userAgent;
+  const ios=/iPad|iPhone|iPod/.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  const iosSafari=ios&&/Safari/.test(ua)&&!/CriOS|FxiOS|EdgiOS/.test(ua);
+  const androidChrome=/Android/.test(ua)&&/Chrome\//.test(ua)&&!/EdgA|OPR\//.test(ua);
+  document.getElementById('installText').textContent=iosSafari
+    ? '点 Safari 底部“分享”，再选“添加到主屏幕”。'
+    : androidChrome
+      ? '点 Chrome 右上角 ⋮，选择“安装应用”或“添加到主屏幕”。'
+      : '打开浏览器菜单，选择“安装应用”或“添加到主屏幕”。';
+  installGuide.classList.remove('hide');
+}
+document.getElementById('installClose').addEventListener('click',()=>{
+  try{ localStorage.setItem(LS.install,'1'); }catch(e){ installGuide.dataset.dismissed='session'; }
+  hideInstallGuide();
+});
+addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault(); deferredInstallPrompt=e;
+  if(!isStandalone()&&!installDismissed()){
+    installAction.classList.add('show'); installGuide.classList.remove('hide');
+  }
+});
+installAction.addEventListener('click',async()=>{
+  if(!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt=null; installAction.classList.remove('show');
+});
+addEventListener('appinstalled',hideInstallGuide);
+matchMedia('(display-mode: standalone)').addEventListener('change',e=>{ if(e.matches) hideInstallGuide(); });
+initInstallGuide();
 
 /* ---------- PWA ---------- */
 if('serviceWorker' in navigator &&
