@@ -4,6 +4,12 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
+const serviceWorkerSource = fs.readFileSync(path.resolve(__dirname, '../../../sw.js'), 'utf8');
+const versionMatch = serviceWorkerSource.match(/const VERSION = '(v\d+\.\d+\.\d+)';/);
+assert.ok(versionMatch, 'Service Worker 应声明语义版本');
+const currentCache = `sl-shell-${versionMatch[1]}`;
+const staleCache = `${currentCache}-stale`;
+
 const handlers = {};
 const deleted = [];
 const added = [];
@@ -26,13 +32,13 @@ const context = vm.createContext({
   },
   caches: {
     open: async () => cache,
-    keys: async () => ['sl-shell-v0.6.0', 'other-app-cache', 'sl-shell-v0.7.1'],
+    keys: async () => [staleCache, 'other-app-cache', currentCache],
     delete: async (key) => { deleted.push(key); return true; },
     match: async () => cachedResponse,
   },
   fetch: async () => fetchResponse,
 });
-vm.runInContext(fs.readFileSync(path.resolve(__dirname, '../../../sw.js'), 'utf8'), context);
+vm.runInContext(serviceWorkerSource, context);
 
 async function waitEvent(name, event) {
   let pending;
@@ -42,7 +48,7 @@ async function waitEvent(name, event) {
 
 (async () => {
   await waitEvent('activate', {});
-  assert.deepStrictEqual(deleted, ['sl-shell-v0.6.0']);
+  assert.deepStrictEqual(deleted, [staleCache]);
 
   fetchResponse = new Response('<html>wrong</html>', { status: 200, headers: { 'Content-Type': 'text/html' } });
   await assert.rejects(waitEvent('install', {}), /invalid_precache_response/);

@@ -130,7 +130,15 @@ const fixtures = [
   const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
   const deployGuide = fs.readFileSync(path.join(root, 'docs/aliyun-deploy.md'), 'utf8');
   const packageJson = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../package.json'), 'utf8'));
-  assert.ok(serviceWorker.includes("const VERSION = 'v0.7.1'"), '部署前加固上线时应刷新 App 壳缓存');
+  assert.match(
+    serviceWorker,
+    /const VERSION = 'v\d+\.\d+\.\d+';/,
+    '部署前加固上线时应使用语义版本刷新 App 壳缓存'
+  );
+  assert.ok(
+    serviceWorker.includes('const SHELL_CACHE = CACHE_PREFIX + VERSION;'),
+    'App 壳缓存名应从当前版本派生'
+  );
   assert.ok(serviceWorker.includes("'./catalog-control.js'"), '发布控制模块应进入离线 App 壳');
   assert.ok(serviceWorker.includes("'./content-source.js'"), '内容源解析模块应进入离线 App 壳');
   assert.ok(serviceWorker.includes("'./catalog-control.json'"), '发布控制配置应提供离线回退');
@@ -140,11 +148,58 @@ const fixtures = [
   );
   assert.ok(readme.includes('## 目录发布控制'), 'README 应记录目录开关操作方法');
   assert.ok(deployGuide.includes('npm ci --omit=dev'), '生产依赖必须从 lock 文件安装');
+  assert.ok(deployGuide.includes('set -euo pipefail'), '静态发布必须遇错即停');
   assert.ok(deployGuide.includes('content-source.js'), '内容源模块必须进入静态发布清单');
+  assert.ok(
+    deployGuide.includes('SCIENCE_LAB_SHELL_FILES=('),
+    '静态发布必须定义完整的物理 App 壳文件清单'
+  );
+  [
+    'index.html',
+    'catalog-control.js',
+    'content-source.js',
+    'catalog-control.json',
+    'manifest.json',
+    'manifest.webmanifest',
+    'assets/icons/icon-192.png',
+    'assets/icons/icon-512.png',
+    'assets/icons/icon-maskable-512.png',
+    'assets/icons/apple-touch-icon.png'
+  ].forEach((shellFile) => {
+    assert.ok(
+      deployGuide.includes(`"${shellFile}"`),
+      `静态发布校验清单必须包含 ${shellFile}`
+    );
+  });
+  assert.ok(
+    /for SCIENCE_LAB_SHELL_FILE in "\$\{SCIENCE_LAB_SHELL_FILES\[@\]\}"; do[\s\S]*?test -f "\$SCIENCE_LAB_RELEASE_DIR\/\$SCIENCE_LAB_SHELL_FILE"[\s\S]*?done/.test(deployGuide),
+    '静态发布切换前必须逐个校验物理 App 壳文件'
+  );
+  assert.ok(deployGuide.includes('JSON.parse'), '静态发布切换前必须解析 JSON 文件');
   assert.ok(deployGuide.includes('try_files $uri =404;'), '缺失静态资源必须返回 404');
   assert.ok(!deployGuide.includes('try_files $uri $uri/ /index.html;'), '静态站不得把缺失 JSON 回退为首页');
   assert.ok(deployGuide.includes('/var/www/science-lab-current'), 'nginx 必须指向原子切换的 release 链接');
   assert.ok(deployGuide.includes('science-lab-next'), '发布步骤必须先创建下一版本链接再原子替换');
+  assert.ok(
+    deployGuide.includes('limit_req_zone $binary_remote_addr zone=science_lab_ai:10m rate=10r/m;'),
+    'nginx http 上下文必须定义 AI 突发限流区'
+  );
+  assert.ok(
+    deployGuide.includes('location = /api/ai/chat/completions {'),
+    'nginx 必须为匿名 AI 接口定义精确 location'
+  );
+  assert.ok(
+    deployGuide.includes('limit_req zone=science_lab_ai burst=3 nodelay;'),
+    'nginx AI 精确 location 必须启用突发保护'
+  );
+  assert.ok(
+    deployGuide.includes('location = /catalog-control.json {'),
+    'nginx 必须为目录控制 JSON 定义精确 location'
+  );
+  assert.ok(
+    deployGuide.includes('location = /manifest.json {'),
+    'nginx 必须为清单 JSON 定义精确 location'
+  );
   assert.ok(deployGuide.includes('### 仅回滚静态页面'), '静态页面回滚必须是独立操作');
   assert.ok(deployGuide.includes('### 仅回滚 Node API'), 'Node API 回滚必须是独立操作');
   assert.ok(deployGuide.includes('deepseek-v4-flash'), '真实 AI 验证必须使用当前模型');

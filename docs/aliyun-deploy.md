@@ -82,23 +82,78 @@ index.html  catalog-control.js  content-source.js  catalog-control.json  manifes
 
 ```bash
 # 在仓库根目录执行。每次发布都生成一个新目录，不覆盖正在服务的版本。
+set -euo pipefail
+
 SCIENCE_LAB_RELEASE_ID=$(date '+%Y%m%d-%H%M%S')
 SCIENCE_LAB_RELEASE_DIR="/var/www/science-lab-releases/${SCIENCE_LAB_RELEASE_ID}"
 sudo install -d -m 755 "$SCIENCE_LAB_RELEASE_DIR"
 sudo install -m 644 index.html catalog-control.js content-source.js catalog-control.json manifest.json manifest.webmanifest sw.js "$SCIENCE_LAB_RELEASE_DIR/"
 sudo cp -a assets "$SCIENCE_LAB_RELEASE_DIR/"
 
-# 切换前确认关键文件齐全；任一检查失败都不要切换。
-test -f "$SCIENCE_LAB_RELEASE_DIR/index.html" && test -f "$SCIENCE_LAB_RELEASE_DIR/catalog-control.json" && test -f "$SCIENCE_LAB_RELEASE_DIR/sw.js"
+# 根 URL 与 index.html 是同一份内容，因此 App 壳有以下十个物理文件。
+SCIENCE_LAB_SHELL_FILES=(
+  "index.html"
+  "catalog-control.js"
+  "content-source.js"
+  "catalog-control.json"
+  "manifest.json"
+  "manifest.webmanifest"
+  "assets/icons/icon-192.png"
+  "assets/icons/icon-512.png"
+  "assets/icons/icon-maskable-512.png"
+  "assets/icons/apple-touch-icon.png"
+)
+
+# 切换前确认全部 App 壳文件和 Service Worker 齐全，并实际解析两个 JSON；任一检查失败都不要切换。
+for SCIENCE_LAB_SHELL_FILE in "${SCIENCE_LAB_SHELL_FILES[@]}"; do
+  test -f "$SCIENCE_LAB_RELEASE_DIR/$SCIENCE_LAB_SHELL_FILE"
+done
+test -f "$SCIENCE_LAB_RELEASE_DIR/sw.js"
+
+for SCIENCE_LAB_JSON_FILE in "catalog-control.json" "manifest.json"; do
+  node -e 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))' \
+    "$SCIENCE_LAB_RELEASE_DIR/$SCIENCE_LAB_JSON_FILE"
+done
+
 sudo ln -sfn "$SCIENCE_LAB_RELEASE_DIR" /var/www/science-lab-next
 sudo mv -Tf /var/www/science-lab-next /var/www/science-lab-current
+
+# 切换后验证首页与十个物理 App 壳 URL。
+SCIENCE_LAB_PUBLIC_URL="https://lab.xingnian.net.cn"
+curl --fail --silent --show-error "$SCIENCE_LAB_PUBLIC_URL/" --output /dev/null
+for SCIENCE_LAB_SHELL_FILE in "${SCIENCE_LAB_SHELL_FILES[@]}"; do
+  curl --fail --silent --show-error \
+    "$SCIENCE_LAB_PUBLIC_URL/$SCIENCE_LAB_SHELL_FILE" --output /dev/null
+done
+
+# 两个 JSON 必须返回 JSON/no-cache；故意不存在的 JSON 必须保持 404。
+SCIENCE_LAB_HEADER_FILE=$(mktemp)
+trap 'rm -f "$SCIENCE_LAB_HEADER_FILE"' EXIT
+for SCIENCE_LAB_JSON_FILE in "catalog-control.json" "manifest.json"; do
+  curl --fail --silent --show-error \
+    --dump-header "$SCIENCE_LAB_HEADER_FILE" --output /dev/null \
+    "$SCIENCE_LAB_PUBLIC_URL/$SCIENCE_LAB_JSON_FILE"
+  grep -Eiq '^Content-Type:[[:space:]]*application/json([;[:space:]]|$)' "$SCIENCE_LAB_HEADER_FILE"
+  grep -Eiq '^Cache-Control:[[:space:]]*no-cache([,[:space:]]|$)' "$SCIENCE_LAB_HEADER_FILE"
+done
+SCIENCE_LAB_MISSING_JSON_STATUS=$(curl --silent --show-error \
+  --output /dev/null --write-out '%{http_code}' \
+  "$SCIENCE_LAB_PUBLIC_URL/__science-lab-missing.json")
+test "$SCIENCE_LAB_MISSING_JSON_STATUS" = "404"
+rm -f "$SCIENCE_LAB_HEADER_FILE"
+trap - EXIT
 ```
 
 `/var/www/science-lab-current` 必须保持为指向某个 release 目录的符号链接。`server/`、`docs/`、`tools/` 不用上传，它们不是网页运行所需。
 
 ## 4. nginx：一个 server 同时托管页面与接口
 
+下面的 `limit_req_zone` 必须放在 nginx 的 `http {}` 上下文中、所有 `server {}` 之外；不要把它放进站点的 `server` 块。它只提供匿名接口的短时突发保护，不是认证机制，也不是全局费用上限。Node 端仍须保留默认每 IP 每分钟 10 次、每 24 小时 20 次的两级限流。
+
 ```nginx
+# 放在 nginx.conf 的 http {} 上下文中，且位于所有 server {} 之外
+limit_req_zone $binary_remote_addr zone=science_lab_ai:10m rate=10r/m;
+
 server {
     listen 443 ssl http2;
     server_name lab.xingnian.net.cn;             # 换成你的子域名
@@ -108,6 +163,25 @@ server {
 
     root /var/www/science-lab-current;
     index index.html;
+
+    # 匿名 AI 接口的精确突发保护；请求转发到 Node 的 /ai/chat/completions。
+    location = /api/ai/chat/completions {
+        limit_req zone=science_lab_ai burst=3 nodelay;
+        limit_req_status 429;
+
+        proxy_pass http://127.0.0.1:8970/ai/chat/completions;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # DeepSeek 使用 SSE；关闭缓冲和缓存，允许长响应。
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 300s;
+    }
 
     # 接口反代：/api/ → 本机 Node（末尾斜杠会去掉 /api 前缀）
     location /api/ {
@@ -128,6 +202,19 @@ server {
     # Service Worker 不缓存，保证更新及时；文件缺失必须返回 404
     location = /sw.js {
         try_files $uri =404;
+        add_header Cache-Control "no-cache" always;
+    }
+
+    # 发布控制和 Web App 清单必须是实际 JSON 文件，且每次请求都重新验证。
+    location = /catalog-control.json {
+        try_files $uri =404;
+        default_type application/json;
+        add_header Cache-Control "no-cache" always;
+    }
+
+    location = /manifest.json {
+        try_files $uri =404;
+        default_type application/json;
         add_header Cache-Control "no-cache" always;
     }
 
@@ -160,7 +247,7 @@ nginx -t && nginx -s reload
 
 ## 5. 启用内置 AI
 
-确认 `.env` 已设置 `DEEPSEEK_API_KEY`，执行 `pm2 restart science-lab-api --update-env`，再打开 App →「我的」→「AI 问答」直接提问。默认模式不需要在浏览器填写任何配置。
+写入真实 Key 前，先准备一个仅供本服务使用的低余额账户，把可用余额控制在可承受范围，并关闭不受控的自动充值；不要把 nginx 限流当作认证或全局费用上限。然后确认 `.env` 已设置 `DEEPSEEK_API_KEY`，执行 `pm2 restart science-lab-api --update-env`，再打开 App →「我的」→「AI 问答」直接提问。默认模式不需要在浏览器填写任何配置。
 
 如果暂不配置 Key，前端会收到明确的 503 提示；用户仍可在 AI 设置中开启 BYOK，使用自己的 OpenAI 兼容 endpoint、model 和 Key。
 
@@ -222,7 +309,7 @@ pm2 restart science-lab-api --update-env
 - AI 路由叠加每分钟和每 24 小时两级 IP 限流，默认分别为 10 次和 20 次，可用 `AI_RATE_LIMIT_MINUTE_MAX`、`AI_RATE_LIMIT_DAY_MAX` 调整。
 - AI 上游请求默认在 120 秒后中止，客户端断开连接时也会中止；可用 `AI_UPSTREAM_TIMEOUT_MS` 调整总超时。
 - AI 请求仅接受最多 20 条 `messages`；角色和单条长度受限；模型仅允许 `deepseek-v4-flash`；服务端强制流式响应、关闭思考模式、`max_tokens ≤ 2048`、`temperature ∈ [0,2]`，其他字段不会透传。
-- `DEEPSEEK_API_KEY` 只放在服务端 `.env`。错误响应不会回显 Key 或 DeepSeek 原始错误正文；建议同时设置 DeepSeek 账户预算告警并定期轮换 Key。
+- `DEEPSEEK_API_KEY` 只放在服务端 `.env`。错误响应不会回显 Key 或 DeepSeek 原始错误正文；使用独立低余额账户、关闭不受控自动充值，并定期轮换 Key。
 - Node 仅监听 127.0.0.1，对外只经 nginx 443。
 - 同源部署天然规避跨站；如分域部署再依赖 `CORS_ORIGINS` 白名单。
 - 当前限流计数保存在单个 Node 进程内。若用 PM2 cluster、多个容器或多台机器，实际总额度会按实例放大，应改用共享 Redis store 或在网关/WAF 再加全局限流。
@@ -230,7 +317,7 @@ pm2 restart science-lab-api --update-env
 
 ## 上线风险解除清单
 
-- **匿名费用风险**：使用服务端专用 Key，并将供应商账户的可用余额或预算控制在可承受范围；监控 429、502 和调用量。CORS 不是访问控制，不能阻止脚本或 `curl` 调用。
+- **匿名费用风险**：使用服务端专用 Key 和专用低余额账户，关闭不受控自动充值；监控 429、502、调用量与余额。CORS 不是访问控制，不能阻止脚本或 `curl` 调用。
 - **共享出口 IP**：学校或宿舍用户可能共用一个公网 IP。先保持默认限额；只有确认正常课堂流量出现大量 429 后，才逐步上调分钟上限，同时保留每日费用边界。
 - **多实例限流**：未接入 Redis store 或网关全局限流前，只运行一个 PM2 fork 实例，不启用 cluster 或横向副本。
 - **真实上游**：配置费用控制后只做一次小额 `curl -N` 验证，确认持续输出和 `[DONE]` 正常结束；失败时先停用 Key，不连续重试。
