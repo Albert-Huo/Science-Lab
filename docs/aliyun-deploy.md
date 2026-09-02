@@ -77,13 +77,13 @@ pm2 save && pm2 startup    # 按提示执行输出命令，开机自启
 把仓库根目录这些文件放到该子域名的站点根（如 `/var/www/science-lab`）：
 
 ```
-index.html  manifest.json  manifest.webmanifest  sw.js  assets/
+index.html  catalog-control.js  catalog-control.json  manifest.json  manifest.webmanifest  sw.js  assets/
 ```
 
 ```bash
 mkdir -p /var/www/science-lab
 # 从仓库根拷贝（按实际路径）
-cp index.html manifest.json manifest.webmanifest sw.js /var/www/science-lab/
+cp index.html catalog-control.js catalog-control.json manifest.json manifest.webmanifest sw.js /var/www/science-lab/
 cp -r assets /var/www/science-lab/
 ```
 

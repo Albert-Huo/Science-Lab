@@ -128,6 +128,7 @@ const fixtures = [
   const root = path.resolve(__dirname, '../../..');
   const serviceWorker = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
   const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
+  const deployGuide = fs.readFileSync(path.join(root, 'docs/aliyun-deploy.md'), 'utf8');
   const packageJson = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../package.json'), 'utf8'));
   assert.ok(serviceWorker.includes("const VERSION = 'v0.7.0'"), '发布控制上线时应刷新 App 壳缓存');
   assert.ok(serviceWorker.includes("'./catalog-control.js'"), '发布控制模块应进入离线 App 壳');
@@ -138,9 +139,13 @@ const fixtures = [
   );
   assert.ok(readme.includes('## 目录发布控制'), 'README 应记录目录开关操作方法');
   assert.ok(
+    /cp index\.html catalog-control\.js catalog-control\.json manifest\.json manifest\.webmanifest sw\.js/.test(deployGuide),
+    '部署命令必须复制目录发布控制文件'
+  );
+  assert.ok(
     packageJson.scripts.test.includes('node test/frontend-catalog-control.js'),
     '统一测试命令应包含目录发布控制回归测试'
   );
 }
 
-console.log('✓ 目录发布控制 7 组解析/定位场景、7 项页面接入及缓存文档检查通过');
+console.log('✓ 目录发布控制 7 组解析/定位场景、8 项页面接入及缓存文档检查通过');
