@@ -2,6 +2,10 @@
 
 抖音式沉浸滑动浏览的科学实验 App。展示 [`Albert-Huo/HTML-`](https://github.com/Albert-Huo/HTML-) 仓库中的交互实验 HTML，适配手机/平板，兼顾桌面网页。
 
+## 免登录本地版
+
+实验馆面向学习者免费使用，无需注册或登录。浏览历史和 AI 问答记录只保存在当前设备的浏览器 `localStorage`，不会同步到云端；清除浏览器数据、更换浏览器或更换设备后，这些记录会丢失且无法恢复。
+
 ## 交互设计
 
 - 全屏单实验展示，一页一个交互实验（iframe，仅挂载当前 ±1，懒加载）
@@ -46,10 +50,11 @@ git add manifest.json && git commit -m "chore: 更新实验清单" && git push
 
 "我的"侧栏 → AI 问答，使用 DeepSeek（OpenAI 兼容协议），系统提示自动注入当前实验的标题/学科/学段。
 
-两种接入方式：
+默认使用部署在本站 `/api/ai/chat/completions` 的内置 AI 代理，学习者无需填写接口、模型或 API Key。站点管理员在服务端 `.env` 配置 `DEEPSEEK_API_KEY`，浏览器不会接触该 Key。
 
-1. **浏览器直连（默认，个人使用）**：聊天框左下 ⚙ → 粘贴 DeepSeek API Key。Key 只存本设备 localStorage，不进仓库、不上传。共用设备勿填。
-2. **Worker 代理（对外分发时用）**：按 `server/cloudflare-worker.js` 头部注释部署，key 存在 Worker Secret 里；然后在 ⚙ 设置中把接口地址改为 Worker 地址、Key 留空。直连遇到 CORS 报错时也用此方案。
+为生成回答，当前实验信息、最近对话和本次问题会经本站代理发送给 DeepSeek；站点不做账号绑定或云端会话保存，但模型服务商仍会按其服务条款处理请求。请勿提交姓名、联系方式等敏感个人信息。
+
+需要使用其他 OpenAI 兼容服务时，可在聊天框左下 ⚙ 开启“使用自己的 API Key”，再填写 endpoint、model 和 Key。BYOK 配置只保存在当前浏览器；共用设备请勿填写个人 Key。
 
 ## 版权与许可
 
@@ -59,9 +64,9 @@ MIT 许可只覆盖本仓库中的 App 壳、清单、Service Worker、图标、
 
 API Key、模型服务凭证和已部署 Worker Secret 不属于仓库内容，不能提交到 Git。
 
-## 云同步（可选，自托管）
+## 旧接口兼容
 
-「我的」→ 云同步，账号登录 + 浏览进度跨设备同步，后端自托管在自己的服务器（Node/Express + MySQL），代码见 `server/api/`。在 ⚙ 填入部署好的 https 接口地址，邮箱密码注册/登录即可。未配置时纯本地，行为不变。部署步骤见 `docs/aliyun-deploy.md`。
+`server/api/` 仍保留旧版 `/auth/register`、`/auth/login` 和 `/progress` 接口及 MySQL 数据结构，以免破坏已有部署和历史数据；当前免登录前端不会调用这些接口。内置 AI 代理也由该 Node 服务提供，部署步骤见 `docs/aliyun-deploy.md`。
 
 ## 本地开发
 
