@@ -51,6 +51,10 @@ git add manifest.json && git commit -m "chore: 更新实验清单" && git push
 
 新增内容目录（学科/学段）时，先在 `tools/build-manifest.py` 的 `DIRS` 中登记。
 
+初中物理目录按文件名中的数字自然排序（如 `1、2、10、12-1、12-2、49、49-1`），其他目录保留原有排序。目录列表和上下切换共用清单顺序，无需重命名实验文件。
+
+排序回归测试已接入 `npm test --prefix server/api`；测试环境需要 Node.js 和 Python 3，也可单独运行 `node server/api/test/manifest-order.js`。
+
 ## 目录发布控制
 
 不要从 `manifest.json` 删除临时下线的内容；在 `catalog-control.json` 中调整状态即可恢复和审查。目录使用实验路径的第一段作为稳定标识，例如 `physics-high/einstein-relativity-level-1-simultaneity.html` 对应目录 ID `physics-high`。

@@ -23,6 +23,13 @@ DIRS = {
 TITLE_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.S | re.I)
 
 
+def natural_sort_key(filename: str) -> tuple:
+    # 去掉扩展名，确保主实验 49 排在子实验 49-1 前。
+    stem = os.path.splitext(filename)[0]
+    parts = tuple(int(part) if part.isdecimal() else part for part in re.split(r"(\d+)", stem))
+    return parts, filename
+
+
 def extract_title(path: str, fallback: str) -> str:
     try:
         with open(path, encoding="utf-8", errors="ignore") as f:
@@ -48,7 +55,8 @@ def main() -> None:
         if not os.path.isdir(full):
             print(f"跳过缺失目录: {d}")
             continue
-        for fname in sorted(os.listdir(full)):
+        sort_key = natural_sort_key if d == "physics-middle" else None
+        for fname in sorted(os.listdir(full), key=sort_key):
             if not fname.endswith(".html"):
                 continue
             rel = f"{d}/{fname}"

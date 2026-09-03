@@ -6,6 +6,54 @@
   "level": "初中"
  },
  {
+  "path": "physics-middle/初中物理实验2.html",
+  "title": "初中物理实验2｜探究晶体熔化和凝固的过程及特点（三模式优化版）",
+  "subject": "物理",
+  "level": "初中"
+ },
+ {
+  "path": "physics-middle/初中物理实验3.html",
+  "title": "初中物理实验3｜观察升华与凝华现象（交互闯关版）",
+  "subject": "物理",
+  "level": "初中"
+ },
+ {
+  "path": "physics-middle/初中物理实验4.html",
+  "title": "初中物理实验4｜探究水沸腾时温度变化规律（交互闯关版）",
+  "subject": "物理",
+  "level": "初中"
+ },
+ {
+  "path": "physics-middle/初中物理实验5.html",
+  "title": "初中物理实验5｜探究蒸发快慢的影响因素（交互闯关版）",
+  "subject": "物理",
+  "level": "初中"
+ },
+ {
+  "path": "physics-middle/初中物理实验6.html",
+  "title": "初中物理实验6｜体验不同物质的弹性（交互闯关版）",
+  "subject": "物理",
+  "level": "初中"
+ },
+ {
+  "path": "physics-middle/初中物理实验7.html",
+  "title": "初中物理实验7｜观察磁现象（交互闯关版）",
+  "subject": "物理",
+  "level": "初中"
+ },
+ {
+  "path": "physics-middle/初中物理实验8.html",
+  "title": "初中物理实验8｜比较物质的导电性（交互闯关版）",
+  "subject": "物理",
+  "level": "初中"
+ },
+ {
+  "path": "physics-middle/初中物理实验9.html",
+  "title": "初中物理实验9｜比较不同材料的导热性（交互闯关版）",
+  "subject": "物理",
+  "level": "初中"
+ },
+ {
   "path": "physics-middle/初中物理实验10.html",
   "title": "初中物理实验10 - 用托盘天平测量物体质量",
   "subject": "物理",
@@ -72,12 +120,6 @@
   "level": "初中"
  },
  {
-  "path": "physics-middle/初中物理实验2.html",
-  "title": "初中物理实验2｜探究晶体熔化和凝固的过程及特点（三模式优化版）",
-  "subject": "物理",
-  "level": "初中"
- },
- {
   "path": "physics-middle/初中物理实验20.html",
   "title": "初中物理实验20｜观察磁体对小铁球的作用（交互版）",
   "subject": "物理",
@@ -134,12 +176,6 @@
  {
   "path": "physics-middle/初中物理实验29.html",
   "title": "初中物理实验29｜观察或体验液体的内部压强（交互版）",
-  "subject": "物理",
-  "level": "初中"
- },
- {
-  "path": "physics-middle/初中物理实验3.html",
-  "title": "初中物理实验3｜观察升华与凝华现象（交互闯关版）",
   "subject": "物理",
   "level": "初中"
  },
@@ -204,12 +240,6 @@
   "level": "初中"
  },
  {
-  "path": "physics-middle/初中物理实验4.html",
-  "title": "初中物理实验4｜探究水沸腾时温度变化规律（交互闯关版）",
-  "subject": "物理",
-  "level": "初中"
- },
- {
   "path": "physics-middle/初中物理实验40.html",
   "title": "初中物理实验40｜用凸透镜设计与制作简易照相机",
   "subject": "物理",
@@ -264,20 +294,14 @@
   "level": "初中"
  },
  {
-  "path": "physics-middle/初中物理实验49-1.html",
-  "title": "初中物理实验49-1｜演示电动机换向器原理",
-  "subject": "物理",
-  "level": "初中"
- },
- {
   "path": "physics-middle/初中物理实验49.html",
   "title": "初中物理实验49｜制作简易直流电动机",
   "subject": "物理",
   "level": "初中"
  },
  {
-  "path": "physics-middle/初中物理实验5.html",
-  "title": "初中物理实验5｜探究蒸发快慢的影响因素（交互闯关版）",
+  "path": "physics-middle/初中物理实验49-1.html",
+  "title": "初中物理实验49-1｜演示电动机换向器原理",
   "subject": "物理",
   "level": "初中"
  },
@@ -342,12 +366,6 @@
   "level": "初中"
  },
  {
-  "path": "physics-middle/初中物理实验6.html",
-  "title": "初中物理实验6｜体验不同物质的弹性（交互闯关版）",
-  "subject": "物理",
-  "level": "初中"
- },
- {
   "path": "physics-middle/初中物理实验60.html",
   "title": "初中物理实验60｜探究电流与电压、电阻的关系",
   "subject": "物理",
@@ -398,24 +416,6 @@
  {
   "path": "physics-middle/初中物理实验68.html",
   "title": "初中物理实验68｜利用新能源设计并制作一种模型",
-  "subject": "物理",
-  "level": "初中"
- },
- {
-  "path": "physics-middle/初中物理实验7.html",
-  "title": "初中物理实验7｜观察磁现象（交互闯关版）",
-  "subject": "物理",
-  "level": "初中"
- },
- {
-  "path": "physics-middle/初中物理实验8.html",
-  "title": "初中物理实验8｜比较物质的导电性（交互闯关版）",
-  "subject": "物理",
-  "level": "初中"
- },
- {
-  "path": "physics-middle/初中物理实验9.html",
-  "title": "初中物理实验9｜比较不同材料的导热性（交互闯关版）",
   "subject": "物理",
   "level": "初中"
  },
