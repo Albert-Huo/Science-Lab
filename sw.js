@@ -1,13 +1,16 @@
 /* 实验馆 Service Worker
- * 策略：App 壳预缓存（离线可用）；实验清单和发布控制网络优先（更新及时生效）；
- * 其余同源资源 stale-while-revalidate；跨域请求（线上实验内容）不拦截。
+ * - App 壳预缓存
+ * - 清单与目录控制网络优先，只缓存有效 JSON
+ * - 跨域实验内容与 API 请求不拦截
  */
-const VERSION = 'v0.7.0';
-const SHELL_CACHE = 'sl-shell-' + VERSION;
+const VERSION = 'v0.7.2';
+const CACHE_PREFIX = 'sl-shell-';
+const SHELL_CACHE = CACHE_PREFIX + VERSION;
 const SHELL = [
   './',
   './index.html',
   './catalog-control.js',
+  './content-source.js',
   './catalog-control.json',
   './manifest.json',
   './manifest.webmanifest',
@@ -16,52 +19,80 @@ const SHELL = [
   './assets/icons/icon-maskable-512.png',
   './assets/icons/apple-touch-icon.png',
 ];
+const JSON_SHELL = ['./catalog-control.json', './manifest.json'];
+const STATIC_SHELL = SHELL.filter((path) => !JSON_SHELL.includes(path));
+const SHELL_URLS = new Set(SHELL.map((path) => new URL(path, self.location.href).href));
 
-self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(SHELL_CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+function isJson(response) {
+  return !!(response && response.ok && (response.headers.get('content-type') || '').includes('application/json'));
+}
+
+async function precache() {
+  const cache = await caches.open(SHELL_CACHE);
+  await cache.addAll(STATIC_SHELL);
+  for (const path of JSON_SHELL) {
+    const response = await fetch(path, { cache: 'no-store' });
+    if (!isJson(response)) throw new Error('invalid_precache_response:' + path);
+    await cache.put(path, response);
+  }
+}
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(precache().then(() => self.skipWaiting()));
 });
 
-self.addEventListener('activate', (e) => {
-  e.waitUntil(
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== SHELL_CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys
+        .filter((key) => key.startsWith(CACHE_PREFIX) && key !== SHELL_CACHE)
+        .map((key) => caches.delete(key))))
       .then(() => self.clients.claim())
   );
 });
 
-self.addEventListener('fetch', (e) => {
-  const req = e.request;
-  if (req.method !== 'GET') return;
-  const url = new URL(req.url);
-  if (url.origin !== location.origin) return; // 跨域内容不拦截
+self.addEventListener('fetch', (event) => {
+  const request = event.request;
+  if (request.method !== 'GET') return;
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
 
   if (url.pathname.endsWith('/manifest.json') ||
       url.pathname.endsWith('/catalog-control.json')) {
-    // 实验清单与发布控制：网络优先，离线退回缓存
-    e.respondWith(
-      fetch(req)
-        .then((res) => {
-          const copy = res.clone();
-          caches.open(SHELL_CACHE).then((c) => c.put(req, copy));
-          return res;
+    event.respondWith(
+      fetch(request)
+        .then(async (response) => {
+          if (isJson(response)) {
+            const cache = await caches.open(SHELL_CACHE);
+            await cache.put(request, response.clone());
+            return response;
+          }
+          return (await caches.match(request)) || response;
         })
-        .catch(() => caches.match(req))
+        .catch(async (error) => {
+          const cached = await caches.match(request);
+          if (cached) return cached;
+          throw error;
+        })
     );
     return;
   }
 
-  // 壳与同源资源：缓存优先 + 后台更新
-  e.respondWith(
-    caches.match(req).then((cached) => {
-      const refresh = fetch(req)
-        .then((res) => {
-          if (res && res.ok) {
-            const copy = res.clone();
-            caches.open(SHELL_CACHE).then((c) => c.put(req, copy));
+  if (!SHELL_URLS.has(url.href)) return;
+  event.respondWith(
+    caches.match(request).then((cached) => {
+      const refresh = fetch(request)
+        .then(async (response) => {
+          if (response && response.ok) {
+            const cache = await caches.open(SHELL_CACHE);
+            await cache.put(request, response.clone());
           }
-          return res;
+          return response;
         })
-        .catch(() => cached);
+        .catch((error) => {
+          if (cached) return cached;
+          throw error;
+        });
       return cached || refresh;
     })
   );

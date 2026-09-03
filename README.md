@@ -32,12 +32,13 @@
 
 ## 内容源
 
-实验 HTML 不在本仓库。App 默认从线上内容站 `https://html.xingnian.net.cn/` 加载；当 App 部署在该域名下时自动改用相对路径。可用 URL 参数覆盖：
+实验 HTML 不在本仓库。App 默认从线上内容站 `https://html.xingnian.net.cn/` 加载；当 App 部署在该域名下时自动改用相对路径。只有页面运行在 `localhost` 或 `127.0.0.1` 时，才接受根相对的 `base` 参数用于本地联调：
 
 ```
 index.html?base=/HTML-/        # 本地联调：加载本地 HTML- 仓库工作区
-index.html?base=https://html.xingnian.net.cn/
 ```
+
+生产域名会忽略 `base` 参数，始终使用官方内容站；协议相对地址、外部绝对地址和脚本协议不会进入实验 iframe。
 
 ## 内容更新流程
 

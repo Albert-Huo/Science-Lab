@@ -36,7 +36,7 @@ const app = require('../server');
       'X-Forwarded-For': '203.0.113.20',
     },
     body: JSON.stringify({
-      model: 'deepseek-chat',
+      model: 'deepseek-v4-flash',
       messages: [{ role: 'user', content: '默认限额测试' }],
     }),
   });

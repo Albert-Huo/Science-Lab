@@ -13,6 +13,7 @@ delete process.env.DEEPSEEK_API_KEY;
 const assert = require('assert');
 const nativeFetch = global.fetch.bind(globalThis);
 const app = require('../server');
+const AI_MODEL = 'deepseek-v4-flash';
 
 let base;
 function api(path, opts) { return nativeFetch(base + path, opts); }
@@ -36,7 +37,7 @@ function aiRequest(body, ip) {
     assert.strictEqual((await (await api('/health')).json()).ok, true); ok('health');
 
     // AI proxy: missing server-side key
-    let r = await aiRequest({ model: 'deepseek-chat', messages: [{ role: 'user', content: '你好' }] }, '203.0.113.1');
+    let r = await aiRequest({ model: AI_MODEL, messages: [{ role: 'user', content: '你好' }] }, '203.0.113.1');
     let j = await r.json();
     assert.strictEqual(r.status, 503); assert.strictEqual(j.error, 'ai_unavailable'); ok('AI 缺少服务端 Key 时 503');
 
@@ -44,7 +45,7 @@ function aiRequest(body, ip) {
     process.env.DEEPSEEK_API_KEY = 'test-deepseek-key';
     let upstreamCalled = false;
     global.fetch = async () => { upstreamCalled = true; throw new Error('不应调用上游'); };
-    r = await aiRequest({ model: 'deepseek-chat', messages: 'invalid' }, '203.0.113.2');
+    r = await aiRequest({ model: AI_MODEL, messages: 'invalid' }, '203.0.113.2');
     j = await r.json();
     assert.strictEqual(r.status, 400); assert.strictEqual(j.error, 'invalid_messages'); assert.strictEqual(upstreamCalled, false); ok('AI 非法 messages 400');
 
@@ -58,14 +59,15 @@ function aiRequest(body, ip) {
       });
     };
     r = await aiRequest({
-      model: 'deepseek-chat', stream: false, max_tokens: 9999, temperature: 1.5,
+      model: AI_MODEL, stream: false, max_tokens: 9999, temperature: 1.5,
       messages: [{ role: 'user', content: '解释实验' }], ignored: 'do-not-forward',
     }, '203.0.113.3');
     const sse = await r.text();
     assert.strictEqual(r.status, 200); assert.match(sse, /答案/);
     assert.strictEqual(captured.url, 'https://api.deepseek.com/chat/completions');
     assert.deepStrictEqual(captured.body, {
-      model: 'deepseek-chat', stream: true, max_tokens: 2048, temperature: 1.5,
+      model: AI_MODEL, stream: true, max_tokens: 2048, temperature: 1.5,
+      thinking: { type: 'disabled' },
       messages: [{ role: 'user', content: '解释实验' }],
     });
     assert.strictEqual(captured.opts.headers.Authorization, 'Bearer test-deepseek-key'); ok('AI 字段收紧 + SSE 透传');
@@ -80,7 +82,7 @@ function aiRequest(body, ip) {
         reject(error);
       }, { once: true });
     });
-    r = await aiRequest({ model: 'deepseek-chat', messages: [{ role: 'user', content: '超时测试' }] }, '203.0.113.5');
+    r = await aiRequest({ model: AI_MODEL, messages: [{ role: 'user', content: '超时测试' }] }, '203.0.113.5');
     j = await r.json();
     assert.strictEqual(r.status, 504); assert.strictEqual(j.error, 'ai_upstream_timeout');
     assert.strictEqual(timeoutSignal.aborted, true); ok('AI 上游超时会中止请求');
@@ -93,7 +95,7 @@ function aiRequest(body, ip) {
       global.fetch = async () => {
         throw new Error(`invalid authorization header Bearer ${process.env.DEEPSEEK_API_KEY}`);
       };
-      r = await aiRequest({ model: 'deepseek-chat', messages: [{ role: 'user', content: '日志测试' }] }, '203.0.113.6');
+      r = await aiRequest({ model: AI_MODEL, messages: [{ role: 'user', content: '日志测试' }] }, '203.0.113.6');
     } finally {
       console.error = originalConsoleError;
     }
@@ -102,9 +104,9 @@ function aiRequest(body, ip) {
 
     // AI proxy: minute limiter is isolated per IP
     global.fetch = async () => new Response('data: [DONE]\n\n', { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
-    assert.strictEqual((await aiRequest({ model: 'deepseek-chat', messages: [{ role: 'user', content: '1' }] }, '203.0.113.4')).status, 200);
-    assert.strictEqual((await aiRequest({ model: 'deepseek-chat', messages: [{ role: 'user', content: '2' }] }, '203.0.113.4')).status, 200);
-    r = await aiRequest({ model: 'deepseek-chat', messages: [{ role: 'user', content: '3' }] }, '203.0.113.4');
+    assert.strictEqual((await aiRequest({ model: AI_MODEL, messages: [{ role: 'user', content: '1' }] }, '203.0.113.4')).status, 200);
+    assert.strictEqual((await aiRequest({ model: AI_MODEL, messages: [{ role: 'user', content: '2' }] }, '203.0.113.4')).status, 200);
+    r = await aiRequest({ model: AI_MODEL, messages: [{ role: 'user', content: '3' }] }, '203.0.113.4');
     assert.strictEqual(r.status, 429); ok('AI 每分钟限流 429');
     global.fetch = nativeFetch;
 
