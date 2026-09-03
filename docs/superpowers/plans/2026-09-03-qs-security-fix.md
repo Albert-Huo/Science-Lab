@@ -98,9 +98,19 @@ Run `npm ci --omit=dev --ignore-scripts --no-audit --no-fund`, `node test/depend
 Expected: 6 regression tests pass, the entire existing suite passes, production audit reports 0 vulnerabilities, and both parent paths resolve qs 6.16.0.
 Run `git diff --check` and review the full diff. Verify server.js, db.js, schema.sql, index.html, catalog-control.json, sw.js and .env.example are unchanged from the base.
 
-- [ ] **Step 6: Review and preserve the verified local fix.**
+- [x] **Step 6: Review and preserve the verified local fix.**
 
 After self-review, commit only the three implementation/test files and this plan to the local fix branch, using `fix(api): patch qs dependency vulnerabilities`. Then complete independent spec review followed by code-quality review. Fix any substantiated findings and rerun relevant checks. Do not push or merge main without further approval.
+
+Verification completed on 2026-09-03:
+
+- Implementation commit: `c2a22644157a999081bf3f7e997b26734ac2151a`.
+- The controller independently ran the new tests against the unchanged main installation: 4 expected vulnerability failures and 2 normal-query passes.
+- Fixed installation: all 6 regression tests and the complete npm test chain passed; `npm audit --omit=dev` reported 0 vulnerabilities.
+- A fresh installation from the exported API runtime files also passed installation and production audit, with both parent paths resolving qs 6.16.0.
+- Lockfile record comparison confirmed that only `node_modules/qs` changed.
+- Independent specification review and full code-quality review both approved, with no Critical, Important or substantive Minor findings.
+- The fix remains local to `codex/qs-security-fix`; no main merge, remote push or production deployment was performed.
 
 ## Deployment handoff
 
