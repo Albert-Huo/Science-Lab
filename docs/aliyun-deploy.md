@@ -11,12 +11,24 @@
 
 环境示例保留 `APP_MODE=full` 以兼容已有部署。未设置或为空也默认 `full`，必须有有效 JWT 密钥和可连接的数据库；数据库失败时拒绝启动，不会静默降级。其他非空模式值同样拒绝启动。`DB_DRIVER=memory` 只用于本地测试，不持久化，不能用于生产替代数据库。
 
+### 本站现网运行方式（2026-09-03）
+
+`lab.xingnian.net.cn` 已采用 `ai-only`，由 **systemd** 管理非 root、单实例服务 `science-lab-api.service`，不是下面通用示例中的 PM2。Node 22 独立安装在 `/opt/science-lab-runtime/`，没有替换系统 Node。
+
+- 后端当前目录：`/opt/science-lab-api-current`；仅监听 `127.0.0.1:8970`。
+- 环境配置：`/etc/science-lab-api.env`，仅 root 可读写（600），初次发布的真实 DeepSeek Key 留空。
+- 修改环境配置后使用 `sudo systemctl restart science-lab-api`；查看状态用 `systemctl is-active science-lab-api`。
+- nginx 仅转发精确的 `/api/health` 和 `/api/ai/chat/completions`；旧 `/api/` 接口继续维持部署前的 `503 sync_api_not_configured`。
+- 静态页面使用 `/var/www/science-lab-current` 发布链接；原 `/var/www/science-lab` 保留供证书续期及回滚使用。
+
+启用真实 AI 时，通过服务器私密环境配置提供 Key，不要写入前端、Git 或聊天记录；重启后再做一次有费用上限的真实请求验收。不要在本站额外启动第二个 PM2/API 实例，否则进程内的每日限额不能统一计数。
+
 > GitHub 仓库继续用于存代码/版本管理；对外网页由阿里云提供。国内访问比 GitHub Pages 更快更稳。
 
 ## 0. 准备
 
 - 新子域名解析到本服务器，例如 `lab.xingnian.net.cn`，并签发 TLS 证书（Let's Encrypt 或阿里云免费证书）。
-- Node ≥ 18；仅 `full` 模式需要可用的 MySQL（自建或阿里云 RDS）。
+- 代码要求 Node ≥ 18；生产选择仍受维护的 Node LTS（本站使用 Node 22），不要将最低兼容版本当作生产推荐版本。仅 `full` 模式需要可用的 MySQL（自建或阿里云 RDS）。
 - 防火墙只放行 443（与现网所需端口）；Node 端口（默认 8970）仅监听 127.0.0.1。
 
 > “本次没有修改数据库代码或表结构”不等于“生产数据已经验证完好”。升级已有部署时，必须先完成下面的备份和只读基线核验；新建部署可跳过旧数据核验。
