@@ -1,6 +1,12 @@
 'use strict';
 require('dotenv').config();
 
+const APP_MODE = process.env.APP_MODE || 'full';
+if (!['full', 'ai-only'].includes(APP_MODE)) {
+  console.error('启动失败：APP_MODE 必须为 full 或 ai-only'); process.exit(1);
+}
+const AI_ONLY = APP_MODE === 'ai-only';
+
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
@@ -8,7 +14,7 @@ const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const { Readable } = require('stream');
 const { pipeline } = require('stream/promises');
-const db = require('./db');
+const db = AI_ONLY ? null : require('./db');
 
 const PORT = Number(process.env.PORT || 8970);
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -25,12 +31,16 @@ const AI_RATE_LIMIT_MINUTE_MAX = positiveInt(process.env.AI_RATE_LIMIT_MINUTE_MA
 const AI_RATE_LIMIT_DAY_MAX = positiveInt(process.env.AI_RATE_LIMIT_DAY_MAX, 20);
 const AI_UPSTREAM_TIMEOUT_MS = positiveInt(process.env.AI_UPSTREAM_TIMEOUT_MS, 120000);
 
-if (!JWT_SECRET || JWT_SECRET.length < 16) {
+if (!AI_ONLY && (!JWT_SECRET || JWT_SECRET.length < 16)) {
   console.error('启动失败：请在 .env 设置足够长的 JWT_SECRET'); process.exit(1);
 }
 
 const app = express();
 app.set('trust proxy', 1); // 处于 nginx 反代之后，限流取真实 IP
+if (AI_ONLY) {
+  // 在 CORS 预检和 JSON 解析前禁用，确保旧接口的所有方法统一返回 503。
+  app.use(['/auth', '/progress'], (_req, res) => res.status(503).json({ error: 'sync_disabled' }));
+}
 app.use(express.json({ limit: '256kb' }));
 
 // CORS：仅允许白名单来源
@@ -262,7 +272,7 @@ app.put('/progress', auth, async (req, res) => {
 });
 
 async function start() {
-  await db.init();
+  if (!AI_ONLY) await db.init();
   app.listen(PORT, '127.0.0.1', () => console.log('science-lab-api listening on 127.0.0.1:' + PORT));
 }
 if (require.main === module) start().catch(e => { console.error('启动失败：', e); process.exit(1); });

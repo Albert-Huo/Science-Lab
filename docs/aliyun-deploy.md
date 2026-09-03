@@ -7,17 +7,23 @@
 
 二者同源，浏览器不需要跨域调用，内置 AI 默认请求本站 `/api/ai/chat/completions`。当前服务端仍校验请求的 `Origin`，因此 `CORS_ORIGINS` 必须包含 `https://lab.xingnian.net.cn`。主域名留给现有网站，互不影响。实验内容仍从 `html.xingnian.net.cn` 加载。
 
+本站免登录部署设置 `APP_MODE=ai-only`：无需 MySQL 或 `JWT_SECRET`，保留健康检查及 AI 校验、限流与 SSE；`/auth`、`/progress` 及其子路径的所有方法返回 `503 {"error":"sync_disabled"}`（HEAD 不返回响应体）。不加载数据库，也不会写入旧账号或进度。
+
+环境示例保留 `APP_MODE=full` 以兼容已有部署。未设置或为空也默认 `full`，必须有有效 JWT 密钥和可连接的数据库；数据库失败时拒绝启动，不会静默降级。其他非空模式值同样拒绝启动。`DB_DRIVER=memory` 只用于本地测试，不持久化，不能用于生产替代数据库。
+
 > GitHub 仓库继续用于存代码/版本管理；对外网页由阿里云提供。国内访问比 GitHub Pages 更快更稳。
 
 ## 0. 准备
 
 - 新子域名解析到本服务器，例如 `lab.xingnian.net.cn`，并签发 TLS 证书（Let's Encrypt 或阿里云免费证书）。
-- Node ≥ 18；可用的 MySQL（自建或阿里云 RDS）。
+- Node ≥ 18；仅 `full` 模式需要可用的 MySQL（自建或阿里云 RDS）。
 - 防火墙只放行 443（与现网所需端口）；Node 端口（默认 8970）仅监听 127.0.0.1。
 
 > “本次没有修改数据库代码或表结构”不等于“生产数据已经验证完好”。升级已有部署时，必须先完成下面的备份和只读基线核验；新建部署可跳过旧数据核验。
 
-## 1. 建库与表
+## 1. 建库与表（仅 full）
+
+新建 `ai-only` 部署可跳过建库。若已有账号数据库，即使本次切换为 `ai-only`，仍须保留旧库并执行下面的备份与只读基线核验，不要删除旧数据。
 
 ```sql
 CREATE DATABASE sciencelab CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -54,12 +60,14 @@ cd /opt/science-lab-api
 npm ci --omit=dev
 cp .env.example .env
 # 编辑 .env：
-#   JWT_SECRET: node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+#   APP_MODE: 本站设置 ai-only；保留旧账号/同步服务时设置 full
+#   JWT_SECRET: ai-only 可留空；仅 full 需要长随机密钥
+#     生成示例：node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 #   DEEPSEEK_API_KEY: 服务端专用 DeepSeek API Key（不要提交到 Git）
 #   AI_RATE_LIMIT_MINUTE_MAX: 单 IP 每分钟上限，默认 10
 #   AI_RATE_LIMIT_DAY_MAX: 单 IP 每 24 小时上限，默认 20
 #   AI_UPSTREAM_TIMEOUT_MS: DeepSeek 单次请求总超时，默认 120000 毫秒
-#   DB_* 填上面建的库与账号
+#   DB_*: ai-only 无需配置；仅 full 填上面建的库与账号
 #   CORS_ORIGINS: 至少填写前端完整 Origin，例如 https://lab.xingnian.net.cn
 nano .env
 
@@ -70,7 +78,9 @@ pm2 save && pm2 startup    # 按提示执行输出命令，开机自启
 
 健康检查：`curl http://127.0.0.1:8970/health` → `{"ok":true}`。
 
-`DEEPSEEK_API_KEY` 可以暂时留空：Node 服务仍会正常启动，健康检查及旧版账号/进度接口不受影响，仅 `/ai/*` 返回 `503 ai_unavailable`。
+`DEEPSEEK_API_KEY` 可以暂时留空：在所选模式的启动条件满足后，Node 服务仍会正常启动，健康检查不受影响，合法 AI 请求返回 `503 ai_unavailable`。`ai-only` 的旧接口始终禁用；`full` 的旧版账号/进度接口不受缺 Key 影响。
+
+发布前运行 `cd server/api && npm test`，其中启动模式测试会用隔离环境执行真实的 `node server.js`，确认无数据库的 `ai-only` 能启动、旧接口被禁用，并验证默认/`full` 模式仍要求 JWT 和数据库。测试不会继承本机 Key 或 `.env`，不会调用真实 AI。
 
 ## 3. 部署 App 静态页面
 
@@ -339,10 +349,12 @@ pm2 restart science-lab-api --update-env
 | GET | `/api/progress` | 旧版兼容：需 Bearer token，返回 `{history}` |
 | PUT | `/api/progress` | 旧版兼容：需 Bearer token，服务端合并，返回 `{history}` |
 
+表中的旧版账号/进度接口仅在 `full` 模式可用；`ai-only` 模式统一返回 `503 sync_disabled`，包括子路径和 OPTIONS 预检。
+
 ## 安全要点
 
-- 密码 bcrypt 哈希；登录态 JWT（密钥在 `.env`）。
-- 注册/登录限流（15 分钟 30 次/IP）。
+- `full` 模式：密码 bcrypt 哈希；登录态 JWT（密钥在 `.env`）。
+- `full` 模式：注册/登录限流（15 分钟 30 次/IP）；`ai-only` 不开放账号与同步接口。
 - AI 路由叠加每分钟和每 24 小时两级 IP 限流，默认分别为 10 次和 20 次，可用 `AI_RATE_LIMIT_MINUTE_MAX`、`AI_RATE_LIMIT_DAY_MAX` 调整。
 - AI 上游请求默认在 120 秒后中止，客户端断开连接时也会中止；可用 `AI_UPSTREAM_TIMEOUT_MS` 调整总超时。
 - AI 请求仅接受最多 20 条 `messages`；角色和单条长度受限；模型仅允许 `deepseek-v4-flash`；服务端强制流式响应、关闭思考模式、`max_tokens ≤ 2048`、`temperature ∈ [0,2]`，其他字段不会透传。
