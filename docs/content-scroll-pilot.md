@@ -88,7 +88,7 @@ node tools/preview-scroll.mjs --content-root /Users/lx100/projects/HTML-GitHub/H
 - 正式验证材料位于 `/Users/lx100/projects/HTML-GitHub/HTML-sources-private/reports/visual-regression/2026-09-04-all-middle-scroll/output/playwright/`。宿主继续使用 `experiment-scroll.js?app=v0.8.4`，API 健康检查为 `{"ok":true}`；本轮没有改动 App 静态文件，因此没有切换 ECS release。
 - 回滚方式：在内容仓库对 `3a3b92797c8073f081d66c3bef23204b9cdf4880` 创建反向提交并推送 `main`，等待 Pages 与缓存刷新工作流完成；无需回滚或重启 ECS。
 
-## 2026-09-04 Android 微信生命周期恢复（待发布 v0.8.5）
+## 2026-09-04 Android 微信生命周期恢复（v0.8.5）
 
 - 诊断稳定复现了“手柄仍为 ready、输入计数增加、实验内容不滚动”：实验 iframe 的接收器在 `pagehide` 后清空连接，但自身没有恢复处理；宿主又可能继续持有最后状态。
 - 接收器改为在可恢复挂起时暂停观察器并保留会话，在 `pageshow` / `resume` 时恢复；宿主在重新可见、页面显示或恢复时重连当前 iframe。每次有效拖动开始还会重发同会话 `connect`，用于应对 WebView 漏发恢复事件。
@@ -96,6 +96,10 @@ node tools/preview-scroll.mjs --content-root /Users/lx100/projects/HTML-GitHub/H
 - 内容接收器升级为 `experiment-scroll-receiver.v2.js`。70 个初中物理实验仅将 v1 引用替换为 v2，实验正文逐字不变；v1 文件保留以兼容未刷新的旧页面。
 - 宿主页面、滚动模块和 Service Worker 同步升级为 v0.8.5。专项行为均按失败测试→最小实现→通过验证完成。
 - 390×844 Android 微信隔离回归：实验 1、2、10、35、41、50、68 共 42 次往返拖动全部生效；iframe 和宿主恢复后均滚动 63px，首次拖动自愈场景也滚动 63px，触摸取消为 0。触摸带实测距右边缘 18px；桌面 1280×720 保持隐藏并可正常切换实验。
+- 内容提交 `bfd505b1ba9dec42b2c6b1df6ee4d53bdec10ba0` 已推送到 `HTML-` 的 `main`。GitHub Pages 工作流 [33862801436](https://github.com/Albert-Huo/HTML-/actions/runs/33862801436) 与缓存刷新工作流 [33862854539](https://github.com/Albert-Huo/HTML-/actions/runs/33862854539) 均成功；公开 v2 接收器 SHA-256 为 `9483ccbac89be3ef9a6259af156ee9ecd4f43ce1a39efbdaa11f9102d9854054`，70/70 个实验页均只引用 v2。
+- App 功能提交 `cd1f743fe55b6700c5b3b2736ffaba5e7b0373a0` 已推送到 `Science-Lab` 的 `main`。阿里云静态站已原子切换到 `/var/www/science-lab-releases/20260904-cd1f743fe55b`，回滚链接指向 `/var/www/science-lab-releases/20260904-e13832ae2670`；API、nginx、数据库和密钥未改动，API 内外网健康检查均通过。
+- 正式公网 390×844 Android 微信仿真读取到 `v0.8.5` 与 `experiment-scroll-receiver.v2.js`。实验 1、2、10、35、41、50、68 各连续拖动两次均滚动 63px，且编号不变；iframe 恢复、宿主恢复和首次拖动自愈也均为 63px。触摸区为 30×112px、距右边缘 18px，控制台错误为 0，Service Worker 已接管并使用 `sl-shell-v0.8.5`。最终真机体验仍由用户确认。
+- 部署保护曾在一条严格管道校验的误报中自动切回旧 release；改为完整下载响应后再校验，最终切换成功。这验证了静态回滚链路可用，没有影响 API 或用户数据。
 
 ## 单手柄改版验证记录
 
