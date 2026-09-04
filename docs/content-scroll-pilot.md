@@ -51,6 +51,10 @@ node tools/preview-scroll.mjs --content-root /Users/lx100/projects/HTML-GitHub/H
 - 隔离的 390×844 Chromium 使用微信 Android User-Agent、触摸上下文并强制 `setPointerCapture` 抛错：实验 1 从 0 滚到 100px，实验 35、41 均从 0 滚到 60px，三个实验编号分别保持 1/118、36/118、42/118；实验 1 横拖与轻点后仍为 0。控制台 0 错误，只有预期的兼容模式警告。
 - 验证截图：`/Users/lx100/projects/HTML-GitHub/HTML-sources-private/reports/visual-regression/2026-09-04-wechat-scroll-fallback/output/playwright/.playwright-cli/page-2026-09-04T03-10-14-592Z.png`。
 - 自动化检查只能模拟微信输入组合。正式推送和部署前，仍需在真实微信内确认实验 1、35、41 可上下拖动且实验编号不变。
+- 用户随后授权发布：设计提交 `b18ee6c8f055445efb90141bc19f2c64f4ddfb04` 与功能提交 `ae9f5756abb9126fe0600915462735b973d4eaab` 已快进合并并推送到 `main`。
+- Service Worker 升级为 `v0.8.2`；阿里云静态站已原子切换到 `/var/www/science-lab-releases/20260904-ae9f5756abb9`，上一版 `/var/www/science-lab-releases/20260904-659d71c79d89` 保留为回滚目标。API、nginx 和数据库未改动，API 内外网健康检查均通过。
+- 公网 390×844 微信 Android 仿真复验实际返回 Touch 回退代码和 `v0.8.2`：强制指针捕获失败后，实验 1、35、41 均从 0 滚动到 60px，编号保持 1/118、36/118、42/118；控制台 0 错误。最终结论仍以用户的微信真机体验为准。
+- 公网验证截图：`/Users/lx100/projects/HTML-GitHub/HTML-sources-private/reports/visual-regression/2026-09-04-wechat-scroll-fallback/output/playwright/.playwright-cli/page-2026-09-04T03-22-10-839Z.png`。
 
 ## 单手柄改版验证记录
 
