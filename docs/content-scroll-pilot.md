@@ -64,6 +64,8 @@ node tools/preview-scroll.mjs --content-root /Users/lx100/projects/HTML-GitHub/H
 - 新增版本一致性、页面级事件接管和监听清理测试。滚动专项 18/18、完整 `npm test --prefix server/api`、离线依赖审计、脚本语法和差异空白检查均通过。
 - 隔离的 390×844 Chromium 使用 Android 微信 User-Agent 和触摸上下文，并强制 `setPointerCapture` 失败：实验 1 手指从手柄内拖到手柄外后滚动 140px；实验 35、41 各滚动 80px，编号保持 1/118、36/118、42/118。控制台 0 错误，只有预期兼容警告。
 - 验证截图：`/Users/lx100/projects/HTML-GitHub/HTML-sources-private/reports/visual-regression/2026-09-04-android-scroll-v083/output/playwright/.playwright-cli/page-2026-09-04T04-10-09-916Z.png`。自动化不能等同于真实 X5，最终结论仍以 Android 微信真机为准。
+- 功能提交 `73f46aabe6d18a6554cc953d3ff95792acce84a4` 已推送并快进合并到 `main`。阿里云静态站已原子切换到 `/var/www/science-lab-releases/20260904-73f46aabe6d1`，回滚链接指向 `/var/www/science-lab-releases/20260904-ae9f5756abb9`；API、nginx、数据库及内容站未改动，API 内外网健康检查均通过。
+- 公网同一 Android 微信仿真再次读取到 `v0.8.3`：强制指针捕获失败后，实验 1、35、41 分别滚动到 140、80、80px，编号保持不变，结束后活动状态均已清理，控制台 0 错误。公网截图：`/Users/lx100/projects/HTML-GitHub/HTML-sources-private/reports/visual-regression/2026-09-04-android-scroll-v083/output/playwright/.playwright-cli/page-2026-09-04T04-14-31-796Z.png`。
 
 ## 单手柄改版验证记录
 
