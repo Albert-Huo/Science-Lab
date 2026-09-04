@@ -99,7 +99,7 @@ pm2 save && pm2 startup    # 按提示执行输出命令，开机自启
 每次把仓库根目录这些文件放到一个新的只读 release 目录，再原子切换 `/var/www/science-lab-current` 符号链接：
 
 ```
-index.html  catalog-control.js  content-source.js  catalog-control.json  manifest.json  manifest.webmanifest  sw.js  assets/
+index.html  catalog-control.js  content-source.js  experiment-scroll.js  catalog-control.json  manifest.json  manifest.webmanifest  sw.js  assets/
 ```
 
 ```bash
@@ -109,17 +109,18 @@ set -euo pipefail
 SCIENCE_LAB_RELEASE_ID=$(date '+%Y%m%d-%H%M%S')
 SCIENCE_LAB_RELEASE_DIR="/var/www/science-lab-releases/${SCIENCE_LAB_RELEASE_ID}"
 sudo install -d -m 755 "$SCIENCE_LAB_RELEASE_DIR"
-sudo install -m 644 index.html catalog-control.js content-source.js catalog-control.json manifest.json manifest.webmanifest sw.js "$SCIENCE_LAB_RELEASE_DIR/"
+sudo install -m 644 index.html catalog-control.js content-source.js experiment-scroll.js catalog-control.json manifest.json manifest.webmanifest sw.js "$SCIENCE_LAB_RELEASE_DIR/"
 sudo cp -a assets "$SCIENCE_LAB_RELEASE_DIR/"
 sudo chown -R root:root "$SCIENCE_LAB_RELEASE_DIR"
 sudo find "$SCIENCE_LAB_RELEASE_DIR" -type d -exec chmod 755 {} +
 sudo find "$SCIENCE_LAB_RELEASE_DIR" -type f -exec chmod 644 {} +
 
-# 根 URL 与 index.html 是同一份内容，因此 App 壳有以下十个物理文件。
+# 根 URL 与 index.html 是同一份内容，因此 App 壳有以下十一个物理文件。
 SCIENCE_LAB_SHELL_FILES=(
   "index.html"
   "catalog-control.js"
   "content-source.js"
+  "experiment-scroll.js"
   "catalog-control.json"
   "manifest.json"
   "manifest.webmanifest"
@@ -162,7 +163,7 @@ fi
 sudo ln -sfn "$SCIENCE_LAB_RELEASE_DIR" /var/www/science-lab-next
 sudo mv -Tf /var/www/science-lab-next /var/www/science-lab-current
 
-# 切换后验证首页与十个物理 App 壳 URL。
+# 切换后验证首页与十一个物理 App 壳 URL。
 SCIENCE_LAB_PUBLIC_URL="https://lab.xingnian.net.cn"
 SCIENCE_LAB_HTTP_STATUS=$(curl --silent --show-error \
   --output /dev/null --write-out '%{http_code}' "$SCIENCE_LAB_PUBLIC_URL/")
@@ -194,6 +195,14 @@ trap - EXIT
 ```
 
 `/var/www/science-lab-current` 必须保持为指向某个 release 目录的符号链接。`server/`、`docs/`、`tools/` 不用上传，它们不是网页运行所需。
+
+### 内容滚动手柄的双站发布顺序
+
+移动端内容手柄首批只接入初中物理实验 1、35、41。先在内容仓库的这三份 HTML 中内联 App 仓库 `experiment-scroll-receiver.js` 的原始源码，确认 Pages 和 CDN 返回新版本，再部署 App 壳。接收器独立打开时不生效，不改变器材或教学步骤；未接入的实验隐藏手柄。
+
+发布前运行 `node tools/check-scroll-release.mjs --content-root <内容仓库目录> --base-ref <内容基线完整提交SHA>`，确认接收器一致且没有夹带其他 HTML 修改。App 的 `sw.js` v0.8.0 预缓存 `experiment-scroll.js`；接收器源文件、`scroll-preview.html` 和预览工具不上传 ECS。跨域实验内容仍不由 App 缓存，离线只保证已有 App 壳，不能承诺实验离线可用。
+
+先发布接收器可兼容旧 App。若 App 发布失败，仅恢复原静态 release 链接即可；不要删除旧缓存以外的浏览器数据，也不要重启或改动 API。
 
 ## 4. nginx：一个 server 同时托管页面与接口
 

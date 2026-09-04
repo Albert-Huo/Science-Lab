@@ -60,6 +60,22 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
   border-radius:2px;background:#ffffff2a;transition:background .2s;}
 #edgeL .rail{left:4px;}#edgeR .rail{right:4px;}
 .edge.active .rail{background:var(--acc);}
+.scroll-grip{display:none;}
+@media (pointer:coarse){
+  #edgeL{display:none;}
+  #edgeR{--scroll-h:min(112px,max(0px,calc(100% - var(--hud-h) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 150px)));
+    top:clamp(calc(var(--hud-h) + env(safe-area-inset-top) + 8px),calc(50% - var(--scroll-h) / 2),calc(100% - 134px - env(safe-area-inset-bottom) - var(--scroll-h)));
+    bottom:auto;height:var(--scroll-h);visibility:hidden;pointer-events:none;user-select:none;}
+  #edgeR.scroll-ready{visibility:visible;pointer-events:auto;}
+  #edgeR .rail{display:none;}
+  #edgeR .scroll-grip{display:flex;position:absolute;inset:8px 6px;flex-direction:column;align-items:center;justify-content:center;gap:7px;
+    border-radius:8px;border:1px solid #d7dfea20;background:#0b0f1740;color:#d7dfea99;pointer-events:none;
+    transition:background .15s,color .15s,border-color .15s;}
+  #edgeR .scroll-grip::before,#edgeR .scroll-grip::after{content:"";width:2px;height:24px;border-radius:2px;background:currentColor;opacity:.6;}
+  #edgeR .scroll-grip span{font-size:12px;line-height:14px;}
+  #edgeR.active .scroll-grip,#edgeR:focus-visible .scroll-grip{background:#121826cc;color:var(--txt);border-color:#d7dfea66;}
+  #edgeR:focus-visible{outline:1px solid var(--txt2);outline-offset:-2px;border-radius:10px;}
+}
 /* ---------- nav arrows ---------- */
 #navBtns{position:fixed;right:10px;bottom:calc(24px + env(safe-area-inset-bottom));z-index:30;
   display:flex;flex-direction:column;gap:10px;}
@@ -211,11 +227,13 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 </div>
 
 <div class="edge" id="edgeL"><div class="rail"></div></div>
-<div class="edge" id="edgeR"><div class="rail"></div></div>
+<div class="edge" id="edgeR" aria-hidden="true" tabindex="-1" aria-orientation="vertical">
+  <div class="rail"></div><div class="scroll-grip" aria-hidden="true"><span>↕</span></div>
+</div>
 
 <div id="navBtns">
-  <button id="btnPrev" title="上一个">↑</button>
-  <button id="btnNext" title="下一个">↓</button>
+  <button id="btnPrev" title="上一个实验" aria-label="上一个实验">↑</button>
+  <button id="btnNext" title="下一个实验" aria-label="下一个实验">↓</button>
 </div>
 
 <div id="overlay"></div>
@@ -272,9 +290,10 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 </aside>
 
 <div id="hint" class="hide"><div class="card">
-  <b>↑ 上下滑动</b>　左右边缘竖条上下滑可切换实验<br>
-  <b>← 左滑</b>　从右边缘向左滑打开目录<br>
-  <b>→ 右滑</b>　从左边缘向右滑打开我的/AI<br>
+  <b>↕ 查看当前实验</b>　按住右侧短手柄，上滑查看下方，下滑返回（已适配实验）<br>
+  <b>↑ ↓ 切换实验</b>　点击右下角箭头<br>
+  <b>☰ 目录</b>　点击顶部目录按钮选择实验<br>
+  <b>我的 / AI</b>　点击左上角头像按钮<br>
   桌面端可用 滚轮 / 方向键 翻页
   <button class="ok" id="hintOk">开始探索</button>
 </div></div>
@@ -290,6 +309,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 
 <script src="catalog-control.js"></script>
 <script src="content-source.js"></script>
+<script src="experiment-scroll.js"></script>
 <script>
 const qs = new URLSearchParams(location.search);
 /* 内容源：生产固定线上站；与内容站同域时用相对路径；仅本地联调接受根相对 ?base= */
@@ -377,8 +397,13 @@ function mount(i){
   if(!p.querySelector('iframe')){
     const f=document.createElement('iframe');
     f.src = CONTENT_BASE + MANIFEST[i].path;
+    f.id='experiment-frame-'+i;
     f.loading='lazy';
-    f.addEventListener('load',()=>{const ph=p.querySelector('.ph'); if(ph) ph.remove();});
+    f.addEventListener('load',()=>{
+      f.dataset.scrollLoaded='1';
+      const ph=p.querySelector('.ph'); if(ph) ph.remove();
+      if(i===cur) activateScroll();
+    });
     p.appendChild(f);
   }
 }
@@ -409,6 +434,7 @@ function render(){
   markHistory(it);
   highlightCat();
   renderChatForCurrent();
+  activateScroll();
 }
 function goTo(i){
   if(i<0||i>=MANIFEST.length||i===cur) return;
@@ -502,10 +528,12 @@ function openPanel(which){
   closePanels();
   document.getElementById(which==='catalog'?'panelCat':'panelUser').classList.add('show');
   overlay.classList.add('show');
+  updateScrollBand();
 }
 function closePanels(){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('show'));
   overlay.classList.remove('show');
+  updateScrollBand();
 }
 matchMedia('(min-width:900px)').addEventListener('change',closePanels); // 跨断点时归位
 overlay.addEventListener('click',closePanels);
@@ -713,9 +741,47 @@ document.getElementById('aiClearChat').addEventListener('click',()=>{
 });
 
 /* ---------- gestures ---------- */
+const scrollTouch=matchMedia('(pointer:coarse)');
+const scrollEdge=document.getElementById('edgeR');
+const scrollClient=ExperimentScroll.createClient(window,()=>updateScrollBand());
+const scrollBand=ExperimentScroll.bindBand(scrollEdge,{
+  enabled:()=>scrollEdge.classList.contains('scroll-ready'),
+  scroll:delta=>scrollClient.scroll(delta),jump:edge=>scrollClient.jump(edge),
+  state:()=>scrollClient.getState()
+});
+function updateScrollBand(){
+  const state=scrollClient.getState();
+  const ready=scrollTouch.matches&&scrollEdge.clientHeight>=44&&state&&state.max>1&&!state.blocked&&
+    !document.querySelector('.panel.show')&&document.getElementById('hint').classList.contains('hide')&&!document.hidden;
+  scrollEdge.classList.toggle('scroll-ready',!!ready);
+  scrollEdge.tabIndex=ready?0:-1;
+  scrollEdge.setAttribute('aria-hidden',String(!ready));
+  if(!ready){scrollBand.cancel();scrollEdge.removeAttribute('role');return;}
+  scrollEdge.setAttribute('role','scrollbar');
+  scrollEdge.setAttribute('aria-roledescription','内容滚动手柄');
+  scrollEdge.setAttribute('aria-label','按住上下拖动查看当前实验；上滑查看下方，方向键也可滚动');
+  scrollEdge.setAttribute('aria-controls','experiment-frame-'+cur);
+  scrollEdge.setAttribute('aria-valuemin','0');
+  scrollEdge.setAttribute('aria-valuemax',String(Math.round(state.max)));
+  scrollEdge.setAttribute('aria-valuenow',String(Math.round(state.top)));
+  scrollEdge.setAttribute('aria-valuetext',Math.round(state.top/state.max*100)+'%');
+}
+function activateScroll(){
+  scrollBand.cancel();
+  const frame=pages[cur].querySelector('iframe');
+  scrollClient.activate(scrollTouch.matches&&frame&&frame.dataset.scrollLoaded==='1'?frame:null);
+}
+scrollTouch.addEventListener('change',activateScroll);
+window.addEventListener('resize',updateScrollBand);
+document.addEventListener('visibilitychange',()=>{scrollBand.cancel();updateScrollBand();});
+window.addEventListener('pagehide',()=>{scrollBand.cancel();scrollClient.activate(null);});
+window.addEventListener('pageshow',event=>{if(event.persisted) activateScroll();});
+
 function attachEdge(el, side){
   let sx=0,sy=0,on=false;
-  el.addEventListener('pointerdown',e=>{ on=true; sx=e.clientX; sy=e.clientY;
+  el.addEventListener('pointerdown',e=>{
+    if(scrollTouch.matches) return;
+    on=true; sx=e.clientX; sy=e.clientY;
     el.classList.add('active'); try{el.setPointerCapture(e.pointerId);}catch(_){} e.preventDefault(); });
   el.addEventListener('pointerup',e=>{
     if(!on) return; on=false; el.classList.remove('active');
@@ -759,6 +825,7 @@ const hint=document.getElementById('hint');
 if(!safeGet(LS.hint)) hint.classList.remove('hide');
 document.getElementById('hintOk').addEventListener('click',()=>{
   hint.classList.add('hide'); safeSet(LS.hint,'1');
+  updateScrollBand();
 });
 
 /* ---------- init ---------- */

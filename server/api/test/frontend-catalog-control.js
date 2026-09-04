@@ -243,6 +243,7 @@ function assertActiveRateZonePlacement(nginxBlock) {
   );
   assert.ok(serviceWorker.includes("'./catalog-control.js'"), '发布控制模块应进入离线 App 壳');
   assert.ok(serviceWorker.includes("'./content-source.js'"), '内容源解析模块应进入离线 App 壳');
+  assert.ok(serviceWorker.includes("'./experiment-scroll.js'"), '内容滚动模块应进入离线 App 壳');
   assert.ok(serviceWorker.includes("'./catalog-control.json'"), '发布控制配置应提供离线回退');
   assert.ok(
     serviceWorker.includes("url.pathname.endsWith('/catalog-control.json')"),
@@ -254,6 +255,7 @@ function assertActiveRateZonePlacement(nginxBlock) {
     'index.html',
     'catalog-control.js',
     'content-source.js',
+    'experiment-scroll.js',
     'catalog-control.json',
     'manifest.json',
     'manifest.webmanifest',
@@ -267,7 +269,7 @@ function assertActiveRateZonePlacement(nginxBlock) {
   const shellArray = staticDeployBlock.match(/SCIENCE_LAB_SHELL_FILES=\(\n([\s\S]*?)\n\)/);
   assert.ok(shellArray, '静态发布必须定义完整的物理 App 壳文件清单');
   const documentedShellFiles = Array.from(shellArray[1].matchAll(/^\s+"([^"]+)"$/gm), (match) => match[1]);
-  assert.deepStrictEqual(documentedShellFiles, shellFiles, '静态发布校验清单必须精确包含十个物理壳文件');
+  assert.deepStrictEqual(documentedShellFiles, shellFiles, '静态发布校验清单必须精确包含十一个物理壳文件');
   assert.ok(
     /for SCIENCE_LAB_SHELL_FILE in "\$\{SCIENCE_LAB_SHELL_FILES\[@\]\}"; do[\s\S]*?test -f "\$SCIENCE_LAB_RELEASE_DIR\/\$SCIENCE_LAB_SHELL_FILE"[\s\S]*?done/.test(staticDeployBlock),
     '静态发布切换前必须逐个校验物理 App 壳文件'
@@ -415,7 +417,7 @@ function assertActiveRateZonePlacement(nginxBlock) {
   assert.ok(deployGuide.includes('### 仅回滚 Node API'), 'Node API 回滚必须是独立操作');
   assert.ok(deployGuide.includes('deepseek-v4-flash'), '真实 AI 验证必须使用当前模型');
   assert.ok(
-    /install -m 644 index\.html catalog-control\.js content-source\.js catalog-control\.json manifest\.json manifest\.webmanifest sw\.js/.test(deployGuide),
+    /install -m 644 index\.html catalog-control\.js content-source\.js experiment-scroll\.js catalog-control\.json manifest\.json manifest\.webmanifest sw\.js/.test(deployGuide),
     '原子发布必须复制全部 App 壳文件'
   );
   assert.ok(
