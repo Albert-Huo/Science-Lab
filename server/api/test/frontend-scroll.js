@@ -160,12 +160,13 @@ test('actual pilot modal-mask is observed and blocks background scrolling', () =
   f.receiver.destroy();
 });
 
-function bandFixture() {
+function bandFixture({ captureThrows = false } = {}) {
   const events = windowStub(), captured = new Set(), deltas = [], jumps = [];
   let enabled = true, catalog = 0;
   const element = {
     ...events, classList: { add() {}, remove() {} },
-    setPointerCapture: id => captured.add(id), hasPointerCapture: id => captured.has(id),
+    setPointerCapture: id => { if (captureThrows) throw new Error('pointer capture unsupported'); captured.add(id); },
+    hasPointerCapture: id => captured.has(id),
     releasePointerCapture: id => captured.delete(id),
     querySelector: () => ({ getBoundingClientRect: () => ({ top: 100, bottom: 150 }) })
   };
@@ -177,7 +178,11 @@ function bandFixture() {
     pointerId: 1, pointerType: 'touch', isPrimary: true, clientX: x, clientY: y,
     preventDefault() {}, stopPropagation() {}, ...extra
   });
-  return { band, send, deltas, jumps, captured, disable: () => { enabled = false; }, catalog: () => catalog };
+  const touch = (identifier, x, y) => ({ identifier, clientX: x, clientY: y });
+  const sendTouch = (type, touches, changedTouches = touches) => element.emit(type, {
+    touches, changedTouches, preventDefault() {}, stopPropagation() {}
+  });
+  return { band, send, sendTouch, touch, deltas, jumps, captured, disable: () => { enabled = false; }, catalog: () => catalog };
 }
 
 test('vertical band gestures scroll incrementally and cancellation releases capture', () => {
@@ -196,6 +201,39 @@ test('vertical band gestures scroll incrementally and cancellation releases capt
   f.send('lostpointercapture', 380, 400);
   f.send('pointermove', 380, 200);
   assert.deepEqual(f.deltas, [50, 50]);
+  f.band.destroy();
+});
+
+test('pointer gesture continues inside the handle when pointer capture is unavailable', () => {
+  const f = bandFixture({ captureThrows: true });
+  f.send('pointerdown', 380, 400, { pointerType: 'mouse', button: 0 });
+  f.send('pointermove', 380, 340, { pointerType: 'mouse' });
+  f.send('pointerup', 380, 340, { pointerType: 'mouse' });
+  assert.deepEqual(f.deltas, [60]);
+  assert.equal(f.captured.size, 0);
+  f.band.destroy();
+});
+
+test('touch events scroll without a pointer stream and stop after touch end', () => {
+  const f = bandFixture();
+  f.sendTouch('touchstart', [f.touch(7, 380, 400)]);
+  f.sendTouch('touchmove', [f.touch(7, 380, 340)]);
+  f.sendTouch('touchend', [], [f.touch(7, 380, 340)]);
+  f.sendTouch('touchmove', [f.touch(7, 380, 280)]);
+  assert.deepEqual(f.deltas, [60]);
+  f.band.destroy();
+});
+
+test('touch fallback takes over a matching pointer gesture without double scrolling', () => {
+  const f = bandFixture();
+  f.send('pointerdown', 380, 400);
+  f.sendTouch('touchstart', [f.touch(7, 380, 400)]);
+  f.send('pointermove', 380, 350);
+  f.sendTouch('touchmove', [f.touch(7, 380, 350)]);
+  f.sendTouch('touchend', [], [f.touch(7, 380, 350)]);
+  f.send('pointermove', 380, 300);
+  assert.deepEqual(f.deltas, [50]);
+  assert.equal(f.captured.size, 0);
   f.band.destroy();
 });
 

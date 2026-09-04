@@ -43,37 +43,84 @@
 
   function bindBand(element,options){
     let gesture=null;
+    let captureWarningShown=false;
     const handlers=[];
-    function listen(type,fn){element.addEventListener(type,fn,type==='wheel'?{passive:false}:undefined);handlers.push([type,fn]);}
+    function listen(type,fn,settings){
+      const listenerSettings=settings||(type==='wheel'?{passive:false}:undefined);
+      element.addEventListener(type,fn,listenerSettings);handlers.push([type,fn,listenerSettings]);
+    }
     function cancel(){
       const previous=gesture; gesture=null; element.classList.remove('active');
-      if(previous&&element.hasPointerCapture(previous.id)) element.releasePointerCapture(previous.id);
+      if(previous&&previous.input==='pointer'&&previous.captured){
+        try{
+          if(typeof element.hasPointerCapture!=='function'||element.hasPointerCapture(previous.id)) element.releasePointerCapture(previous.id);
+        }catch(error){console.warn('内容滚动手柄释放指针捕获失败：'+error.message);}
+      }
+    }
+    function begin(input,id,x,y,fields={}){
+      gesture={input,id,x,y,lastY:y,axis:null,captured:false,...fields};
+      element.classList.add('active');
+    }
+    function move(x,y){
+      if(!options.enabled()){cancel();return;}
+      const dx=x-gesture.x,dy=y-gesture.y;
+      if(!gesture.axis&&Math.max(Math.abs(dx),Math.abs(dy))>=8) gesture.axis=Math.abs(dy)>=Math.abs(dx)?'y':'x';
+      if(gesture.axis==='y'){
+        options.scroll(Math.max(-4096,Math.min(4096,gesture.lastY-y)));
+        gesture.lastY=y;
+      }
+    }
+    function findTouch(list,id){
+      for(let i=0;i<list.length;i++) if(list[i].identifier===id) return list[i];
+      return null;
     }
     listen('pointerdown',event=>{
       if(!options.enabled()||gesture||event.isPrimary===false||(event.pointerType==='mouse'&&event.button!==0)) return;
-      try{element.setPointerCapture(event.pointerId);}
-      catch(error){console.warn('内容滚动带无法捕获触摸：'+error.message);return;}
-      gesture={id:event.pointerId,x:event.clientX,y:event.clientY,lastY:event.clientY,axis:null};
-      element.classList.add('active'); event.preventDefault();
-    });
-    listen('pointermove',event=>{
-      if(!gesture||event.pointerId!==gesture.id) return;
-      if(!options.enabled()){cancel();return;}
-      const dx=event.clientX-gesture.x,dy=event.clientY-gesture.y;
-      if(!gesture.axis&&Math.max(Math.abs(dx),Math.abs(dy))>=8) gesture.axis=Math.abs(dy)>=Math.abs(dx)?'y':'x';
-      if(gesture.axis==='y'){
-        options.scroll(Math.max(-4096,Math.min(4096,gesture.lastY-event.clientY)));
-        gesture.lastY=event.clientY;
+      let captured=false;
+      try{element.setPointerCapture(event.pointerId);captured=true;}
+      catch(error){
+        if(!captureWarningShown){console.warn('内容滚动手柄无法捕获指针，已启用兼容模式：'+error.message);captureWarningShown=true;}
       }
+      begin('pointer',event.pointerId,event.clientX,event.clientY,{captured,pointerType:event.pointerType});
       event.preventDefault();
     });
+    listen('pointermove',event=>{
+      if(!gesture||gesture.input!=='pointer'||event.pointerId!==gesture.id) return;
+      move(event.clientX,event.clientY);event.preventDefault();
+    });
     listen('pointerup',event=>{
-      if(!gesture||event.pointerId!==gesture.id) return;
+      if(!gesture||gesture.input!=='pointer'||event.pointerId!==gesture.id) return;
       cancel();
       event.preventDefault();
     });
-    listen('pointercancel',event=>{if(gesture&&event.pointerId===gesture.id) cancel();});
-    listen('lostpointercapture',event=>{if(gesture&&event.pointerId===gesture.id) cancel();});
+    listen('pointercancel',event=>{if(gesture&&gesture.input==='pointer'&&event.pointerId===gesture.id) cancel();});
+    listen('lostpointercapture',event=>{if(gesture&&gesture.input==='pointer'&&event.pointerId===gesture.id) cancel();});
+    listen('touchstart',event=>{
+      if(!options.enabled()) return;
+      if(event.touches.length!==1){if(gesture&&gesture.input==='touch') cancel();return;}
+      const point=event.touches[0];
+      if(gesture){
+        if(gesture.input!=='pointer'||gesture.pointerType!=='touch') return;
+        cancel();
+      }
+      begin('touch',point.identifier,point.clientX,point.clientY);
+      event.preventDefault();event.stopPropagation();
+    },{passive:false});
+    listen('touchmove',event=>{
+      if(!gesture||gesture.input!=='touch') return;
+      if(event.touches.length!==1){cancel();return;}
+      const point=findTouch(event.touches,gesture.id);
+      if(!point) return;
+      move(point.clientX,point.clientY);event.preventDefault();event.stopPropagation();
+    },{passive:false});
+    listen('touchend',event=>{
+      if(!gesture||gesture.input!=='touch'||!findTouch(event.changedTouches,gesture.id)) return;
+      cancel();event.preventDefault();event.stopPropagation();
+    },{passive:false});
+    listen('touchcancel',event=>{
+      if(!gesture||gesture.input!=='touch') return;
+      cancel();event.stopPropagation();
+    },{passive:false});
     listen('wheel',event=>{
       if(!options.enabled()) return;
       event.stopPropagation();
@@ -93,7 +140,7 @@
       else return;
       event.preventDefault();event.stopPropagation();
     });
-    return {cancel,destroy(){cancel();for(const [type,fn] of handlers) element.removeEventListener(type,fn);}};
+    return {cancel,destroy(){cancel();for(const [type,fn,settings] of handlers) element.removeEventListener(type,fn,settings);}};
   }
   return {createClient,bindBand,validState};
 });

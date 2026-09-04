@@ -48,7 +48,8 @@ export async function createPreview({ contentRoot, port = 18890 }) {
       if (content && PILOTS.has(relative)) {
         const html = body.toString('utf8');
         if (!/<\/body\s*>/i.test(html)) throw new Error('pilot_body_missing');
-        body = Buffer.from(html.replace(/<\/body\s*>/i, () => `<script data-scroll-pilot>\n${receiver}\n</script>\n</body>`));
+        const alreadyAdapted = /<script\b[^>]*\bdata-(?:science-lab-scroll|scroll-pilot)\b/i.test(html);
+        if (!alreadyAdapted) body = Buffer.from(html.replace(/<\/body\s*>/i, () => `<script data-scroll-pilot>\n${receiver}\n</script>\n</body>`));
       } else if (!content && relative === 'index.html') {
         // The preview uses a dedicated origin and does not register a caching worker.
         const html = body.toString('utf8');

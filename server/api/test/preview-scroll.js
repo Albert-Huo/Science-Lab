@@ -14,6 +14,8 @@ test('local preview injects only pilot HTML and never serves private paths or a 
   try {
     await fs.mkdir(path.join(contentRoot, 'physics-middle'));
     for (const number of [1, 2]) await fs.writeFile(path.join(contentRoot, `physics-middle/初中物理实验${number}.html`), '<body>fixture</body>');
+    await fs.writeFile(path.join(contentRoot, 'physics-middle/初中物理实验35.html'),
+      '<body>fixture<script data-science-lab-scroll>const CHANNEL="science-lab.scroll.v1";</script></body>');
     await fs.symlink('/etc/hosts', path.join(contentRoot, 'outside.html'));
     server = await createPreview({ contentRoot, port: 0 });
     const base = `http://127.0.0.1:${server.address().port}`;
@@ -22,6 +24,9 @@ test('local preview injects only pilot HTML and never serves private paths or a 
     assert.match(await pilot.text(), /science-lab\.scroll\.v1/);
     const plain = await fetch(base + '/HTML-/physics-middle/' + encodeURIComponent('初中物理实验2.html'));
     assert.equal(await plain.text(), '<body>fixture</body>');
+    const embedded = await (await fetch(base + '/HTML-/physics-middle/' + encodeURIComponent('初中物理实验35.html'))).text();
+    assert.equal((embedded.match(/science-lab\.scroll\.v1/g) || []).length, 1);
+    assert.ok(!embedded.includes('data-scroll-pilot'));
     const app = await (await fetch(base)).text();
     assert.ok(app.includes('experiment-scroll.js'));
     assert.ok(!app.includes("navigator.serviceWorker.register('sw.js')"));

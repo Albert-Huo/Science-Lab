@@ -200,7 +200,7 @@ trap - EXIT
 
 移动端内容手柄首批只接入初中物理实验 1、35、41。先在内容仓库的这三份 HTML 中内联 App 仓库 `experiment-scroll-receiver.js` 的原始源码，确认 Pages 和 CDN 返回新版本，再部署 App 壳。接收器独立打开时不生效，不改变器材或教学步骤；未接入的实验隐藏手柄。
 
-发布前运行 `node tools/check-scroll-release.mjs --content-root <内容仓库目录> --base-ref <内容基线完整提交SHA>`，确认接收器一致且没有夹带其他 HTML 修改。App 的 `sw.js` v0.8.0 预缓存 `experiment-scroll.js`；接收器源文件、`scroll-preview.html` 和预览工具不上传 ECS。跨域实验内容仍不由 App 缓存，离线只保证已有 App 壳，不能承诺实验离线可用。
+发布前运行 `node tools/check-scroll-release.mjs --content-root <内容仓库目录> --base-ref <内容基线完整提交SHA>`，确认接收器一致且没有夹带其他 HTML 修改。App 的 `sw.js` 预缓存 `experiment-scroll.js`，版本号在每次发布时递增；接收器源文件、`scroll-preview.html` 和预览工具不上传 ECS。跨域实验内容仍不由 App 缓存，离线只保证已有 App 壳，不能承诺实验离线可用。
 
 先发布接收器可兼容旧 App。若 App 发布失败，仅恢复原静态 release 链接即可；不要删除旧缓存以外的浏览器数据，也不要重启或改动 API。
 
