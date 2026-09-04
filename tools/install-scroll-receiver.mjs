@@ -5,7 +5,8 @@ import { parseArgs } from 'node:util';
 import { fileURLToPath } from 'node:url';
 
 const EXPECTED_COUNT = 70;
-const ASSET = 'experiment-scroll-receiver.v1.js';
+const ASSET = 'experiment-scroll-receiver.v2.js';
+const PREVIOUS_ASSETS = ['experiment-scroll-receiver.v1.js'];
 const TARGET_PATTERN = /^初中物理实验(?:\d+|\d+-\d+)\.html$/;
 const { values } = parseArgs({
   options: {
@@ -20,6 +21,7 @@ const contentRoot = path.resolve(values['content-root']);
 const experimentRoot = path.join(contentRoot, 'physics-middle');
 const receiver = readFileSync(path.join(appRoot, 'experiment-scroll-receiver.js'), 'utf8');
 const tag = `<script src="../${ASSET}" data-science-lab-scroll></script>\n`;
+const previousTags = PREVIOUS_ASSETS.map(asset => `<script src="../${asset}" data-science-lab-scroll></script>\n`);
 const legacyBlock = `<script data-science-lab-scroll>\n${receiver}</script>\n`;
 const files = readdirSync(experimentRoot)
   .filter(file => TARGET_PATTERN.test(file))
@@ -52,6 +54,9 @@ const changes = files.map(file => {
   }
   if (markerCount === 1) {
     if (html.includes(tag)) return null;
+    for (const previousTag of previousTags) {
+      if (html.includes(previousTag)) return { absolute, content: html.replace(previousTag, tag) };
+    }
     if (html.includes(legacyBlock)) {
       return { absolute, content: html.replace(legacyBlock, tag) };
     }

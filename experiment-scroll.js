@@ -3,7 +3,7 @@
   if(typeof module==='object'&&module.exports) module.exports=api;
   else root.ExperimentScroll=api;
 })(typeof globalThis!=='undefined'?globalThis:this,function(){
-  const VERSION='v0.8.4';
+  const VERSION='v0.8.5';
   const CHANNEL='science-lab.scroll.v1';
   function validState(data){
     return data&&data.type==='state'&&typeof data.blocked==='boolean'&&
@@ -30,6 +30,7 @@
         data.channel!==CHANNEL||data.session!==active.session||!validState(data)) return;
       notify({top:data.top,max:data.max,viewport:data.viewport,blocked:data.blocked});
     }
+    function ensure(){if(!active) return false;post('connect');return true;}
     function scroll(delta){
       if(!active||!state||state.blocked||state.max<=0||!Number.isFinite(delta)||Math.abs(delta)>4096) return false;
       post('scroll',{delta}); return true;
@@ -39,7 +40,27 @@
       post('jump',{edge}); return true;
     }
     view.addEventListener('message',receive);
-    return {activate,scroll,jump,getState:()=>state,destroy(){activate(null);view.removeEventListener('message',receive);}};
+    return {activate,ensure,scroll,jump,getState:()=>state,destroy(){activate(null);view.removeEventListener('message',receive);}};
+  }
+
+  function bindLifecycle(view,doc,options){
+    function resume(){if(!doc.hidden) options.activate();}
+    function onVisibility(){
+      options.cancel();
+      if(doc.hidden) options.update();
+      else options.activate();
+    }
+    function onPageHide(){options.cancel();options.deactivate();}
+    doc.addEventListener('visibilitychange',onVisibility);
+    doc.addEventListener('resume',resume);
+    view.addEventListener('pagehide',onPageHide);
+    view.addEventListener('pageshow',resume);
+    return {destroy(){
+      doc.removeEventListener('visibilitychange',onVisibility);
+      doc.removeEventListener('resume',resume);
+      view.removeEventListener('pagehide',onPageHide);
+      view.removeEventListener('pageshow',resume);
+    }};
   }
 
   function bindBand(element,options){
@@ -70,6 +91,7 @@
       }
     }
     function begin(input,id,x,y,fields={}){
+      if(typeof options.start==='function') options.start();
       gesture={input,id,x,y,lastY:y,axis:null,captured:false,...fields};
       element.classList.add('active');
       if(input==='pointer'){
@@ -164,5 +186,5 @@
     });
     return {cancel,destroy(){cancel();for(const [type,fn,settings] of handlers) element.removeEventListener(type,fn,settings);}};
   }
-  return {createClient,bindBand,validState,version:VERSION};
+  return {createClient,bindLifecycle,bindBand,validState,version:VERSION};
 });

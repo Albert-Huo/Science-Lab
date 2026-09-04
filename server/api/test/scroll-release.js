@@ -16,8 +16,10 @@ const { test } = require('node:test');
 
 const ROOT = path.resolve(__dirname, '../../..');
 const RECEIVER = readFileSync(path.join(ROOT, 'experiment-scroll-receiver.js'), 'utf8');
-const ASSET = 'experiment-scroll-receiver.v1.js';
+const ASSET = 'experiment-scroll-receiver.v2.js';
 const TAG = `<script src="../${ASSET}" data-science-lab-scroll></script>\n`;
+const PREVIOUS_ASSET = 'experiment-scroll-receiver.v1.js';
+const PREVIOUS_TAG = `<script src="../${PREVIOUS_ASSET}" data-science-lab-scroll></script>\n`;
 const LEGACY_BLOCK = `<script data-science-lab-scroll>\n${RECEIVER}</script>\n`;
 const NUMBERS = Array.from({ length: 68 }, (_, index) => index + 1)
   .filter(number => number !== 12)
@@ -75,6 +77,23 @@ function createFixture(t) {
   return { contentRoot, baseline: runGit(contentRoot, ['rev-parse', 'HEAD']) };
 }
 
+function createInstalledV1Fixture(t) {
+  const { contentRoot } = createFixture(t);
+  for (const number of NUMBERS) {
+    const file = path.join(contentRoot, 'physics-middle', `初中物理实验${number}.html`);
+    const html = readFileSync(file, 'utf8').replace(LEGACY_BLOCK, '').replace('</body>', `${PREVIOUS_TAG}</body>`);
+    writeFileSync(file, html);
+  }
+  writeFileSync(path.join(contentRoot, PREVIOUS_ASSET), RECEIVER);
+  runGit(contentRoot, ['add', '.']);
+  runGit(contentRoot, [
+    '-c', 'user.name=Science Lab Tests',
+    '-c', 'user.email=science-lab-tests@example.invalid',
+    'commit', '--quiet', '-m', 'installed v1 receiver'
+  ]);
+  return { contentRoot, baseline: runGit(contentRoot, ['rev-parse', 'HEAD']) };
+}
+
 function install(contentRoot) {
   return run('tools/install-scroll-receiver.mjs', ['--content-root', contentRoot, '--apply']);
 }
@@ -106,6 +125,17 @@ test('installer migrates all 70 pages and remains idempotent', t => {
   }
 
   assert.match(run('tools/install-scroll-receiver.mjs', ['--content-root', contentRoot]), /0 page changes/);
+});
+
+test('installer upgrades all v1 receiver tags to v2 without changing experiment content', t => {
+  const { contentRoot } = createInstalledV1Fixture(t);
+  install(contentRoot);
+  assert.equal(readFileSync(path.join(contentRoot, ASSET), 'utf8'), RECEIVER);
+  for (const number of NUMBERS) {
+    const html = readFileSync(path.join(contentRoot, `physics-middle/初中物理实验${number}.html`), 'utf8');
+    assert.equal(html.split(TAG.trim()).length - 1, 1);
+    assert.equal(html.split(PREVIOUS_TAG.trim()).length - 1, 0);
+  }
 });
 
 test('installer rejects an unknown receiver marker before writing', t => {

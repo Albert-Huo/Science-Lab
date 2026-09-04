@@ -13,9 +13,13 @@ test('host waits for the iframe load before connecting the scroll receiver', () 
 
 test('host version-pins the scroll module and exposes opt-in local diagnostics', () => {
   const serviceWorker = fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8');
+  const scrollModule = fs.readFileSync(path.join(ROOT, 'experiment-scroll.js'), 'utf8');
   const version = serviceWorker.match(/const VERSION = '(v\d+\.\d+\.\d+)';/)?.[1];
   const scrollVersion = hostHtml.match(/<script src="experiment-scroll\.js\?app=(v\d+\.\d+\.\d+)"><\/script>/)?.[1];
+  const moduleVersion = scrollModule.match(/const VERSION='(v\d+\.\d+\.\d+)'/)?.[1];
+  assert.equal(version, 'v0.8.5');
   assert.equal(scrollVersion, version);
+  assert.equal(moduleVersion, version);
   assert.ok(hostHtml.includes("qs.get('scroll-debug')==='1'"));
   assert.ok(hostHtml.includes('ExperimentScroll.version'));
 });
@@ -71,14 +75,49 @@ test('host trusts only current iframe, exact origin/session and valid state', ()
   assert.equal(client.getState(), null);
   win.emit('message', { origin: 'https://html.xingnian.net.cn', source: frame.contentWindow, data: state });
   assert.equal(client.getState().max, 1000);
+  assert.equal(typeof client.ensure, 'function', 'client connection confirmation is required');
+  assert.equal(client.ensure(), true);
+  assert.equal(messages.at(-1).data.type, 'connect');
+  assert.equal(messages.at(-1).data.session, session);
   assert.equal(client.scroll(120), true);
   assert.equal(messages.at(-1).data.delta, 120);
   assert.equal(client.scroll(Infinity), false);
   client.activate(null);
   assert.equal(messages.at(-1).data.type, 'disconnect');
   assert.equal(client.getState(), null);
+  assert.equal(client.ensure(), false);
   assert.equal(client.scroll(100), false);
   client.destroy();
+});
+
+test('host lifecycle reconnects after visibility and page resume transitions', () => {
+  const api = load('experiment-scroll.js');
+  assert.equal(typeof api.bindLifecycle, 'function', 'scroll lifecycle binder is required');
+  const win = windowStub();
+  const doc = windowStub();
+  let activated = 0, cancelled = 0, deactivated = 0, updated = 0;
+  const lifecycle = api.bindLifecycle(win, doc, {
+    activate: () => activated++,
+    cancel: () => cancelled++,
+    deactivate: () => deactivated++,
+    update: () => updated++
+  });
+
+  doc.hidden = true;
+  doc.emit('visibilitychange', {});
+  assert.deepEqual({ activated, cancelled, deactivated, updated }, { activated: 0, cancelled: 1, deactivated: 0, updated: 1 });
+  doc.hidden = false;
+  doc.emit('visibilitychange', {});
+  win.emit('pagehide', { persisted: false });
+  win.emit('pageshow', { persisted: false });
+  doc.emit('resume', {});
+  assert.deepEqual({ activated, cancelled, deactivated, updated }, { activated: 3, cancelled: 3, deactivated: 1, updated: 1 });
+
+  lifecycle.destroy();
+  assert.equal(win.listenerCount('pagehide'), 0);
+  assert.equal(win.listenerCount('pageshow'), 0);
+  assert.equal(doc.listenerCount('visibilitychange'), 0);
+  assert.equal(doc.listenerCount('resume'), 0);
 });
 
 test('receiver clamps scrolling to this document and rejects malformed requests', () => {
@@ -102,6 +141,17 @@ test('receiver clamps scrolling to this document and rejects malformed requests'
   f.send('disconnect');
   f.send('scroll', { delta: 100 });
   assert.equal(f.root.scrollTop, 0);
+  f.receiver.destroy();
+});
+
+test('receiver resumes its existing session after a bfcache pagehide/pageshow cycle', () => {
+  const f = childFixture();
+  f.send('connect');
+  f.win.emit('pagehide', { persisted: true });
+  f.win.emit('pageshow', { persisted: true });
+  f.win.flush();
+  f.send('scroll', { delta: 120 });
+  assert.equal(f.root.scrollTop, 120);
   f.receiver.destroy();
 });
 
@@ -305,6 +355,7 @@ test('handle wheel scroll stays bounded and cannot bubble to experiment navigati
 
 test('page removes legacy edge strips and uses one dedicated responsive scroll handle', () => {
   const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  const handleRule = html.match(/#scrollHandle\{([^}]+)\}/)?.[1] || '';
   assert.match(html, /<script src="experiment-scroll\.js\?app=v\d+\.\d+\.\d+"><\/script>/);
   assert.ok(!html.includes('id="edgeL"'));
   assert.ok(!html.includes('class="rail"'));
@@ -317,7 +368,10 @@ test('page removes legacy edge strips and uses one dedicated responsive scroll h
   assert.ok(html.includes('scrollBand.cancel();'));
   assert.ok(html.includes("const scrollMode=matchMedia('(max-width:899px), (any-pointer:coarse)');"));
   assert.ok(html.includes("scrollClient.activate(scrollMode.matches&&frame&&frame.dataset.scrollLoaded==='1'?frame:null)"));
+  assert.ok(html.includes('start:()=>scrollClient.ensure()'));
   assert.ok(html.includes('aria-orientation="vertical"'));
+  assert.ok(handleRule.includes('right:max(18px,env(safe-area-inset-right))'));
+  assert.ok(!handleRule.includes('right:0'));
 });
 
 test('short viewports reduce handle height and disable targets smaller than 44px', () => {

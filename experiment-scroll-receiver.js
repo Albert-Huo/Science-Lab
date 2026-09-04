@@ -16,7 +16,7 @@
     if(view.parent===view) return {destroy(){}};
     const doc=view.document;
     const getTarget=options.getTarget||(()=>doc.scrollingElement);
-    let connection=null,pending=0,resizeObserver=null,modalObserver=null;
+    let connection=null,pending=0,resizeObserver=null,modalObserver=null,observing=false;
     function blocked(){
       return Array.from(doc.querySelectorAll('dialog[open],[aria-modal="true"],.modal.show,.modal.open,.modal-mask')).some(el=>{
         const style=view.getComputedStyle(el);
@@ -35,16 +35,18 @@
       if(connection&&state&&state.viewport>0) view.parent.postMessage({channel:CHANNEL,type:'state',session:connection.session,...state},connection.origin);
     }
     function schedule(){if(connection&&!pending) pending=view.requestAnimationFrame(report);}
-    function disconnect(){
-      connection=null;
+    function stopObserving(){
       if(pending) view.cancelAnimationFrame(pending);
       pending=0;
       resizeObserver?.disconnect(); modalObserver?.disconnect();
       resizeObserver=null; modalObserver=null;
       view.removeEventListener('scroll',schedule,true); view.removeEventListener('resize',schedule);
+      observing=false;
     }
-    function connect(event,data){
-      disconnect(); connection={origin:event.origin,session:data.session};
+    function disconnect(){connection=null;stopObserving();}
+    function observe(){
+      if(!connection||observing) return;
+      observing=true;
       view.addEventListener('scroll',schedule,true); view.addEventListener('resize',schedule);
       if(view.ResizeObserver){
         resizeObserver=new view.ResizeObserver(schedule);
@@ -56,6 +58,12 @@
       }
       schedule();
     }
+    function connect(event,data){
+      disconnect(); connection={origin:event.origin,session:data.session}; observe();
+    }
+    function suspend(){stopObserving();}
+    function resume(){observe();}
+    function onPageHide(event){if(event.persisted) suspend();else disconnect();}
     function receive(event){
       const data=event.data;
       if(event.source!==view.parent||!allowedParent(event.origin,view.location.origin)||!data||
@@ -72,8 +80,19 @@
       schedule();
     }
     view.addEventListener('message',receive);
-    view.addEventListener('pagehide',disconnect);
-    return {destroy(){disconnect();view.removeEventListener('message',receive);view.removeEventListener('pagehide',disconnect);}};
+    view.addEventListener('pagehide',onPageHide);
+    view.addEventListener('pageshow',resume);
+    if(typeof doc.addEventListener==='function'){
+      doc.addEventListener('freeze',suspend);
+      doc.addEventListener('resume',resume);
+    }
+    return {destroy(){
+      disconnect();view.removeEventListener('message',receive);
+      view.removeEventListener('pagehide',onPageHide);view.removeEventListener('pageshow',resume);
+      if(typeof doc.removeEventListener==='function'){
+        doc.removeEventListener('freeze',suspend);doc.removeEventListener('resume',resume);
+      }
+    }};
   }
   return {createReceiver,allowedParent};
 });

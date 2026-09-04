@@ -54,7 +54,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 #hudTitle{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--txt);}
 #hudIdx{color:var(--txt2);white-space:nowrap;flex:none;font-variant-numeric:tabular-nums;}
 /* ---------- content scroll handle ---------- */
-#scrollHandle{display:none;position:fixed;right:0;z-index:30;width:30px;touch-action:none;user-select:none;
+#scrollHandle{display:none;position:fixed;right:max(18px,env(safe-area-inset-right));z-index:30;width:30px;touch-action:none;user-select:none;
   visibility:hidden;pointer-events:none;}
 #scrollDebug{display:none;position:fixed;left:6px;bottom:6px;z-index:120;max-width:calc(100% - 70px);
   padding:5px 7px;border:1px solid #ffffff38;border-radius:6px;background:#05080ee8;color:#d8fff4;
@@ -309,7 +309,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 
 <script src="catalog-control.js"></script>
 <script src="content-source.js"></script>
-<script src="experiment-scroll.js?app=v0.8.4"></script>
+<script src="experiment-scroll.js?app=v0.8.5"></script>
 <script>
 const qs = new URLSearchParams(location.search);
 /* 内容源：生产固定线上站；与内容站同域时用相对路径；仅本地联调接受根相对 ?base= */
@@ -768,6 +768,7 @@ function initScrollDebug(){
 const scrollClient=ExperimentScroll.createClient(window,()=>updateScrollBand());
 const scrollBand=ExperimentScroll.bindBand(scrollEdge,{
   enabled:()=>scrollEdge.classList.contains('scroll-ready'),
+  start:()=>scrollClient.ensure(),
   scroll:delta=>scrollClient.scroll(delta),jump:edge=>scrollClient.jump(edge),
   state:()=>scrollClient.getState()
 });
@@ -797,9 +798,12 @@ function activateScroll(){
 }
 scrollMode.addEventListener('change',activateScroll);
 window.addEventListener('resize',updateScrollBand);
-document.addEventListener('visibilitychange',()=>{scrollBand.cancel();updateScrollBand();});
-window.addEventListener('pagehide',()=>{scrollBand.cancel();scrollClient.activate(null);});
-window.addEventListener('pageshow',event=>{if(event.persisted) activateScroll();});
+ExperimentScroll.bindLifecycle(window,document,{
+  activate:activateScroll,
+  cancel:()=>scrollBand.cancel(),
+  deactivate:()=>scrollClient.activate(null),
+  update:updateScrollBand
+});
 
 document.getElementById('btnPrev').addEventListener('click',prev);
 document.getElementById('btnNext').addEventListener('click',next);

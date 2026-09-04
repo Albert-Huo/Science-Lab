@@ -6,7 +6,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const EXPECTED_COUNT = 70;
-const ASSET = 'experiment-scroll-receiver.v1.js';
+const ASSET = 'experiment-scroll-receiver.v2.js';
+const PREVIOUS_ASSETS = ['experiment-scroll-receiver.v1.js'];
 const TARGET_PATTERN = /^初中物理实验(?:\d+|\d+-\d+)\.html$/;
 const { values } = parseArgs({ options: { 'content-root': { type: 'string' }, 'base-ref': { type: 'string' } } });
 assert.ok(values['content-root'], '--content-root is required');
@@ -15,6 +16,7 @@ const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const contentRoot = path.resolve(values['content-root']);
 const receiver = readFileSync(path.join(appRoot, 'experiment-scroll-receiver.js'), 'utf8');
 const tag = `<script src="../${ASSET}" data-science-lab-scroll></script>\n`;
+const previousTags = PREVIOUS_ASSETS.map(asset => `<script src="../${asset}" data-science-lab-scroll></script>\n`);
 const legacyBlock = `<script data-science-lab-scroll>\n${receiver}</script>\n`;
 const files = readdirSync(path.join(contentRoot, 'physics-middle'))
   .filter(file => TARGET_PATTERN.test(file))
@@ -29,6 +31,9 @@ assert.equal(
 
 function stripReceiver(html) {
   if (html.includes(tag)) return html.replace(tag, '');
+  for (const previousTag of previousTags) {
+    if (html.includes(previousTag)) return html.replace(previousTag, '');
+  }
   if (html.includes(legacyBlock)) return html.replace(legacyBlock, '');
   return html;
 }
