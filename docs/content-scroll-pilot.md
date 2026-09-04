@@ -56,6 +56,15 @@ node tools/preview-scroll.mjs --content-root /Users/lx100/projects/HTML-GitHub/H
 - 公网 390×844 微信 Android 仿真复验实际返回 Touch 回退代码和 `v0.8.2`：强制指针捕获失败后，实验 1、35、41 均从 0 滚动到 60px，编号保持 1/118、36/118、42/118；控制台 0 错误。最终结论仍以用户的微信真机体验为准。
 - 公网验证截图：`/Users/lx100/projects/HTML-GitHub/HTML-sources-private/reports/visual-regression/2026-09-04-wechat-scroll-fallback/output/playwright/.playwright-cli/page-2026-09-04T03-22-10-839Z.png`。
 
+## 2026-09-04 Android 微信二次修订（v0.8.3，待真机确认）
+
+- 真机反馈仍无法拖动后，补充确认线上 HTML 虽已更新，但滚动脚本使用未版本化 URL；旧 Service Worker 可能先返回 `v0.8.1` 缓存。`index.html` 与预缓存现统一使用 `experiment-scroll.js?app=v0.8.3`，带查询参数的验收入口也会绕开旧首页精确缓存。
+- Pointer/Touch 的移动、结束和取消监听改为仅在活动手势期间安装到宿主文档捕获阶段；手指移出 30×112px 短手柄后仍可继续接收同一手势，结束后立即卸载，避免常驻非被动监听影响普通页面滚动。
+- 增加可选的 `?scroll-debug=1` 页面诊断条，显示脚本版本、手柄可用状态、当前滚动位置及 Pointer/Touch 计数。诊断不写存储、不发送网络请求，普通入口不显示。
+- 新增版本一致性、页面级事件接管和监听清理测试。滚动专项 18/18、完整 `npm test --prefix server/api`、离线依赖审计、脚本语法和差异空白检查均通过。
+- 隔离的 390×844 Chromium 使用 Android 微信 User-Agent 和触摸上下文，并强制 `setPointerCapture` 失败：实验 1 手指从手柄内拖到手柄外后滚动 140px；实验 35、41 各滚动 80px，编号保持 1/118、36/118、42/118。控制台 0 错误，只有预期兼容警告。
+- 验证截图：`/Users/lx100/projects/HTML-GitHub/HTML-sources-private/reports/visual-regression/2026-09-04-android-scroll-v083/output/playwright/.playwright-cli/page-2026-09-04T04-10-09-916Z.png`。自动化不能等同于真实 X5，最终结论仍以 Android 微信真机为准。
+
 ## 单手柄改版验证记录
 
 - 滚动测试 13/13、预览服务测试 1/1 通过；新增行为及矮屏规则均先观察失败再补实现。

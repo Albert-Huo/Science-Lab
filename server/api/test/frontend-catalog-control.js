@@ -243,7 +243,8 @@ function assertActiveRateZonePlacement(nginxBlock) {
   );
   assert.ok(serviceWorker.includes("'./catalog-control.js'"), '发布控制模块应进入离线 App 壳');
   assert.ok(serviceWorker.includes("'./content-source.js'"), '内容源解析模块应进入离线 App 壳');
-  assert.ok(serviceWorker.includes("'./experiment-scroll.js'"), '内容滚动模块应进入离线 App 壳');
+  assert.ok(serviceWorker.includes("const SCROLL_ASSET = './experiment-scroll.js?app=' + VERSION;"), '内容滚动模块地址应随 App 版本更新');
+  assert.ok(serviceWorker.includes('  SCROLL_ASSET,'), '版本化内容滚动模块应进入离线 App 壳');
   assert.ok(serviceWorker.includes("'./catalog-control.json'"), '发布控制配置应提供离线回退');
   assert.ok(
     serviceWorker.includes("url.pathname.endsWith('/catalog-control.json')"),

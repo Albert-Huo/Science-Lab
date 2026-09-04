@@ -11,6 +11,15 @@ test('host waits for the iframe load before connecting the scroll receiver', () 
   assert.match(hostHtml, /frame&&frame\.dataset\.scrollLoaded==='1'\?frame:null/);
 });
 
+test('host version-pins the scroll module and exposes opt-in local diagnostics', () => {
+  const serviceWorker = fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8');
+  const version = serviceWorker.match(/const VERSION = '(v\d+\.\d+\.\d+)';/)?.[1];
+  const scrollVersion = hostHtml.match(/<script src="experiment-scroll\.js\?app=(v\d+\.\d+\.\d+)"><\/script>/)?.[1];
+  assert.equal(scrollVersion, version);
+  assert.ok(hostHtml.includes("qs.get('scroll-debug')==='1'"));
+  assert.ok(hostHtml.includes('ExperimentScroll.version'));
+});
+
 function load(file) {
   assert.ok(fs.existsSync(path.join(ROOT, file)), `Missing scroll implementation: ${file}`);
   return require(path.join(ROOT, file));
@@ -23,6 +32,7 @@ function windowStub(origin = 'https://lab.xingnian.net.cn') {
     addEventListener: (type, fn) => { if (!listeners.has(type)) listeners.set(type, new Set()); listeners.get(type).add(fn); },
     removeEventListener: (type, fn) => listeners.get(type)?.delete(fn),
     emit: (type, event) => listeners.get(type)?.forEach(fn => fn(event)),
+    listenerCount: type => listeners.get(type)?.size || 0,
     requestAnimationFrame: fn => { win.pending = fn; return 1; },
     cancelAnimationFrame: () => { win.pending = null; },
     flush: () => { const fn = win.pending; win.pending = null; fn?.(); }
@@ -161,10 +171,10 @@ test('actual pilot modal-mask is observed and blocks background scrolling', () =
 });
 
 function bandFixture({ captureThrows = false } = {}) {
-  const events = windowStub(), captured = new Set(), deltas = [], jumps = [];
+  const events = windowStub(), dragTarget = windowStub(), captured = new Set(), deltas = [], jumps = [];
   let enabled = true, catalog = 0;
   const element = {
-    ...events, classList: { add() {}, remove() {} },
+    ...events, ownerDocument: dragTarget, classList: { add() {}, remove() {} },
     setPointerCapture: id => { if (captureThrows) throw new Error('pointer capture unsupported'); captured.add(id); },
     hasPointerCapture: id => captured.has(id),
     releasePointerCapture: id => captured.delete(id),
@@ -174,15 +184,17 @@ function bandFixture({ captureThrows = false } = {}) {
     enabled: () => enabled, scroll: delta => deltas.push(delta), jump: edge => jumps.push(edge),
     state: () => ({ top: 20, max: 10000, viewport: 500 }), openCatalog: () => catalog++
   });
-  const send = (type, x, y, extra = {}) => element.emit(type, {
+  const activeTypes = new Set(['pointermove', 'pointerup', 'pointercancel', 'touchmove', 'touchend', 'touchcancel']);
+  const targetFor = type => activeTypes.has(type) ? dragTarget : element;
+  const send = (type, x, y, extra = {}) => targetFor(type).emit(type, {
     pointerId: 1, pointerType: 'touch', isPrimary: true, clientX: x, clientY: y,
     preventDefault() {}, stopPropagation() {}, ...extra
   });
   const touch = (identifier, x, y) => ({ identifier, clientX: x, clientY: y });
-  const sendTouch = (type, touches, changedTouches = touches) => element.emit(type, {
+  const sendTouch = (type, touches, changedTouches = touches) => targetFor(type).emit(type, {
     touches, changedTouches, preventDefault() {}, stopPropagation() {}
   });
-  return { band, send, sendTouch, touch, deltas, jumps, captured, disable: () => { enabled = false; }, catalog: () => catalog };
+  return { band, send, sendTouch, touch, deltas, jumps, captured, dragTarget, disable: () => { enabled = false; }, catalog: () => catalog };
 }
 
 test('vertical band gestures scroll incrementally and cancellation releases capture', () => {
@@ -211,6 +223,7 @@ test('pointer gesture continues inside the handle when pointer capture is unavai
   f.send('pointerup', 380, 340, { pointerType: 'mouse' });
   assert.deepEqual(f.deltas, [60]);
   assert.equal(f.captured.size, 0);
+  assert.equal(f.dragTarget.listenerCount('pointermove'), 0);
   f.band.destroy();
 });
 
@@ -221,6 +234,7 @@ test('touch events scroll without a pointer stream and stop after touch end', ()
   f.sendTouch('touchend', [], [f.touch(7, 380, 340)]);
   f.sendTouch('touchmove', [f.touch(7, 380, 280)]);
   assert.deepEqual(f.deltas, [60]);
+  assert.equal(f.dragTarget.listenerCount('touchmove'), 0);
   f.band.destroy();
 });
 
@@ -291,7 +305,7 @@ test('handle wheel scroll stays bounded and cannot bubble to experiment navigati
 
 test('page removes legacy edge strips and uses one dedicated responsive scroll handle', () => {
   const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-  assert.ok(html.includes('<script src="experiment-scroll.js"></script>'));
+  assert.match(html, /<script src="experiment-scroll\.js\?app=v\d+\.\d+\.\d+"><\/script>/);
   assert.ok(!html.includes('id="edgeL"'));
   assert.ok(!html.includes('class="rail"'));
   assert.ok(!html.includes('function attachEdge'));

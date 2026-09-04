@@ -3,15 +3,16 @@
  * - 清单与目录控制网络优先，只缓存有效 JSON
  * - 跨域实验内容与 API 请求不拦截
  */
-const VERSION = 'v0.8.2';
+const VERSION = 'v0.8.3';
 const CACHE_PREFIX = 'sl-shell-';
 const SHELL_CACHE = CACHE_PREFIX + VERSION;
+const SCROLL_ASSET = './experiment-scroll.js?app=' + VERSION;
 const SHELL = [
   './',
   './index.html',
   './catalog-control.js',
   './content-source.js',
-  './experiment-scroll.js',
+  SCROLL_ASSET,
   './catalog-control.json',
   './manifest.json',
   './manifest.webmanifest',

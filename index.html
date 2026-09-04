@@ -56,6 +56,10 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 /* ---------- content scroll handle ---------- */
 #scrollHandle{display:none;position:fixed;right:0;z-index:30;width:30px;touch-action:none;user-select:none;
   visibility:hidden;pointer-events:none;}
+#scrollDebug{display:none;position:fixed;left:6px;bottom:6px;z-index:120;max-width:calc(100% - 70px);
+  padding:5px 7px;border:1px solid #ffffff38;border-radius:6px;background:#05080ee8;color:#d8fff4;
+  font:10px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;pointer-events:none;white-space:normal;}
+#scrollDebug.show{display:block;}
 @media (max-width:899px),(any-pointer:coarse){
   #scrollHandle{display:block;--scroll-h:min(112px,max(0px,calc(100% - var(--hud-h) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 150px)));
     top:clamp(calc(var(--hud-h) + env(safe-area-inset-top) + 8px),calc(50% - var(--scroll-h) / 2),calc(100% - 134px - env(safe-area-inset-bottom) - var(--scroll-h)));
@@ -301,7 +305,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 
 <script src="catalog-control.js"></script>
 <script src="content-source.js"></script>
-<script src="experiment-scroll.js"></script>
+<script src="experiment-scroll.js?app=v0.8.3"></script>
 <script>
 const qs = new URLSearchParams(location.search);
 /* 内容源：生产固定线上站；与内容站同域时用相对路径；仅本地联调接受根相对 ?base= */
@@ -735,12 +739,35 @@ document.getElementById('aiClearChat').addEventListener('click',()=>{
 /* ---------- gestures ---------- */
 const scrollMode=matchMedia('(max-width:899px), (any-pointer:coarse)');
 const scrollEdge=document.getElementById('scrollHandle');
+const scrollDebugEnabled=qs.get('scroll-debug')==='1';
+let scrollDebugEl=null;
+const scrollDebugCounts={pointerdown:0,pointermove:0,pointerup:0,pointercancel:0,touchstart:0,touchmove:0,touchend:0,touchcancel:0};
+function renderScrollDebug(){
+  if(!scrollDebugEl) return;
+  const state=scrollClient.getState();
+  scrollDebugEl.textContent='Android 滚动诊断 · 脚本 '+(ExperimentScroll.version||'legacy')+
+    ' · ready '+(scrollEdge.classList.contains('scroll-ready')?'是':'否')+
+    ' · top '+(state?Math.round(state.top):'-')+
+    ' · P '+scrollDebugCounts.pointerdown+'/'+scrollDebugCounts.pointermove+'/'+scrollDebugCounts.pointerup+'/'+scrollDebugCounts.pointercancel+
+    ' · T '+scrollDebugCounts.touchstart+'/'+scrollDebugCounts.touchmove+'/'+scrollDebugCounts.touchend+'/'+scrollDebugCounts.touchcancel;
+}
+function initScrollDebug(){
+  if(!scrollDebugEnabled) return;
+  scrollDebugEl=document.createElement('div');
+  scrollDebugEl.id='scrollDebug';scrollDebugEl.className='show';scrollDebugEl.setAttribute('role','status');
+  document.body.appendChild(scrollDebugEl);
+  Object.keys(scrollDebugCounts).forEach(type=>document.addEventListener(type,()=>{
+    scrollDebugCounts[type]++;renderScrollDebug();
+  },{capture:true,passive:true}));
+  renderScrollDebug();
+}
 const scrollClient=ExperimentScroll.createClient(window,()=>updateScrollBand());
 const scrollBand=ExperimentScroll.bindBand(scrollEdge,{
   enabled:()=>scrollEdge.classList.contains('scroll-ready'),
   scroll:delta=>scrollClient.scroll(delta),jump:edge=>scrollClient.jump(edge),
   state:()=>scrollClient.getState()
 });
+initScrollDebug();
 function updateScrollBand(){
   const state=scrollClient.getState();
   const ready=scrollMode.matches&&scrollEdge.clientHeight>=44&&state&&state.max>1&&!state.blocked&&
@@ -748,7 +775,7 @@ function updateScrollBand(){
   scrollEdge.classList.toggle('scroll-ready',!!ready);
   scrollEdge.tabIndex=ready?0:-1;
   scrollEdge.setAttribute('aria-hidden',String(!ready));
-  if(!ready){scrollBand.cancel();scrollEdge.removeAttribute('role');return;}
+  if(!ready){scrollBand.cancel();scrollEdge.removeAttribute('role');renderScrollDebug();return;}
   scrollEdge.setAttribute('role','scrollbar');
   scrollEdge.setAttribute('aria-roledescription','内容滚动手柄');
   scrollEdge.setAttribute('aria-label','按住上下拖动查看当前实验；上滑查看下方，方向键也可滚动');
@@ -757,6 +784,7 @@ function updateScrollBand(){
   scrollEdge.setAttribute('aria-valuemax',String(Math.round(state.max)));
   scrollEdge.setAttribute('aria-valuenow',String(Math.round(state.top)));
   scrollEdge.setAttribute('aria-valuetext',Math.round(state.top/state.max*100)+'%');
+  renderScrollDebug();
 }
 function activateScroll(){
   scrollBand.cancel();

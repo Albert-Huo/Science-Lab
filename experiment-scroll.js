@@ -3,6 +3,7 @@
   if(typeof module==='object'&&module.exports) module.exports=api;
   else root.ExperimentScroll=api;
 })(typeof globalThis!=='undefined'?globalThis:this,function(){
+  const VERSION='v0.8.3';
   const CHANNEL='science-lab.scroll.v1';
   function validState(data){
     return data&&data.type==='state'&&typeof data.blocked==='boolean'&&
@@ -45,12 +46,23 @@
     let gesture=null;
     let captureWarningShown=false;
     const handlers=[];
+    const activeHandlers=[];
+    const dragTarget=options.dragTarget||element.ownerDocument||element;
     function listen(type,fn,settings){
       const listenerSettings=settings||(type==='wheel'?{passive:false}:undefined);
       element.addEventListener(type,fn,listenerSettings);handlers.push([type,fn,listenerSettings]);
     }
+    function activeListen(type,fn,settings){
+      dragTarget.addEventListener(type,fn,settings);activeHandlers.push([type,fn,settings]);
+    }
+    function clearActive(){
+      while(activeHandlers.length){
+        const [type,fn,settings]=activeHandlers.pop();
+        dragTarget.removeEventListener(type,fn,settings);
+      }
+    }
     function cancel(){
-      const previous=gesture; gesture=null; element.classList.remove('active');
+      const previous=gesture; gesture=null; clearActive(); element.classList.remove('active');
       if(previous&&previous.input==='pointer'&&previous.captured){
         try{
           if(typeof element.hasPointerCapture!=='function'||element.hasPointerCapture(previous.id)) element.releasePointerCapture(previous.id);
@@ -60,6 +72,15 @@
     function begin(input,id,x,y,fields={}){
       gesture={input,id,x,y,lastY:y,axis:null,captured:false,...fields};
       element.classList.add('active');
+      if(input==='pointer'){
+        activeListen('pointermove',onPointerMove,{capture:true});
+        activeListen('pointerup',onPointerUp,{capture:true});
+        activeListen('pointercancel',onPointerCancel,{capture:true});
+      }else{
+        activeListen('touchmove',onTouchMove,{capture:true,passive:false});
+        activeListen('touchend',onTouchEnd,{capture:true,passive:false});
+        activeListen('touchcancel',onTouchCancel,{capture:true,passive:false});
+      }
     }
     function move(x,y){
       if(!options.enabled()){cancel();return;}
@@ -74,6 +95,32 @@
       for(let i=0;i<list.length;i++) if(list[i].identifier===id) return list[i];
       return null;
     }
+    function onPointerMove(event){
+      if(!gesture||gesture.input!=='pointer'||event.pointerId!==gesture.id) return;
+      move(event.clientX,event.clientY);event.preventDefault();
+    }
+    function onPointerUp(event){
+      if(!gesture||gesture.input!=='pointer'||event.pointerId!==gesture.id) return;
+      cancel();event.preventDefault();
+    }
+    function onPointerCancel(event){
+      if(gesture&&gesture.input==='pointer'&&event.pointerId===gesture.id) cancel();
+    }
+    function onTouchMove(event){
+      if(!gesture||gesture.input!=='touch') return;
+      if(event.touches.length!==1){cancel();return;}
+      const point=findTouch(event.touches,gesture.id);
+      if(!point) return;
+      move(point.clientX,point.clientY);event.preventDefault();event.stopPropagation();
+    }
+    function onTouchEnd(event){
+      if(!gesture||gesture.input!=='touch'||!findTouch(event.changedTouches,gesture.id)) return;
+      cancel();event.preventDefault();event.stopPropagation();
+    }
+    function onTouchCancel(event){
+      if(!gesture||gesture.input!=='touch') return;
+      cancel();event.stopPropagation();
+    }
     listen('pointerdown',event=>{
       if(!options.enabled()||gesture||event.isPrimary===false||(event.pointerType==='mouse'&&event.button!==0)) return;
       let captured=false;
@@ -84,16 +131,6 @@
       begin('pointer',event.pointerId,event.clientX,event.clientY,{captured,pointerType:event.pointerType});
       event.preventDefault();
     });
-    listen('pointermove',event=>{
-      if(!gesture||gesture.input!=='pointer'||event.pointerId!==gesture.id) return;
-      move(event.clientX,event.clientY);event.preventDefault();
-    });
-    listen('pointerup',event=>{
-      if(!gesture||gesture.input!=='pointer'||event.pointerId!==gesture.id) return;
-      cancel();
-      event.preventDefault();
-    });
-    listen('pointercancel',event=>{if(gesture&&gesture.input==='pointer'&&event.pointerId===gesture.id) cancel();});
     listen('lostpointercapture',event=>{if(gesture&&gesture.input==='pointer'&&event.pointerId===gesture.id) cancel();});
     listen('touchstart',event=>{
       if(!options.enabled()) return;
@@ -105,21 +142,6 @@
       }
       begin('touch',point.identifier,point.clientX,point.clientY);
       event.preventDefault();event.stopPropagation();
-    },{passive:false});
-    listen('touchmove',event=>{
-      if(!gesture||gesture.input!=='touch') return;
-      if(event.touches.length!==1){cancel();return;}
-      const point=findTouch(event.touches,gesture.id);
-      if(!point) return;
-      move(point.clientX,point.clientY);event.preventDefault();event.stopPropagation();
-    },{passive:false});
-    listen('touchend',event=>{
-      if(!gesture||gesture.input!=='touch'||!findTouch(event.changedTouches,gesture.id)) return;
-      cancel();event.preventDefault();event.stopPropagation();
-    },{passive:false});
-    listen('touchcancel',event=>{
-      if(!gesture||gesture.input!=='touch') return;
-      cancel();event.stopPropagation();
     },{passive:false});
     listen('wheel',event=>{
       if(!options.enabled()) return;
@@ -142,5 +164,5 @@
     });
     return {cancel,destroy(){cancel();for(const [type,fn,settings] of handlers) element.removeEventListener(type,fn,settings);}};
   }
-  return {createClient,bindBand,validState};
+  return {createClient,bindBand,validState,version:VERSION};
 });

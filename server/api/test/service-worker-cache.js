@@ -53,7 +53,7 @@ async function waitEvent(name, event) {
   fetchResponse = new Response('<html>wrong</html>', { status: 200, headers: { 'Content-Type': 'text/html' } });
   await assert.rejects(waitEvent('install', {}), /invalid_precache_response/);
   assert.ok(added.includes('./index.html'));
-  assert.ok(added.includes('./experiment-scroll.js'), '内容滚动脚本必须随 App 壳预缓存');
+  assert.ok(added.includes(`./experiment-scroll.js?app=${versionMatch[1]}`), '内容滚动脚本必须以当前 App 版本预缓存');
   assert.strictEqual(writes.length, 0);
 
   cachedResponse = new Response('{"version":1}', { status: 200, headers: { 'Content-Type': 'application/json' } });
