@@ -263,7 +263,7 @@ git -C /Users/lx100/projects/HTML-GitHub/HTML- push origin main
 
 记录内容仓库功能提交、Pages 状态、CDN 刷新、70/70 公网检查、抽样浏览器结果与回滚提交。
 
-- [ ] **Step 2: 提交并推送 Science-Lab 功能分支**
+- [x] **Step 2: 提交并推送 Science-Lab 功能分支**
 
 Run:
 
@@ -273,6 +273,8 @@ git commit -m "feat: verify full middle-school scroll rollout"
 git push origin codex/content-scroll-pilot
 ```
 
-- [ ] **Step 3: 快进 Science-Lab main 并推送**
+- [x] **Step 3: 快进 Science-Lab main 并推送**
 
 保持主检出目录已有未跟踪文件不变，运行快进合并和完整测试，再推送 `main`。Science-Lab 静态宿主文件未变，因此不切换 ECS release；确认线上仍为已验证的 `v0.8.4` 和健康 API。
+
+结果：功能提交 `07c69d1` 已推送功能分支并快进合并、推送到 `main`；主分支完整测试、离线审计和 70 页发布边界复验均通过。线上宿主仍为 `v0.8.4`，健康检查返回 `{"ok":true}`，未切换 ECS release。
