@@ -251,16 +251,20 @@ test('handle wheel scroll stays bounded and cannot bubble to experiment navigati
   f.band.destroy();
 });
 
-test('page uses one short handle and disables both old edge gestures on touch', () => {
+test('page removes legacy edge strips and uses one dedicated responsive scroll handle', () => {
   const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
   assert.ok(html.includes('<script src="experiment-scroll.js"></script>'));
-  assert.ok(html.includes('if(scrollTouch.matches) return;'));
-  assert.ok(html.includes('#edgeL{display:none;}'));
+  assert.ok(!html.includes('id="edgeL"'));
+  assert.ok(!html.includes('class="rail"'));
+  assert.ok(!html.includes('function attachEdge'));
+  assert.ok(!html.includes('attachEdge('));
+  assert.ok(html.includes('id="scrollHandle"'));
   assert.ok(html.includes('class="scroll-grip"'));
   assert.ok(!html.includes('scroll-track'));
   assert.ok(!html.includes('scroll-thumb'));
   assert.ok(html.includes('scrollBand.cancel();'));
-  assert.ok(html.includes("scrollClient.activate(scrollTouch.matches&&frame&&frame.dataset.scrollLoaded==='1'?frame:null)"));
+  assert.ok(html.includes("const scrollMode=matchMedia('(max-width:899px), (any-pointer:coarse)');"));
+  assert.ok(html.includes("scrollClient.activate(scrollMode.matches&&frame&&frame.dataset.scrollLoaded==='1'?frame:null)"));
   assert.ok(html.includes('aria-orientation="vertical"'));
 });
 

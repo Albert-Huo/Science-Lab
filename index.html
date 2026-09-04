@@ -53,28 +53,22 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 #hudTag{color:var(--acc2);white-space:nowrap;flex:none;}
 #hudTitle{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--txt);}
 #hudIdx{color:var(--txt2);white-space:nowrap;flex:none;font-variant-numeric:tabular-nums;}
-/* ---------- edge strips ---------- */
-.edge{position:fixed;top:calc(var(--hud-h) + env(safe-area-inset-top));bottom:0;width:26px;z-index:30;touch-action:none;}
-#edgeL{left:0;}#edgeR{right:0;}
-.edge .rail{position:absolute;top:50%;transform:translateY(-50%);width:4px;height:84px;
-  border-radius:2px;background:#ffffff2a;transition:background .2s;}
-#edgeL .rail{left:4px;}#edgeR .rail{right:4px;}
-.edge.active .rail{background:var(--acc);}
-.scroll-grip{display:none;}
-@media (pointer:coarse){
-  #edgeL{display:none;}
-  #edgeR{--scroll-h:min(112px,max(0px,calc(100% - var(--hud-h) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 150px)));
+/* ---------- content scroll handle ---------- */
+#scrollHandle{display:none;position:fixed;right:0;z-index:30;width:30px;touch-action:none;user-select:none;
+  visibility:hidden;pointer-events:none;}
+@media (max-width:899px),(any-pointer:coarse){
+  #scrollHandle{display:block;--scroll-h:min(112px,max(0px,calc(100% - var(--hud-h) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 150px)));
     top:clamp(calc(var(--hud-h) + env(safe-area-inset-top) + 8px),calc(50% - var(--scroll-h) / 2),calc(100% - 134px - env(safe-area-inset-bottom) - var(--scroll-h)));
-    bottom:auto;height:var(--scroll-h);visibility:hidden;pointer-events:none;user-select:none;}
-  #edgeR.scroll-ready{visibility:visible;pointer-events:auto;}
-  #edgeR .rail{display:none;}
-  #edgeR .scroll-grip{display:flex;position:absolute;inset:8px 6px;flex-direction:column;align-items:center;justify-content:center;gap:7px;
-    border-radius:8px;border:1px solid #d7dfea20;background:#0b0f1740;color:#d7dfea99;pointer-events:none;
-    transition:background .15s,color .15s,border-color .15s;}
-  #edgeR .scroll-grip::before,#edgeR .scroll-grip::after{content:"";width:2px;height:24px;border-radius:2px;background:currentColor;opacity:.6;}
-  #edgeR .scroll-grip span{font-size:12px;line-height:14px;}
-  #edgeR.active .scroll-grip,#edgeR:focus-visible .scroll-grip{background:#121826cc;color:var(--txt);border-color:#d7dfea66;}
-  #edgeR:focus-visible{outline:1px solid var(--txt2);outline-offset:-2px;border-radius:10px;}
+    height:var(--scroll-h);}
+  #scrollHandle.scroll-ready{visibility:visible;pointer-events:auto;}
+  #scrollHandle .scroll-grip{display:flex;position:absolute;top:8px;right:4px;bottom:8px;width:14px;
+    align-items:center;justify-content:center;border-radius:8px;border:1px solid #d7dfea70;
+    background:#0b0f17c7;color:#f3f6fc;box-shadow:0 2px 10px #0008;pointer-events:none;
+    transition:background .15s,color .15s,border-color .15s,transform .15s;}
+  #scrollHandle .scroll-grip span{font-size:12px;line-height:14px;}
+  #scrollHandle.active .scroll-grip,#scrollHandle:focus-visible .scroll-grip{
+    background:#172033eb;color:#fff;border-color:#ffffffa0;transform:scaleX(1.06);}
+  #scrollHandle:focus-visible{outline:1px solid var(--txt2);outline-offset:-2px;border-radius:10px;}
 }
 /* ---------- nav arrows ---------- */
 #navBtns{position:fixed;right:10px;bottom:calc(24px + env(safe-area-inset-bottom));z-index:30;
@@ -201,7 +195,6 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
     border-right:1px solid var(--line);z-index:20;}
   #panelCat header .close{display:none;}
   #feed,#hud{left:var(--dock-w);}
-  #edgeL{left:var(--dock-w);}
   #btnCat{display:none;}
   #panelUser{z-index:60;}
   .page{background:#05070c;}
@@ -226,9 +219,8 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
   <button class="hud-btn" id="btnCat" title="目录">☰</button>
 </div>
 
-<div class="edge" id="edgeL"><div class="rail"></div></div>
-<div class="edge" id="edgeR" aria-hidden="true" tabindex="-1" aria-orientation="vertical">
-  <div class="rail"></div><div class="scroll-grip" aria-hidden="true"><span>↕</span></div>
+<div id="scrollHandle" aria-hidden="true" tabindex="-1" aria-orientation="vertical">
+  <div class="scroll-grip" aria-hidden="true"><span>↕</span></div>
 </div>
 
 <div id="navBtns">
@@ -741,8 +733,8 @@ document.getElementById('aiClearChat').addEventListener('click',()=>{
 });
 
 /* ---------- gestures ---------- */
-const scrollTouch=matchMedia('(pointer:coarse)');
-const scrollEdge=document.getElementById('edgeR');
+const scrollMode=matchMedia('(max-width:899px), (any-pointer:coarse)');
+const scrollEdge=document.getElementById('scrollHandle');
 const scrollClient=ExperimentScroll.createClient(window,()=>updateScrollBand());
 const scrollBand=ExperimentScroll.bindBand(scrollEdge,{
   enabled:()=>scrollEdge.classList.contains('scroll-ready'),
@@ -751,7 +743,7 @@ const scrollBand=ExperimentScroll.bindBand(scrollEdge,{
 });
 function updateScrollBand(){
   const state=scrollClient.getState();
-  const ready=scrollTouch.matches&&scrollEdge.clientHeight>=44&&state&&state.max>1&&!state.blocked&&
+  const ready=scrollMode.matches&&scrollEdge.clientHeight>=44&&state&&state.max>1&&!state.blocked&&
     !document.querySelector('.panel.show')&&document.getElementById('hint').classList.contains('hide')&&!document.hidden;
   scrollEdge.classList.toggle('scroll-ready',!!ready);
   scrollEdge.tabIndex=ready?0:-1;
@@ -769,34 +761,13 @@ function updateScrollBand(){
 function activateScroll(){
   scrollBand.cancel();
   const frame=pages[cur].querySelector('iframe');
-  scrollClient.activate(scrollTouch.matches&&frame&&frame.dataset.scrollLoaded==='1'?frame:null);
+  scrollClient.activate(scrollMode.matches&&frame&&frame.dataset.scrollLoaded==='1'?frame:null);
 }
-scrollTouch.addEventListener('change',activateScroll);
+scrollMode.addEventListener('change',activateScroll);
 window.addEventListener('resize',updateScrollBand);
 document.addEventListener('visibilitychange',()=>{scrollBand.cancel();updateScrollBand();});
 window.addEventListener('pagehide',()=>{scrollBand.cancel();scrollClient.activate(null);});
 window.addEventListener('pageshow',event=>{if(event.persisted) activateScroll();});
-
-function attachEdge(el, side){
-  let sx=0,sy=0,on=false;
-  el.addEventListener('pointerdown',e=>{
-    if(scrollTouch.matches) return;
-    on=true; sx=e.clientX; sy=e.clientY;
-    el.classList.add('active'); try{el.setPointerCapture(e.pointerId);}catch(_){} e.preventDefault(); });
-  el.addEventListener('pointerup',e=>{
-    if(!on) return; on=false; el.classList.remove('active');
-    const dx=e.clientX-sx, dy=e.clientY-sy;
-    if(Math.abs(dy)>=Math.abs(dx)){
-      if(dy<=-45) next(); else if(dy>=45) prev();
-    }else{
-      if(side==='right' && dx<=-45) openPanel('catalog');
-      else if(side==='left' && dx>=45) openPanel('user');
-    }
-  });
-  el.addEventListener('pointercancel',()=>{ on=false; el.classList.remove('active'); });
-}
-attachEdge(document.getElementById('edgeL'),'left');
-attachEdge(document.getElementById('edgeR'),'right');
 
 document.getElementById('btnPrev').addEventListener('click',prev);
 document.getElementById('btnNext').addEventListener('click',next);

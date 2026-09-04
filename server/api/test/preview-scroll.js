@@ -25,11 +25,13 @@ test('local preview injects only pilot HTML and never serves private paths or a 
     const app = await (await fetch(base)).text();
     assert.ok(app.includes('experiment-scroll.js'));
     assert.ok(!app.includes("navigator.serviceWorker.register('sw.js')"));
-    assert.ok(app.includes("matchMedia('(pointer:coarse)')"));
+    assert.ok(app.includes("matchMedia('(max-width:899px), (any-pointer:coarse)')"));
     const simulated = await (await fetch(base + '/index.html?preview-touch=1')).text();
-    assert.ok(simulated.includes("matchMedia('(min-width:0px)')"));
+    assert.ok(simulated.includes("matchMedia('(max-width:899px), (any-pointer:coarse)')"));
+    assert.ok(!simulated.includes("matchMedia('(min-width:0px)')"));
     const landing = await (await fetch(base + '/scroll-preview.html')).text();
-    assert.ok(landing.includes('preview-touch=1'));
+    assert.ok(landing.includes('src="/index.html?base=/HTML-/"'));
+    assert.ok(!landing.includes('preview-touch=1'));
     for (const resource of ['/server/api/.env', '/.git/config', '/sw.js', '/HTML-/.git/config', '/HTML-/outside.html', '/HTML-/%2e%2e%2findex.html', '/api/ai/chat/completions']) {
       assert.equal((await fetch(base + resource)).status, 404, resource);
     }

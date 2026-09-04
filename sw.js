@@ -3,7 +3,7 @@
  * - 清单与目录控制网络优先，只缓存有效 JSON
  * - 跨域实验内容与 API 请求不拦截
  */
-const VERSION = 'v0.8.0';
+const VERSION = 'v0.8.1';
 const CACHE_PREFIX = 'sl-shell-';
 const SHELL_CACHE = CACHE_PREFIX + VERSION;
 const SHELL = [

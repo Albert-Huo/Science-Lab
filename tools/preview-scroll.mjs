@@ -54,13 +54,7 @@ export async function createPreview({ contentRoot, port = 18890 }) {
         const html = body.toString('utf8');
         const registration = "navigator.serviceWorker.register('sw.js')";
         if (!html.includes(registration)) throw new Error('preview_worker_guard_changed');
-        let preview = html.replace(registration, 'Promise.resolve()');
-        if (url.searchParams.get('preview-touch') === '1') {
-          // Desktop review only: use the same band with a mouse inside the phone-sized wrapper.
-          preview = preview.replace('@media (pointer:coarse)', '@media (min-width:0px)')
-            .replace("matchMedia('(pointer:coarse)')", "matchMedia('(min-width:0px)')");
-        }
-        body = Buffer.from(preview);
+        body = Buffer.from(html.replace(registration, 'Promise.resolve()'));
       }
       response.writeHead(200, { 'Content-Type': MIME[extension], 'Content-Length': body.length });
       response.end(request.method === 'HEAD' ? undefined : body);
