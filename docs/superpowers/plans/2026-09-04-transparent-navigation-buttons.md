@@ -96,7 +96,7 @@ node server/api/test/frontend-catalog-control.js
 
 Expected: 全部退出 0；滚动与缓存版本契约均通过。
 
-- [ ] **Step 4: 提交功能改动**
+- [x] **Step 4: 提交功能改动**
 
 ```bash
 git add index.html sw.js experiment-scroll.js server/api/test/frontend-scroll.js docs/superpowers/plans/2026-09-04-transparent-navigation-buttons.md
@@ -108,7 +108,7 @@ git commit -m "style: make experiment navigation translucent"
 **Files:**
 - Create outside repository: `HTML-sources-private/reports/visual-regression/2026-09-04-transparent-navigation/output/playwright/`
 
-- [ ] **Step 1: 运行完整自动化检查**
+- [x] **Step 1: 运行完整自动化检查**
 
 Run:
 
@@ -121,7 +121,7 @@ git diff --check
 
 Expected: 测试零失败、审计零漏洞、语法和空白检查退出 0。
 
-- [ ] **Step 2: 用隔离的 390×844 Android 微信环境验证**
+- [x] **Step 2: 用隔离的 390×844 Android 微信环境验证**
 
 启动任务专属本地预览：
 
@@ -140,7 +140,7 @@ const style = getComputedStyle(document.querySelector('#btnNext'));
 
 Expected: 两个按钮均为 40×40px；默认背景 `rgba(18, 24, 38, 0.14)`、图标 `rgba(232, 237, 247, 0.68)`；点击下箭头后编号加一，点击上箭头后回到原实验。保存并目检截图，确认按钮下方正文可辨。
 
-- [ ] **Step 3: 关闭本任务创建的浏览器会话和本地预览**
+- [x] **Step 3: 关闭本任务创建的浏览器会话和本地预览**
 
 只关闭本计划登记的 Playwright session 与端口 18984 的预览进程，不触碰其他浏览器或服务。
 
@@ -150,7 +150,7 @@ Expected: 两个按钮均为 40×40px；默认背景 `rgba(18, 24, 38, 0.14)`、
 - Modify after deployment: `docs/content-scroll-pilot.md`
 - Modify after deployment: `docs/superpowers/plans/2026-09-04-transparent-navigation-buttons.md`
 
-- [ ] **Step 1: 推送功能分支并快进 main**
+- [x] **Step 1: 推送功能分支并快进 main**
 
 ```bash
 git push origin codex/content-scroll-pilot
@@ -160,7 +160,7 @@ git -C /Users/lx100/projects/HTML-GitHub/Science-Lab push origin main
 
 Expected: 本地 `main`、远端 `main` 和功能分支指向同一功能提交；保留主检出目录已有未跟踪文件。
 
-- [ ] **Step 2: 上传并原子切换静态 release**
+- [x] **Step 2: 上传并原子切换静态 release**
 
 上传以下文件至以功能提交短 SHA 命名的全新 staging 目录：
 
@@ -171,7 +171,7 @@ catalog-control.json manifest.json manifest.webmanifest sw.js assets/
 
 比对本地和服务器 SHA-256，解析两个 JSON，确认 `v0.8.4` 三处一致；保存当前 release 为 previous，再原子切换 `/var/www/science-lab-current`。切换失败或公网校验失败时立即切回 previous。不得重启或修改 API、nginx、数据库及内容站。
 
-- [ ] **Step 3: 公网验证**
+- [x] **Step 3: 公网验证**
 
 使用独立 Android 微信 Playwright 会话打开：
 
@@ -181,7 +181,7 @@ https://lab.xingnian.net.cn/?app=v0.8.4
 
 检查 `v0.8.4` 脚本、40×40px 按钮、透明计算样式、上下各切换一次、控制台零错误；同时验证内外网 `/api/health`。
 
-- [ ] **Step 4: 记录部署并提交推送**
+- [x] **Step 4: 记录部署并提交推送**
 
 在交付文档记录功能提交、release、previous、测试和公网结果，勾选本计划，随后运行：
 

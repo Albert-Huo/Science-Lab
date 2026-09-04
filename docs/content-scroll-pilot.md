@@ -67,6 +67,15 @@ node tools/preview-scroll.mjs --content-root /Users/lx100/projects/HTML-GitHub/H
 - 功能提交 `73f46aabe6d18a6554cc953d3ff95792acce84a4` 已推送并快进合并到 `main`。阿里云静态站已原子切换到 `/var/www/science-lab-releases/20260904-73f46aabe6d1`，回滚链接指向 `/var/www/science-lab-releases/20260904-ae9f5756abb9`；API、nginx、数据库及内容站未改动，API 内外网健康检查均通过。
 - 公网同一 Android 微信仿真再次读取到 `v0.8.3`：强制指针捕获失败后，实验 1、35、41 分别滚动到 140、80、80px，编号保持不变，结束后活动状态均已清理，控制台 0 错误。公网截图：`/Users/lx100/projects/HTML-GitHub/HTML-sources-private/reports/visual-regression/2026-09-04-android-scroll-v083/output/playwright/.playwright-cli/page-2026-09-04T04-14-31-796Z.png`。
 
+## 2026-09-04 透明实验切换按钮（v0.8.4）
+
+- 右下角上下切换按钮保持 40×40px 触摸区，默认背景改为 14% 不透明、边框 22%、箭头 68%；不对整个按钮使用低 `opacity`，避免箭头和焦点提示一起消失。
+- 移除按钮的背景模糊，使下方正文保持清晰；按下或键盘聚焦时，背景临时提高到 34%、箭头到 95%，禁用按钮继续沿用原有状态。
+- 新增样式与触摸尺寸契约测试。先确认旧样式导致新测试失败，再完成实现；滚动专项 19/19、完整 `npm test --prefix server/api`、离线依赖审计、脚本语法及差异检查均通过。
+- 390×844 Android 微信隔离环境确认默认计算样式、两个按钮尺寸、1/118 → 2/118 → 1/118 切换与键盘焦点态。截图：`/Users/lx100/projects/HTML-GitHub/HTML-sources-private/reports/visual-regression/2026-09-04-transparent-navigation/output/playwright/.playwright-cli/page-2026-09-04T05-58-39-843Z.png`。
+- 功能提交 `e13832ae267053a42186bfc2e894e6bd59489494` 已推送并快进合并到 `main`。阿里云静态站已原子切换到 `/var/www/science-lab-releases/20260904-e13832ae2670`，回滚链接指向 `/var/www/science-lab-releases/20260904-73f46aabe6d1`；API、nginx、数据库及内容站未改动，API 内外网健康检查均通过。
+- 公网 Android 微信仿真读取到 `v0.8.4`，复验两个按钮均为 40×40px、默认和焦点计算样式准确、上下切换正常，控制台 0 错误。公网截图：`/Users/lx100/projects/HTML-GitHub/HTML-sources-private/reports/visual-regression/2026-09-04-transparent-navigation/output/playwright/.playwright-cli/page-2026-09-04T06-01-21-895Z.png`。
+
 ## 单手柄改版验证记录
 
 - 滚动测试 13/13、预览服务测试 1/1 通过；新增行为及矮屏规则均先观察失败再补实现。
