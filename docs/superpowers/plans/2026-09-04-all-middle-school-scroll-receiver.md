@@ -17,7 +17,7 @@
 - Modify: `server/api/package.json`
 - Test: `server/api/test/scroll-release.js`
 
-- [ ] **Step 1: 创建 70 页内容夹具测试**
+- [x] **Step 1: 创建 70 页内容夹具测试**
 
 测试在临时 Git 仓库中生成实验 1–68（用 12-1／12-2 替代 12，并增加 49-1），让 1、35、41 带现有内联接收器，其余页面无接收器。测试调用待实现工具并断言：
 
@@ -45,11 +45,11 @@ for (const number of numbers) {
 
 再分别制造缺失引用、重复引用、共享文件漂移和额外实验内容改动，断言校验工具拒绝发布。
 
-- [ ] **Step 2: 将测试加入完整测试命令**
+- [x] **Step 2: 将测试加入完整测试命令**
 
 在 `server/api/package.json` 的 `test` 命令中，把 `node test/scroll-release.js` 放在 `preview-scroll.js` 之前。
 
-- [ ] **Step 3: 运行测试并确认正确失败**
+- [x] **Step 3: 运行测试并确认正确失败**
 
 Run: `node server/api/test/scroll-release.js`
 
@@ -62,7 +62,7 @@ Expected: FAIL，原因是 `tools/install-scroll-receiver.mjs` 尚不存在，�
 - Modify: `tools/check-scroll-release.mjs`
 - Test: `server/api/test/scroll-release.js`
 
-- [ ] **Step 1: 实现安装器**
+- [x] **Step 1: 实现安装器**
 
 安装器使用以下固定契约：
 
@@ -81,7 +81,7 @@ const legacyBlock = `<script data-science-lab-scroll>\n${receiver}</script>\n`;
 - 存在未知或重复标记：抛错并停止；
 - 非 `--apply` 模式只报告待修改数量，不写文件。
 
-- [ ] **Step 2: 将校验器改为全量外部引用契约**
+- [x] **Step 2: 将校验器改为全量外部引用契约**
 
 校验器必须：
 
@@ -95,13 +95,13 @@ assert.ok(!html.includes(legacyBlock), `${relative}: inline receiver must be rem
 
 提供 `--base-ref` 时，从该提交读取对应 HTML，分别移除规范外部标签或精确旧内联块后逐字比较，拒绝夹带实验内容改动。
 
-- [ ] **Step 3: 运行专项测试并确认转绿**
+- [x] **Step 3: 运行专项测试并确认转绿**
 
 Run: `node server/api/test/scroll-release.js`
 
 Expected: PASS；正常安装和五类失败边界均被覆盖。
 
-- [ ] **Step 4: 运行现有滚动及预览专项**
+- [x] **Step 4: 运行现有滚动及预览专项**
 
 Run:
 
@@ -118,7 +118,7 @@ Expected: 两项退出 0；既有宿主、试点预览和安全边界不回归�
 - Create in HTML repository: `experiment-scroll-receiver.v1.js`
 - Modify in HTML repository: `physics-middle/初中物理实验*.html`（70 个）
 
-- [ ] **Step 1: 从最新远端 main 建立隔离工作树**
+- [x] **Step 1: 从最新远端 main 建立隔离工作树**
 
 在内容仓库执行远端更新，确认本地主检出目录状态后，以准确的 `origin/main` 建立：
 
@@ -129,7 +129,7 @@ git worktree add /Users/lx100/.config/superpowers/worktrees/HTML-/all-middle-scr
 
 创建前用 `git rev-parse origin/main` 保存完整 SHA 到 `CONTENT_BASE`。Expected: 新工作树分支起点等于该 SHA，不读取或修改其他内容工作树。
 
-- [ ] **Step 2: 预演并应用机械改写**
+- [x] **Step 2: 预演并应用机械改写**
 
 Run:
 
@@ -142,7 +142,7 @@ node tools/install-scroll-receiver.mjs \
 
 Expected: 共享文件新增；三个内联块被替换；其余 67 页各新增一个外部引用；第二次预演报告 0 个待修改页面。
 
-- [ ] **Step 3: 运行全量发布边界检查**
+- [x] **Step 3: 运行全量发布边界检查**
 
 Run:
 
@@ -154,7 +154,7 @@ node tools/check-scroll-release.mjs \
 
 Expected: 验证 70/70，规范源一致，去除接入块后所有实验与基线逐字一致。
 
-- [ ] **Step 4: 审查内容差异**
+- [x] **Step 4: 审查内容差异**
 
 确认：
 
@@ -169,7 +169,7 @@ Expected: 验证 70/70，规范源一致，去除接入块后所有实验与基�
 **Files:**
 - Create outside repositories: `HTML-sources-private/reports/visual-regression/2026-09-04-all-middle-scroll/output/playwright/`
 
-- [ ] **Step 1: 运行 Science-Lab 完整检查**
+- [x] **Step 1: 运行 Science-Lab 完整检查**
 
 Run:
 
@@ -184,11 +184,11 @@ git diff --check
 
 Expected: 测试零失败、审计零漏洞、语法和空白检查退出 0。
 
-- [ ] **Step 2: 验证 70 页共享资源可读取**
+- [x] **Step 2: 验证 70 页共享资源可读取**
 
 使用 `tools/preview-scroll.mjs` 指向隔离内容工作树；通过 HTTP 读取共享 JS 和全部 70 个 HTML，确认状态 200、外部引用恰有一个、无内联接收器。若预览服务不能读取根共享 JS，先增加该精确资源的失败测试，再做最小修正。
 
-- [ ] **Step 3: Android 微信移动端抽样**
+- [x] **Step 3: Android 微信移动端抽样**
 
 在隔离 390×844 Android 微信会话中验证实验 1、2、10、35、41、50、68：
 
@@ -200,7 +200,7 @@ Expected: 测试零失败、审计零漏洞、语法和空白检查退出 0。
 
 保存截图和机器可读结果；不判断内部滚动容器，不做逐页溢出审核。
 
-- [ ] **Step 4: 关闭精确的浏览器会话和本地预览**
+- [x] **Step 4: 关闭精确的浏览器会话和本地预览**
 
 只关闭本任务登记的 Playwright session 与预览进程，不触碰其他浏览器、Profile 或本地服务。
 
@@ -209,7 +209,7 @@ Expected: 测试零失败、审计零漏洞、语法和空白检查退出 0。
 **Files:**
 - Commit in HTML repository: shared receiver + 70 HTML files
 
-- [ ] **Step 1: 提交内容仓库改动**
+- [x] **Step 1: 提交内容仓库改动**
 
 Run:
 
@@ -221,7 +221,7 @@ git push origin codex/all-middle-scroll
 
 Expected: 功能分支只包含全量接入改动。
 
-- [ ] **Step 2: 快进内容仓库 main 并推送**
+- [x] **Step 2: 快进内容仓库 main 并推送**
 
 Run:
 
@@ -234,11 +234,13 @@ git -C /Users/lx100/projects/HTML-GitHub/HTML- push origin main
 
 若远端已前进则停止并重新基于新提交验证，不强推。
 
-- [ ] **Step 3: 等待 GitHub Pages 和精确 CDN 刷新任务**
+执行时本地主检出目录存在一份不属于本任务的实验 4 未提交修改。为避免覆盖或 stash，该目录保持不动；经重新获取远端并确认 `origin/main` 是功能提交的直接祖先后，从隔离工作树以非强制 `HEAD:main` 完成等价快进。
+
+- [x] **Step 3: 等待 GitHub Pages 和精确 CDN 刷新任务**
 
 使用 GitHub API 确认 Pages 最新成功构建提交等于内容功能提交；确认 `purge-pages-cache.yml` 对该发布成功。任何失败都停止公网验收，不把“已 push”当成“已部署”。
 
-- [ ] **Step 4: 公网全量验证**
+- [x] **Step 4: 公网全量验证**
 
 验证：
 
@@ -255,7 +257,9 @@ git -C /Users/lx100/projects/HTML-GitHub/HTML- push origin main
 - Modify: `docs/superpowers/plans/2026-09-04-all-middle-school-scroll-receiver.md`
 - Commit: installer, checker, tests, package script, design and release docs
 
-- [ ] **Step 1: 记录测试、内容提交和 Pages 发布结果**
+- [x] **Step 1: 记录测试、内容提交和 Pages 发布结果**
+
+结果：内容提交 `3a3b92797c8073f081d66c3bef23204b9cdf4880`；Pages 运行 `33845027767`、缓存刷新运行 `33845079155` 均成功。公网 70/70 页面通过，资源 SHA-256 为 `7ff4afc5c78eee35cf9144ee37e5e0847f76c067aac92c58429ec5a39fed571d`；正式站 Android 微信抽样 7/7 通过。回滚提交为对内容提交执行 `git revert` 后产生的新提交。
 
 记录内容仓库功能提交、Pages 状态、CDN 刷新、70/70 公网检查、抽样浏览器结果与回滚提交。
 

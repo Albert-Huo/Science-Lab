@@ -1,8 +1,8 @@
-# 当前实验内容滑条：本地试点交付
+# 当前实验内容滑条：试点与全量发布交付
 
 日期：2026-09-03。分支：`codex/content-scroll-pilot`；基础提交：`170517e6f1e3ca7d6120fc663c7a58b9bce27fed`。
 
-本文件先记录本地试点；用户在体验通过后另行授权提交、推送和部署。正式发布范围仍只包含初中物理实验 1、35、41，发布状态见末尾记录。
+本文件保留本地试点和后续兼容修订历史。自 2026-09-04 全量发布起，当前 70 个初中物理实验均使用同一版本化滚动接收器，发布状态见对应记录。
 
 ## 试用
 
@@ -75,6 +75,18 @@ node tools/preview-scroll.mjs --content-root /Users/lx100/projects/HTML-GitHub/H
 - 390×844 Android 微信隔离环境确认默认计算样式、两个按钮尺寸、1/118 → 2/118 → 1/118 切换与键盘焦点态。截图：`/Users/lx100/projects/HTML-GitHub/HTML-sources-private/reports/visual-regression/2026-09-04-transparent-navigation/output/playwright/.playwright-cli/page-2026-09-04T05-58-39-843Z.png`。
 - 功能提交 `e13832ae267053a42186bfc2e894e6bd59489494` 已推送并快进合并到 `main`。阿里云静态站已原子切换到 `/var/www/science-lab-releases/20260904-e13832ae2670`，回滚链接指向 `/var/www/science-lab-releases/20260904-73f46aabe6d1`；API、nginx、数据库及内容站未改动，API 内外网健康检查均通过。
 - 公网 Android 微信仿真读取到 `v0.8.4`，复验两个按钮均为 40×40px、默认和焦点计算样式准确、上下切换正常，控制台 0 错误。公网截图：`/Users/lx100/projects/HTML-GitHub/HTML-sources-private/reports/visual-regression/2026-09-04-transparent-navigation/output/playwright/.playwright-cli/page-2026-09-04T06-01-21-895Z.png`。
+
+## 2026-09-04 初中物理全量接入
+
+- 内容仓库新增不可变共享脚本 `experiment-scroll-receiver.v1.js`，与 Science-Lab 规范源逐字一致，SHA-256 为 `7ff4afc5c78eee35cf9144ee37e5e0847f76c067aac92c58429ec5a39fed571d`。70 个 `physics-middle` 实验各在 `</body>` 前引用一次；实验 1、35、41 的旧内联块被替换，其余 67 页只新增一行引用。
+- 按用户确认的边界，接收器统一控制 `document.scrollingElement`，不引入内部滚动容器适配，也不以逐页“是否超过一屏”作为接入条件；实验器材、布局、教学逻辑和其他目录均未修改。
+- 新增可重复安装器、全量发布校验器和 6 项专项测试。安装器默认只预演，只有 `--apply` 才写入；未知／重复标记会在任何写入前中止。校验器要求页面数为 70、共享脚本无漂移、每页恰好一个版本标签，并在给定基线时剥离接收器后逐字比较实验源码。
+- 内容提交 `3a3b92797c8073f081d66c3bef23204b9cdf4880` 已推送到 `codex/all-middle-scroll`，并从远端基线 `8d98f757e9813753aeb87440fa0210a365286cd1` 非强制快进到 `main`。本地主检出目录当时存在一份不属于本任务的实验 4 未提交修改，因此未在该目录合并或 stash；该修改保持原样。
+- GitHub Pages 工作流 [33845027767](https://github.com/Albert-Huo/HTML-/actions/runs/33845027767) 与发布后缓存刷新工作流 [33845079155](https://github.com/Albert-Huo/HTML-/actions/runs/33845079155) 均成功，且 `headSha` 都是上述内容提交。
+- 公网验收：`html.xingnian.net.cn` 的 70/70 个目标页面均返回 200、只包含一个版本化引用且没有旧内联接收器；自定义域名和 GitHub Pages 源站的共享脚本哈希均与规范源一致。
+- 本地候选和正式 `lab.xingnian.net.cn` 各使用一套独立 390×844 Android 微信仿真会话，抽样实验 1、2、10、35、41、50、68。两轮均确认共享脚本已加载、手柄可用、真实 Touch 拖动将根页面从 0 滚动到 62px、实验编号不变、演示模式有响应，控制台和页面错误均为 0。
+- 正式验证材料位于 `/Users/lx100/projects/HTML-GitHub/HTML-sources-private/reports/visual-regression/2026-09-04-all-middle-scroll/output/playwright/`。宿主继续使用 `experiment-scroll.js?app=v0.8.4`，API 健康检查为 `{"ok":true}`；本轮没有改动 App 静态文件，因此没有切换 ECS release。
+- 回滚方式：在内容仓库对 `3a3b92797c8073f081d66c3bef23204b9cdf4880` 创建反向提交并推送 `main`，等待 Pages 与缓存刷新工作流完成；无需回滚或重启 ECS。
 
 ## 单手柄改版验证记录
 
