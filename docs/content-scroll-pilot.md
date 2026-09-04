@@ -37,6 +37,9 @@ node tools/preview-scroll.mjs --content-root /Users/lx100/projects/HTML-GitHub/H
 - 浏览器控制台 0 错误、0 警告。截图保存于：
   `/Users/lx100/projects/HTML-GitHub/HTML-sources-private/reports/visual-regression/2026-09-04-scroll-handle-cleanup/output/playwright/scroll-handle-cleanup-mobile.png`。
 - 用户在本地预览确认后授权提交、推送并部署；发布时将 Service Worker 缓存版本升级为 `v0.8.1`，防止已安装客户端继续使用旧首页。
+- App 功能提交 `659d71c79d8963a48c6515b199831b449f189243` 已推送；阿里云静态站已原子切换到 `/var/www/science-lab-releases/20260904-659d71c79d89`，上一版 `/var/www/science-lab-releases/20260904-43ced6ff36ca` 保留为回滚目标。API 进程、API release、nginx 与 systemd 配置未改动。
+- 正式公网 390×844 触摸上下文复验实验 1、35、41：均从 0 滚动到 60px 且编号不变；实验 42 无手柄，右缘拖动不换实验；源码和 DOM 均无旧边缘条。
+- 正式公网 Service Worker `v0.8.1` 成功接管，缓存中包含 `experiment-scroll.js`，离线重载 App 壳通过。
 
 ## 单手柄改版验证记录
 
