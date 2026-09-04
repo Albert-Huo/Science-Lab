@@ -16,7 +16,7 @@
 - Modify: `server/api/test/frontend-scroll.js`
 - Test: `server/api/test/frontend-scroll.js`
 
-- [ ] **Step 1: 写入失败测试**
+- [x] **Step 1: 写入失败测试**
 
 在现有页面手柄测试旁增加静态样式契约：
 
@@ -33,7 +33,7 @@ test('navigation arrows use layered transparency without shrinking touch targets
 });
 ```
 
-- [ ] **Step 2: 运行测试并确认因旧样式失败**
+- [x] **Step 2: 运行测试并确认因旧样式失败**
 
 Run: `node server/api/test/frontend-scroll.js`
 
@@ -49,7 +49,7 @@ Expected: 新测试因现有 `#121826cc` 背景、实体边框和 `backdrop-filt
 - Test: `server/api/test/service-worker-cache.js`
 - Test: `server/api/test/frontend-catalog-control.js`
 
-- [ ] **Step 1: 修改按钮默认态和交互态**
+- [x] **Step 1: 修改按钮默认态和交互态**
 
 将按钮样式改为：
 
@@ -66,7 +66,7 @@ Expected: 新测试因现有 `#121826cc` 背景、实体边框和 `backdrop-filt
 
 保留现有 `#navBtns button:disabled{opacity:.3;}`，不修改按钮结构、位置和事件绑定。
 
-- [ ] **Step 2: 将统一静态版本升级到 v0.8.4**
+- [x] **Step 2: 将统一静态版本升级到 v0.8.4**
 
 修改：
 
@@ -84,7 +84,7 @@ const VERSION='v0.8.4';
 <script src="experiment-scroll.js?app=v0.8.4"></script>
 ```
 
-- [ ] **Step 3: 运行专项测试并确认转绿**
+- [x] **Step 3: 运行专项测试并确认转绿**
 
 Run:
 

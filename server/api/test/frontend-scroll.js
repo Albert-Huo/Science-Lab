@@ -326,3 +326,14 @@ test('short viewports reduce handle height and disable targets smaller than 44px
   assert.ok(html.includes('height:var(--scroll-h)'));
   assert.ok(html.includes('scrollEdge.clientHeight>=44'));
 });
+
+test('navigation arrows use layered transparency without shrinking touch targets', () => {
+  const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  const baseRule = html.match(/#navBtns button\{([^}]+)\}/)?.[1] || '';
+  assert.ok(baseRule.includes('width:40px;height:40px'));
+  assert.ok(baseRule.includes('background:rgba(18,24,38,.14)'));
+  assert.ok(baseRule.includes('border:1px solid rgba(147,161,189,.22)'));
+  assert.ok(baseRule.includes('color:rgba(232,237,247,.68)'));
+  assert.ok(!baseRule.includes('backdrop-filter'));
+  assert.match(html, /#navBtns button:active,#navBtns button:focus-visible\{/);
+});

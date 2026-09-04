@@ -77,8 +77,12 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 /* ---------- nav arrows ---------- */
 #navBtns{position:fixed;right:10px;bottom:calc(24px + env(safe-area-inset-bottom));z-index:30;
   display:flex;flex-direction:column;gap:10px;}
-#navBtns button{width:40px;height:40px;border-radius:50%;border:1px solid var(--line);
-  background:#121826cc;color:var(--txt);font-size:16px;cursor:pointer;backdrop-filter:blur(6px);}
+#navBtns button{width:40px;height:40px;border-radius:50%;border:1px solid rgba(147,161,189,.22);
+  background:rgba(18,24,38,.14);color:rgba(232,237,247,.68);font-size:16px;cursor:pointer;
+  transition:background .15s,color .15s,border-color .15s;}
+#navBtns button:active,#navBtns button:focus-visible{
+  border-color:rgba(147,161,189,.5);background:rgba(18,24,38,.34);color:rgba(232,237,247,.95);}
+#navBtns button:focus-visible{outline:1px solid rgba(232,237,247,.72);outline-offset:2px;}
 #navBtns button:disabled{opacity:.3;}
 /* ---------- panels ---------- */
 #overlay{position:fixed;inset:0;background:#0008;z-index:50;opacity:0;pointer-events:none;transition:opacity .3s;}
@@ -305,7 +309,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 
 <script src="catalog-control.js"></script>
 <script src="content-source.js"></script>
-<script src="experiment-scroll.js?app=v0.8.3"></script>
+<script src="experiment-scroll.js?app=v0.8.4"></script>
 <script>
 const qs = new URLSearchParams(location.search);
 /* 内容源：生产固定线上站；与内容站同域时用相对路径；仅本地联调接受根相对 ?base= */

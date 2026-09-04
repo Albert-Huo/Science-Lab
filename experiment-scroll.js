@@ -3,7 +3,7 @@
   if(typeof module==='object'&&module.exports) module.exports=api;
   else root.ExperimentScroll=api;
 })(typeof globalThis!=='undefined'?globalThis:this,function(){
-  const VERSION='v0.8.3';
+  const VERSION='v0.8.4';
   const CHANNEL='science-lab.scroll.v1';
   function validState(data){
     return data&&data.type==='state'&&typeof data.blocked==='boolean'&&
