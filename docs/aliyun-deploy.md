@@ -115,7 +115,7 @@ sudo chown -R root:root "$SCIENCE_LAB_RELEASE_DIR"
 sudo find "$SCIENCE_LAB_RELEASE_DIR" -type d -exec chmod 755 {} +
 sudo find "$SCIENCE_LAB_RELEASE_DIR" -type f -exec chmod 644 {} +
 
-# 根 URL 与 index.html 是同一份内容，因此 App 壳有以下十一个物理文件。
+# 根 URL 与 index.html 是同一份内容，因此 App 壳有以下十二个物理文件。
 SCIENCE_LAB_SHELL_FILES=(
   "index.html"
   "catalog-control.js"
@@ -128,6 +128,7 @@ SCIENCE_LAB_SHELL_FILES=(
   "assets/icons/icon-512.png"
   "assets/icons/icon-maskable-512.png"
   "assets/icons/apple-touch-icon.png"
+  "assets/support/wechat-reward.jpg"
 )
 
 # 切换前确认全部 App 壳文件和 Service Worker 齐全，并实际解析两个 JSON；任一检查失败都不要切换。
@@ -163,7 +164,7 @@ fi
 sudo ln -sfn "$SCIENCE_LAB_RELEASE_DIR" /var/www/science-lab-next
 sudo mv -Tf /var/www/science-lab-next /var/www/science-lab-current
 
-# 切换后验证首页与十一个物理 App 壳 URL。
+# 切换后验证首页与十二个物理 App 壳 URL。
 SCIENCE_LAB_PUBLIC_URL="https://lab.xingnian.net.cn"
 SCIENCE_LAB_HTTP_STATUS=$(curl --silent --show-error \
   --output /dev/null --write-out '%{http_code}' "$SCIENCE_LAB_PUBLIC_URL/")

@@ -174,6 +174,94 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 .local-note{margin:0 16px 16px;padding:11px 12px;border:1px solid var(--line);border-radius:12px;
   background:#0b0f1766;color:var(--txt2);font-size:11.5px;line-height:1.65;}
 .local-note b{color:var(--acc2);font-size:12.5px;}
+/* ---------- contact & support ---------- */
+.community-icon{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round;flex:none;}
+.community-footer{flex:none;padding:13px 14px calc(14px + env(safe-area-inset-bottom));
+  border-top:1px solid var(--line);background:var(--panel);}
+.community-signoff{display:flex;align-items:center;justify-content:space-between;gap:8px;
+  margin-bottom:10px;font-size:10.5px;color:var(--txt2);}
+.community-signoff span:first-child{display:flex;align-items:center;gap:6px;}
+.community-signoff span:first-child::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--acc2);}
+.community-actions{display:flex;gap:8px;}
+.community-actions button{display:flex;align-items:center;justify-content:center;gap:7px;flex:1;min-width:0;
+  min-height:44px;padding:8px 6px;border:1px solid var(--line);border-radius:11px;
+  background:var(--panel2);color:var(--txt);font:inherit;font-size:12px;cursor:pointer;transition:background .18s,border-color .18s;}
+.community-actions [data-community-open="support"]{color:#ecc5a2;background:#b6804b10;border-color:#b6804b38;}
+.community-actions [data-community-open="contact"] .community-icon{color:#80cfc4;}
+.tabpane[data-pane="profile"]{overflow-y:auto;overscroll-behavior:contain;padding-bottom:env(safe-area-inset-bottom);}
+.profile-community{margin:2px 16px 18px;padding-top:16px;border-top:1px solid var(--line);}
+.profile-community>p{color:var(--txt2);font-size:11px;letter-spacing:.04em;margin-bottom:11px;}
+.community-row{display:flex;align-items:center;gap:11px;width:100%;padding:12px 10px;text-align:left;
+  border:1px solid var(--line);border-radius:12px;background:#1a223455;color:var(--txt);font:inherit;cursor:pointer;}
+.community-row+.community-row{margin-top:8px;}
+.community-row .community-symbol{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;
+  background:#22d3a510;color:#80cfc4;flex:none;}
+.community-row[data-community-open="support"] .community-symbol{background:#b6804b16;color:#ecc5a2;}
+.community-row .community-label{flex:1;min-width:0;}
+.community-label b{display:block;font-size:13px;font-weight:600;}
+.community-label small{display:block;margin-top:4px;color:var(--txt2);font-size:11px;}
+.community-row>.community-icon{width:14px;height:14px;color:var(--txt2);}
+.community-actions button:focus-visible,.community-row:focus-visible,#communityDialog button:focus-visible,
+#communityDialog a:focus-visible{outline:2px solid var(--acc2);outline-offset:3px;}
+@media (hover:hover){
+  .community-actions button:hover,.community-row:hover{background:#26314a88;border-color:#60718f;}
+}
+#communityDialog{position:fixed;inset:0;width:min(410px,calc(100% - 32px));max-height:calc(100vh - 32px);
+  max-height:calc(100dvh - 32px);margin:auto;padding:26px;border:1px solid #38445b;border-radius:24px;
+  background:var(--panel);color:var(--txt);box-shadow:0 24px 100px #0009;overflow-y:auto;overscroll-behavior:contain;}
+#communityDialog::backdrop{background:#030711bc;backdrop-filter:blur(7px);}
+#communityDialog[open]{animation:community-enter .2s ease-out;}
+#communityDialog [hidden]{display:none;}
+.community-dismiss{position:sticky;top:12px;height:0;z-index:1;}
+.community-close{position:absolute;right:-12px;top:-12px;width:44px;height:44px;display:grid;place-items:center;
+  border:1px solid var(--line);border-radius:50%;background:#1a223480;color:var(--txt2);cursor:pointer;}
+.community-heading{padding-right:34px;}
+.community-eyebrow{display:flex;align-items:center;gap:7px;color:#80cfc4;font-size:11px;letter-spacing:.05em;margin-bottom:14px;}
+#communityDialog[data-view="support"] .community-eyebrow{color:#ecc5a2;}
+#communityTitle{font-size:24px;font-weight:600;letter-spacing:-.025em;line-height:1.3;}
+#communityIntro{font-size:13px;line-height:1.8;color:var(--txt2);margin-top:10px;}
+.wechat-card{margin-top:24px;padding:20px;border:1px solid #80cfc430;border-radius:16px;
+  background:linear-gradient(135deg,#22d3a50c,#0b0f1744);}
+.wechat-card label{display:block;color:#80cfc4;font-size:11px;margin-bottom:8px;}
+#contactWechat{display:block;width:100%;min-width:0;padding:0;border:0;border-radius:0;outline-offset:4px;
+  background:transparent;color:var(--txt);font:600 24px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.015em;}
+#copyWechat{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:44px;margin-top:18px;
+  padding:10px 12px;border:1px solid #80cfc450;border-radius:10px;background:#b9e6dc;color:#102c2a;
+  font:inherit;font-size:13px;font-weight:600;cursor:pointer;}
+#copyWechat:disabled{cursor:wait;opacity:.65;}
+#contactCopyStatus{min-height:38px;padding-top:10px;color:#a8cabe;font-size:11px;line-height:1.65;}
+.feedback-note{padding:16px 2px 4px;font-size:12px;line-height:1.8;color:var(--txt2);}
+.feedback-note b{display:block;color:var(--txt);font-size:12px;font-weight:500;margin-bottom:4px;}
+.community-credit{margin-top:22px;padding-top:15px;border-top:1px solid var(--line);display:flex;
+  align-items:center;justify-content:space-between;gap:8px;color:var(--txt2);font-size:10.5px;}
+#communityDialog[data-view="support"]{width:min(720px,calc(100% - 32px));}
+.support-layout{display:grid;gap:22px;margin-top:22px;}
+.support-details{font-size:12px;line-height:1.85;color:var(--txt2);}
+.support-details>p+p{margin-top:14px;}
+.support-details strong{color:var(--txt);font-weight:500;}
+.support-minor{margin-top:20px;padding:14px;border:1px solid #b6804b38;border-radius:12px;background:#b6804b0a;}
+.support-minor b{display:block;font-weight:500;color:#ecc5a2;margin-bottom:5px;}
+.support-contact-link{padding:0;border:0;border-bottom:1px solid #80cfc480;background:none;color:#a9dbd2;
+  font:inherit;line-height:1.4;cursor:pointer;}
+.support-payee{margin-top:18px;padding-top:14px;border-top:1px solid var(--line);font-size:11px;overflow-wrap:anywhere;}
+.support-code{margin:0 auto;width:min(292px,100%);border-radius:15px;overflow:hidden;background:#fff;}
+#supportQr{display:block;width:100%;height:auto;-webkit-touch-callout:default;user-select:auto;}
+#supportImageError{padding:20px;color:#344252;font-size:13px;line-height:1.8;text-align:center;}
+.support-instructions{margin-top:14px;text-align:center;color:var(--txt2);font-size:11.5px;line-height:1.8;}
+.support-download{display:flex;align-items:center;justify-content:center;gap:6px;width:fit-content;min-height:40px;
+  margin:4px auto 0;padding:8px 12px;color:#ecc5a2;text-decoration:none;font-size:12px;border-radius:8px;}
+.support-download .community-icon{width:15px;height:15px;}
+.support-promise{margin-top:10px;text-align:center;color:var(--txt2);font-size:11px;}
+@media (min-width:641px){.support-layout{grid-template-columns:minmax(0,1fr) 292px;align-items:start;}}
+@keyframes community-enter{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@media (max-width:540px){
+  #communityDialog,#communityDialog[data-view="support"]{width:100%;max-width:100%;max-height:calc(100vh - env(safe-area-inset-top) - 12px);
+    max-height:calc(100dvh - env(safe-area-inset-top) - 12px);margin:auto auto 0;padding:24px 24px calc(22px + env(safe-area-inset-bottom));
+    border-radius:24px 24px 0 0;border-bottom:0;}
+  .support-code{width:min(280px,100%);}
+}
+@media (prefers-reduced-motion:reduce){#communityDialog[open]{animation:none;}}
 /* hint */
 #hint{position:fixed;inset:0;z-index:80;background:#000a;display:flex;align-items:center;
   justify-content:center;backdrop-filter:blur(3px);}
@@ -217,6 +305,13 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 </style>
 </head>
 <body>
+<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" aria-hidden="true" style="position:absolute">
+  <symbol id="icon-community-chat" viewBox="0 0 24 24"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l-2 2v-9.5A8.5 8.5 0 0 1 10.5 4H13a8 8 0 0 1 8 7.5Z"/><path d="M7 10h9M7 14h6"/></symbol>
+  <symbol id="icon-community-heart" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/></symbol>
+  <symbol id="icon-community-arrow" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+  <symbol id="icon-community-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></symbol>
+  <symbol id="icon-community-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 16v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></symbol>
+</svg>
 <div id="feed"><div id="track"></div></div>
 
 <div id="hud">
@@ -243,6 +338,13 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
   <div id="catSearch"><input id="catInput" type="search" placeholder="搜索实验…"></div>
   <div class="chips" id="catChips"></div>
   <div class="body" id="catList"></div>
+  <footer class="community-footer" aria-label="联系与支持">
+    <div class="community-signoff"><span>免费开放 · 无需登录</span><span>星年科普</span></div>
+    <div class="community-actions">
+      <button type="button" data-community-open="contact" aria-haspopup="dialog"><svg class="community-icon" aria-hidden="true"><use href="#icon-community-chat"/></svg>联系反馈</button>
+      <button type="button" data-community-open="support" aria-haspopup="dialog"><svg class="community-icon" aria-hidden="true"><use href="#icon-community-heart"/></svg>支持实验馆</button>
+    </div>
+  </footer>
 </aside>
 
 <aside class="panel" id="panelUser">
@@ -263,6 +365,19 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
       <div class="stat"><b id="stPct">0%</b><span>探索进度</span></div>
     </div>
     <div class="local-note"><b>隐私说明</b><br>浏览历史与 AI 对话只保存在当前浏览器。清除浏览器数据或更换设备后无法恢复。</div>
+    <section class="profile-community" aria-label="联系与支持">
+      <p>一起，让科学更有趣</p>
+      <button type="button" class="community-row" data-community-open="contact" aria-haspopup="dialog">
+        <span class="community-symbol"><svg class="community-icon" aria-hidden="true"><use href="#icon-community-chat"/></svg></span>
+        <span class="community-label"><b>联系与反馈</b><small>微信 xingniankepu</small></span>
+        <svg class="community-icon" aria-hidden="true"><use href="#icon-community-arrow"/></svg>
+      </button>
+      <button type="button" class="community-row" data-community-open="support" aria-haspopup="dialog">
+        <span class="community-symbol"><svg class="community-icon" aria-hidden="true"><use href="#icon-community-heart"/></svg></span>
+        <span class="community-label"><b>支持实验馆</b><small>免费使用，欢迎自愿赞赏</small></span>
+        <svg class="community-icon" aria-hidden="true"><use href="#icon-community-arrow"/></svg>
+      </button>
+    </section>
   </div>
   <div class="tabpane" data-pane="history">
     <div class="body" id="histList"><div class="empty">还没有浏览记录</div></div>
@@ -289,6 +404,48 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
   </div>
 </aside>
 
+<dialog id="communityDialog" aria-labelledby="communityTitle" aria-describedby="communityIntro">
+  <div class="community-dismiss">
+    <button type="button" class="community-close" id="communityClose" aria-label="关闭联系与支持" autofocus>
+      <svg class="community-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg>
+    </button>
+  </div>
+  <div class="community-heading">
+    <p class="community-eyebrow"><svg class="community-icon" aria-hidden="true"><use id="communityHeadingIcon" href="#icon-community-chat"/></svg><span>星年科普 · 实验馆</span></p>
+    <h2 id="communityTitle">联系与反馈</h2>
+  </div>
+  <p id="communityIntro">遇到问题，或有新的实验想法？欢迎联系我。</p>
+  <div id="communityContact">
+    <div class="wechat-card">
+      <label for="contactWechat">微信号</label>
+      <input id="contactWechat" value="xingniankepu" readonly spellcheck="false" aria-label="微信号 xingniankepu">
+      <button type="button" id="copyWechat"><svg class="community-icon" aria-hidden="true"><use href="#icon-community-copy"/></svg><span id="copyWechatLabel">复制微信号</span></button>
+      <p id="contactCopyStatus" role="status" aria-live="polite">复制后，在微信中搜索并添加好友。</p>
+    </div>
+    <p class="feedback-note"><b>带上这些信息，沟通更高效</b>实验名称、遇到的问题，再附上一张截图，方便我更快定位和改进。</p>
+    <div class="community-credit"><span>每一条反馈，都让实验馆更好一点</span><span>谢谢你</span></div>
+  </div>
+  <div id="communitySupport" hidden>
+    <div class="support-layout">
+      <div class="support-details">
+        <p>若本项目对你有所帮助，你可以自愿支持服务器、素材及日常维护费用。</p>
+        <p><strong>是否支持、支持金额多少，均不影响任何功能或服务；</strong>支持后不提供会员、专属内容、优先服务或其他回报。</p>
+        <div class="support-minor"><b>未满18周岁请勿支付。</b><p>如发生未成年人误付款，请由监护人通过<button type="button" class="support-contact-link" data-community-open="contact">联系方式</button>与我们联系处理。</p></div>
+        <p id="supportPayee" class="support-payee">收款方：北京星年科技中心</p>
+      </div>
+      <div class="support-payment">
+        <figure class="support-code">
+          <img id="supportQr" data-src="assets/support/wechat-reward.jpg" width="1141" height="1494" alt="星年科技微信赞赏码，请使用微信扫码付款">
+          <p id="supportImageError" hidden>赞赏码暂时没有加载成功。请关闭后重试，或通过微信 xingniankepu 联系我。</p>
+        </figure>
+        <p class="support-instructions">用微信扫一扫；手机上可长按保存图片，<br>再到微信“扫一扫”中选择相册识别。</p>
+        <a class="support-download" href="assets/support/wechat-reward.jpg" download="星年科普-赞赏码.jpg"><svg class="community-icon" aria-hidden="true"><use href="#icon-community-download"/></svg>保存赞赏码原图</a>
+        <p class="support-promise">免费使用 · 无需登录 · 支持完全自愿</p>
+      </div>
+    </div>
+  </div>
+</dialog>
+
 <div id="hint" class="hide"><div class="card">
   <b>↕ 查看当前实验</b>　按住右侧短手柄，上滑查看下方，下滑返回（已适配实验）<br>
   <b>↑ ↓ 切换实验</b>　点击右下角箭头<br>
@@ -309,7 +466,86 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 
 <script src="catalog-control.js"></script>
 <script src="content-source.js"></script>
-<script src="experiment-scroll.js?app=v0.8.5"></script>
+<script src="experiment-scroll.js?app=v0.8.6"></script>
+<script>
+/* 联系入口独立于实验清单初始化，空目录时也可使用。 */
+(()=>{
+  const dialog=document.getElementById('communityDialog');
+  const contact=document.getElementById('communityContact');
+  const support=document.getElementById('communitySupport');
+  const wechat=document.getElementById('contactWechat');
+  const copyButton=document.getElementById('copyWechat');
+  const copyLabel=document.getElementById('copyWechatLabel');
+  const copyStatus=document.getElementById('contactCopyStatus');
+  const qr=document.getElementById('supportQr');
+  const imageError=document.getElementById('supportImageError');
+  let opener=null,copyRequest=0;
+  function resetCopy(){
+    copyRequest++;
+    copyButton.disabled=false;
+    copyLabel.textContent='复制微信号';
+    copyStatus.textContent='复制后，在微信中搜索并添加好友。';
+  }
+  document.querySelectorAll('[data-community-open]').forEach(button=>button.addEventListener('click',()=>{
+    const isSupport=button.dataset.communityOpen==='support';
+    if(!dialog.open) opener=button;
+    resetCopy();
+    dialog.dataset.view=isSupport?'support':'contact';
+    contact.hidden=isSupport;
+    support.hidden=!isSupport;
+    document.getElementById('communityTitle').textContent=isSupport?'自愿支持项目维护':'联系与反馈';
+    document.getElementById('communityIntro').textContent=isSupport?
+      'lab-science 的全部实验与功能均可免费使用。':
+      '遇到问题，或有新的实验想法？欢迎联系我。';
+    document.getElementById('communityHeadingIcon').setAttribute('href',isSupport?'#icon-community-heart':'#icon-community-chat');
+    if(isSupport&&(!qr.getAttribute('src')||qr.hidden)){
+      qr.hidden=false;
+      imageError.hidden=true;
+      qr.src=qr.dataset.src;
+    }
+    if(!dialog.open) dialog.showModal();
+    else document.getElementById('communityClose').focus({preventScroll:true});
+    dialog.scrollTop=0;
+  }));
+  document.getElementById('communityClose').addEventListener('click',()=>dialog.close());
+  // 只有按下与抬起都在遮罩上时关闭，避免拖动选中文字时误关。
+  let backdropPress=false;
+  function onBackdrop(event){
+    const rect=dialog.getBoundingClientRect();
+    return event.target===dialog&&(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom);
+  }
+  dialog.addEventListener('pointerdown',event=>{backdropPress=onBackdrop(event);});
+  dialog.addEventListener('click',event=>{
+    if(backdropPress&&onBackdrop(event)) dialog.close();
+    backdropPress=false;
+  });
+  dialog.addEventListener('close',()=>{
+    resetCopy();
+    if(opener&&opener.isConnected) opener.focus({preventScroll:true});
+  });
+  qr.addEventListener('error',()=>{qr.hidden=true;imageError.hidden=false;});
+  copyButton.addEventListener('click',async()=>{
+    const request=++copyRequest;
+    copyButton.disabled=true;
+    try{
+      if(!navigator.clipboard||!navigator.clipboard.writeText) throw new Error('clipboard_unavailable');
+      await navigator.clipboard.writeText(wechat.value);
+      if(request!==copyRequest) return;
+      copyLabel.textContent='已复制';
+      copyStatus.textContent='微信号已复制，打开微信搜索 xingniankepu 即可。';
+    }catch(error){
+      console.warn('微信号自动复制未完成：'+error.message);
+      if(request!==copyRequest) return;
+      wechat.focus();
+      wechat.select();
+      wechat.setSelectionRange(0,wechat.value.length);
+      copyStatus.textContent='自动复制未成功，请长按上方微信号，或使用系统复制。';
+    }finally{
+      if(request===copyRequest) copyButton.disabled=false;
+    }
+  });
+})();
+</script>
 <script>
 const qs = new URLSearchParams(location.search);
 /* 内容源：生产固定线上站；与内容站同域时用相对路径；仅本地联调接受根相对 ?base= */
@@ -811,12 +1047,13 @@ document.getElementById('btnNext').addEventListener('click',next);
 /* desktop: wheel + keys */
 let wheelLock=0;
 window.addEventListener('wheel',e=>{
-  if(document.querySelector('.panel.show')) return;
+  if(document.querySelector('.panel.show,dialog[open]')) return;
   const now=Date.now(); if(now-wheelLock<550) return;
   if(e.deltaY>30){ wheelLock=now; next(); }
   else if(e.deltaY<-30){ wheelLock=now; prev(); }
 },{passive:true});
 window.addEventListener('keydown',e=>{
+  if(document.querySelector('dialog[open]')) return;
   if(['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) return;
   if(e.key==='ArrowDown'||e.key==='PageDown') next();
   else if(e.key==='ArrowUp'||e.key==='PageUp') prev();

@@ -3,7 +3,7 @@
  * - 清单与目录控制网络优先，只缓存有效 JSON
  * - 跨域实验内容与 API 请求不拦截
  */
-const VERSION = 'v0.8.5';
+const VERSION = 'v0.8.6';
 const CACHE_PREFIX = 'sl-shell-';
 const SHELL_CACHE = CACHE_PREFIX + VERSION;
 const SCROLL_ASSET = './experiment-scroll.js?app=' + VERSION;
@@ -20,6 +20,7 @@ const SHELL = [
   './assets/icons/icon-512.png',
   './assets/icons/icon-maskable-512.png',
   './assets/icons/apple-touch-icon.png',
+  './assets/support/wechat-reward.jpg',
 ];
 const JSON_SHELL = ['./catalog-control.json', './manifest.json'];
 const STATIC_SHELL = SHELL.filter((path) => !JSON_SHELL.includes(path));
