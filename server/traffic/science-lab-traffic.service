@@ -1,0 +1,27 @@
+[Unit]
+Description=Generate Science Lab private traffic dashboard
+After=local-fs.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+ExecStart=/usr/bin/flock -n /var/lib/science-lab-traffic/update.lock /opt/science-lab-runtime/node-v22.23.2-linux-x64/bin/node /opt/science-lab-traffic/traffic-dashboard.cjs --log-dir /var/log/nginx --state-dir /var/lib/science-lab-traffic --collection-start 2026-09-07T13:41:00Z
+TimeoutStartSec=90
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateNetwork=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/science-lab-traffic
+CapabilityBoundingSet=
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+MemoryMax=128M
+TasksMax=32
+Nice=10

@@ -1,0 +1,11 @@
+[Unit]
+Description=Update Science Lab traffic every two hours
+
+[Timer]
+OnCalendar=*-*-* 00/2:00:00 Asia/Shanghai
+AccuracySec=1s
+Persistent=true
+Unit=science-lab-traffic.service
+
+[Install]
+WantedBy=timers.target

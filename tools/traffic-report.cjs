@@ -33,6 +33,24 @@ function sourceGroup(referrer) {
   } catch { return 'unknown'; } // Missing or malformed Referer is expected, not a visitor identity.
 }
 
+function parseRecord(line) {
+  if (!line.trim()) return null;
+  const m = LINE.exec(line);
+  const timestamp = m ? parseTime(m[2]) : NaN;
+  if (!m || !Number.isFinite(timestamp) || !isIP(m[1])) throw new Error('无法解析访问日志');
+  const [method, target] = m[3].split(' ');
+  const uri = (target || '').split('?')[0];
+  const automated = AUTOMATION.test(m[7]);
+  const tablet = /iPad|Tablet/i.test(m[7]) || (/Android/i.test(m[7]) && !/Mobile/i.test(m[7]));
+  return {
+    timestamp, uri, status: +m[4], automated,
+    entry: !automated && /Mozilla\//.test(m[7]) && method === 'GET' && ['/', '/index.html'].includes(uri) && [200, 304].includes(+m[4]),
+    identity: m[1] + '\n' + m[7],
+    device: tablet ? 'tablet' : /Mobile|Android|iPhone/i.test(m[7]) ? 'mobile' : 'desktop',
+    source: sourceGroup(m[6])
+  };
+}
+
 function accumulator({ generatedAt = new Date().toISOString() } = {}) {
   const totals = { requests: 0, entryRequests: 0, visitorEstimate: 0, automated: 0, invalid: 0 };
   const devices = { desktop: 0, mobile: 0, tablet: 0 };
@@ -84,24 +102,32 @@ function summarize(lines, options) {
 }
 
 async function summarizeDirectory(directory, options) {
+  const result = accumulator(options);
+  const files = await visitLogDirectory(directory, line => result.add(line));
+  return result.finish(files);
+}
+
+async function visitLogDirectory(directory, visit) {
   const names = fs.readdirSync(directory).filter(name => LOG_NAME.test(name)).sort();
   if (!names.length) throw new Error('未找到实验馆独立日志；不会使用旧混合日志代替。');
-  const result = accumulator(options), files = [];
+  const files = [];
   for (const name of names) {
     const file = path.join(directory, name), stat = fs.lstatSync(file);
     if (!stat.isFile()) throw new Error('独立日志必须是普通文件 (regular file)：' + name);
-    const source = fs.createReadStream(file, { flags: fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW });
+    files.push({ name, bytes: stat.size });
+    if (!stat.size) continue;
+    // Bound the scan to the file size observed at the start, even while Nginx appends.
+    const source = fs.createReadStream(file, { flags: fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW, end: stat.size - 1 });
     const input = name.endsWith('.gz') ? source.pipe(zlib.createGunzip()) : source;
     if (input !== source) source.on('error', error => input.destroy(error));
     const reader = readline.createInterface({ input, crlfDelay: Infinity });
     try {
-      for await (const line of reader) result.add(line);
+      for await (const line of reader) visit(line);
     } catch (error) {
       throw new Error('读取独立日志失败：' + name + '（' + error.code + '）', { cause: error });
     } finally { reader.close(); source.destroy(); if (input !== source) input.destroy(); }
-    files.push({ name, bytes: stat.size });
   }
-  return result.finish(files);
+  return files;
 }
 
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -159,5 +185,5 @@ async function main(args) {
   console.log('入口请求 '+data.totals.entryRequests+'；访客估算 '+data.totals.visitorEstimate+'；解析失败 '+data.totals.invalid+'。');
 }
 
-module.exports = { summarize, summarizeDirectory, renderHtml };
+module.exports = { summarize, summarizeDirectory, renderHtml, parseRecord, visitLogDirectory };
 if (require.main === module || module.id === '[stdin]') main(process.argv.slice(2)).catch(error=>{console.error('生成私有统计失败：'+error.message);process.exitCode=1;});

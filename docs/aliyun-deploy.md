@@ -317,7 +317,11 @@ HTTP 和 HTTPS 两个实验馆 `server` 块都必须保留独立 `access_log`，
 
 修改前保存站点配置备份，先运行 `nginx -t`，通过后才 reload；重载命令返回不代表新 worker 已接管请求。应带 `ScienceLab-Log-Check/` 验收标记重复探测至独立日志出现新记录，再验证正式验收请求不再进入共享日志，同时确认首页与 `/api/health` 正常。报告会从入口指标中排除带该标记的请求；失败则恢复备份并重新检查、reload。
 
-`tools/traffic-report.cjs` 仅处理 `science-lab-access.log`、日期后缀轮转文件及其 `.gz`，不会读取旧 `access.log`。按需生成步骤见 README「私有访问统计」。不部署新服务、数据库或定时任务，不公开统计页面和原始日志；Nginx 主配置、API 与静态 release 均无需随工具变更发布。
+`tools/traffic-report.cjs` 仅处理 `science-lab-access.log`、日期后缀轮转文件及其 `.gz`，不会读取旧 `access.log`。它的按需本地快照功能继续保留。
+
+2026-09-07起另有受密码保护的 `/admin/traffic/` 在线看板，使用 `tools/traffic-dashboard.cjs`，每个北京时间双数整点由服务器 `science-lab-traffic.timer` 生成滚动24小时报告。站点配置在 `http` 上下文增加 `limit_req_zone $binary_remote_addr zone=science_lab_traffic:1m rate=2r/s;`，仅在HTTPS `server` 中包含 `/opt/science-lab-traffic/nginx-locations.conf`。后续替换站点配置时须保留这两处及原独立日志配置。
+
+报告目录、密码散列、每日归档与运行代码相互分离。只有报告目录的index.html可以通过认证访问，原始日志和状态文件均不对外映射。维护流程及具体文件见 `server/traffic/README.md`。App静态release和API未随本次统计功能重新部署。
 
 ## 5. 启用内置 AI
 

@@ -72,5 +72,10 @@ async function waitEvent(name, event) {
     respondWith: () => { intercepted = true; },
   });
   assert.strictEqual(intercepted, false);
+  for (const pathname of ['/admin/traffic/', '/admin/traffic/index.html']) {
+    handlers.fetch({ request: { method: 'GET', url: 'https://lab.xingnian.net.cn' + pathname },
+      respondWith: () => { intercepted = true; } });
+  }
+  assert.strictEqual(intercepted, false, '私有统计页不得进入公开 App 缓存');
   console.log('✓ Service Worker 缓存所有权、JSON 回退与 API 绕过检查通过');
 })().catch((error) => { console.error(error); process.exit(1); });
