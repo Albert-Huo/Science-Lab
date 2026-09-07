@@ -263,14 +263,15 @@ function assertActiveRateZonePlacement(nginxBlock) {
     'assets/icons/icon-192.png',
     'assets/icons/icon-512.png',
     'assets/icons/icon-maskable-512.png',
-    'assets/icons/apple-touch-icon.png'
+    'assets/icons/apple-touch-icon.png',
+    'assets/support/wechat-reward.jpg'
   ];
   const staticDeployBlock = fencedBlock(deployGuide, 'bash', '# 在仓库根目录执行');
   assert.ok(staticDeployBlock.includes('set -euo pipefail'), '静态发布必须遇错即停');
   const shellArray = staticDeployBlock.match(/SCIENCE_LAB_SHELL_FILES=\(\n([\s\S]*?)\n\)/);
   assert.ok(shellArray, '静态发布必须定义完整的物理 App 壳文件清单');
   const documentedShellFiles = Array.from(shellArray[1].matchAll(/^\s+"([^"]+)"$/gm), (match) => match[1]);
-  assert.deepStrictEqual(documentedShellFiles, shellFiles, '静态发布校验清单必须精确包含十一个物理壳文件');
+  assert.deepStrictEqual(documentedShellFiles, shellFiles, '静态发布校验清单必须精确包含十二个物理壳文件');
   assert.ok(
     /for SCIENCE_LAB_SHELL_FILE in "\$\{SCIENCE_LAB_SHELL_FILES\[@\]\}"; do[\s\S]*?test -f "\$SCIENCE_LAB_RELEASE_DIR\/\$SCIENCE_LAB_SHELL_FILE"[\s\S]*?done/.test(staticDeployBlock),
     '静态发布切换前必须逐个校验物理 App 壳文件'

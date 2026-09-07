@@ -97,6 +97,8 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 .panel header h2{font-size:15px;font-weight:600;flex:1;}
 .panel header .close{width:28px;height:28px;border:none;border-radius:8px;background:var(--panel2);
   color:var(--txt2);cursor:pointer;font-size:14px;}
+.catalog-collapse,.catalog-open-label{display:none;}
+.catalog-collapse:focus-visible,#btnCat:focus-visible{outline:2px solid var(--acc2);outline-offset:2px;}
 .panel .body{flex:1;overflow-y:auto;overscroll-behavior:contain;}
 /* catalog */
 #catSearch{margin:10px 12px 4px;display:flex;}
@@ -284,18 +286,27 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 #installAction{display:none;border:0;border-radius:8px;background:var(--acc);color:#fff;padding:7px 9px;font-size:11.5px;cursor:pointer;}
 #installAction.show{display:block;}
 #installClose{width:26px;height:26px;border:0;border-radius:8px;background:var(--panel2);color:var(--txt2);cursor:pointer;flex:none;}
-/* ---------- 宽屏（平板横屏/桌面）：目录常驻左侧栏 ---------- */
+/* ---------- 宽屏（平板横屏/桌面）：可收起的左侧目录 ---------- */
 @media (min-width:900px){
-  :root{--dock-w:300px;}
+  :root{--dock-w:300px;--dock-offset:var(--dock-w);}
+  :root.catalog-collapsed{--dock-offset:0px;}
   #panelCat{left:0;right:auto;width:var(--dock-w);transform:none;box-shadow:none;
     border-right:1px solid var(--line);z-index:20;}
   #panelCat header .close{display:none;}
-  #feed,#hud{left:var(--dock-w);}
+  .catalog-collapse{display:flex;align-items:center;gap:4px;min-height:32px;padding:5px 8px;
+    border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--txt2);font:inherit;font-size:12px;cursor:pointer;}
+  .catalog-collapse:hover{background:var(--panel2);color:var(--txt);}
+  .catalog-collapse svg{width:16px;height:16px;}
+  #feed,#hud{left:var(--dock-offset);}
   #btnCat{display:none;}
+  .catalog-collapsed #panelCat{display:none;}
+  .catalog-collapsed #btnCat{display:flex;order:-1;width:auto;gap:6px;padding:0 10px;}
+  .catalog-open-label{display:inline;font-size:12px;white-space:nowrap;}
   #panelUser{z-index:60;}
   .page{background:#05070c;}
   .page iframe{max-width:1280px;margin:0 auto;}
-  #installGuide{left:calc(var(--dock-w) + 12px);}
+  .catalog-collapsed .page iframe{max-width:none;}
+  #installGuide{left:calc(var(--dock-offset) + 12px);}
 }
 /* toast */
 #toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:90;background:#121826ee;
@@ -319,7 +330,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
   <div id="hudStrip"><div id="hudInner">
     <span id="hudTag">物理 · 初中</span><span id="hudTitle"></span><span id="hudIdx">1/1</span>
   </div></div>
-  <button class="hud-btn" id="btnCat" title="目录">☰</button>
+  <button class="hud-btn" id="btnCat" title="目录" aria-label="目录" aria-controls="panelCat" aria-expanded="false"><span aria-hidden="true">☰</span><span class="catalog-open-label">展开目录</span></button>
 </div>
 
 <div id="scrollHandle" aria-hidden="true" tabindex="-1" aria-orientation="vertical">
@@ -334,7 +345,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 <div id="overlay"></div>
 
 <aside class="panel" id="panelCat">
-  <header><h2>实验目录</h2><button class="close" data-close>✕</button></header>
+  <header><h2>实验目录</h2><button type="button" class="catalog-collapse" id="collapseCat" title="收起目录" aria-label="收起目录" aria-controls="panelCat"><svg class="community-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v16m14-14-6 6 6 6"/></svg>收起</button><button class="close" data-close aria-label="关闭目录">✕</button></header>
   <div id="catSearch"><input id="catInput" type="search" placeholder="搜索实验…"></div>
   <div class="chips" id="catChips"></div>
   <div class="body" id="catList"></div>
@@ -466,7 +477,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 
 <script src="catalog-control.js"></script>
 <script src="content-source.js"></script>
-<script src="experiment-scroll.js?app=v0.8.6"></script>
+<script src="experiment-scroll.js?app=v0.8.7"></script>
 <script>
 /* 联系入口独立于实验清单初始化，空目录时也可使用。 */
 (()=>{
@@ -550,7 +561,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 const qs = new URLSearchParams(location.search);
 /* 内容源：生产固定线上站；与内容站同域时用相对路径；仅本地联调接受根相对 ?base= */
 const CONTENT_BASE=ContentSource.resolve({hostname:location.hostname,requestedBase:qs.get('base')});
-const LS = { idx:'expfeed.idx', current:'expfeed.currentPath', hist:'expfeed.hist', hint:'expfeed.hint', ai:'expfeed.ai', chat:'expfeed.chat', install:'expfeed.install.dismissed' };
+const LS = { idx:'expfeed.idx', current:'expfeed.currentPath', hist:'expfeed.hist', hint:'expfeed.hint', ai:'expfeed.ai', chat:'expfeed.chat', install:'expfeed.install.dismissed', catalog:'expfeed.catalog.collapsed' };
 let storageWarningShown=false;
 function warnStorage(operation,error){
   if(storageWarningShown) return;
@@ -579,6 +590,7 @@ function fetchJson(url,options){
     return response.json();
   });
 }
+document.documentElement.classList.toggle('catalog-collapsed',safeGet(LS.catalog)==='1');
 Promise.all([
   fetchJson('manifest.json'),
   fetchJson('catalog-control.json',{cache:'no-store'}).catch(error=>{
@@ -758,24 +770,46 @@ document.getElementById('catList').addEventListener('click',e=>{
 
 /* ---------- panels ---------- */
 const overlay=document.getElementById('overlay');
-const isDocked=()=>matchMedia('(min-width:900px)').matches; // 宽屏时目录常驻
+const desktopCatalog=matchMedia('(min-width:900px)');
+const catalogPanel=document.getElementById('panelCat');
+const catalogButton=document.getElementById('btnCat');
+const collapseCat=document.getElementById('collapseCat');
+let catalogCollapsed=document.documentElement.classList.contains('catalog-collapsed');
+function syncCatalogLayout(){
+  document.documentElement.classList.toggle('catalog-collapsed',catalogCollapsed);
+  const label=desktopCatalog.matches?'展开目录':'目录';
+  catalogButton.title=label;
+  catalogButton.setAttribute('aria-label',label);
+  catalogButton.setAttribute('aria-expanded',String(desktopCatalog.matches?!catalogCollapsed:catalogPanel.classList.contains('show')));
+  if(desktopCatalog.matches&&catalogCollapsed&&catalogPanel.contains(document.activeElement)) catalogButton.focus({preventScroll:true});
+}
+function setCatalogCollapsed(collapsed){
+  catalogCollapsed=collapsed;
+  safeSet(LS.catalog,collapsed?'1':'0');
+  closePanels();
+  (collapsed?catalogButton:collapseCat).focus({preventScroll:true});
+}
 function openPanel(which){
-  if(which==='catalog'&&isDocked()) return; // 已常驻，无需抽屉
+  if(which==='catalog'&&desktopCatalog.matches){ setCatalogCollapsed(false); return; }
   closePanels();
   document.getElementById(which==='catalog'?'panelCat':'panelUser').classList.add('show');
   overlay.classList.add('show');
+  syncCatalogLayout();
   updateScrollBand();
 }
 function closePanels(){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('show'));
   overlay.classList.remove('show');
+  syncCatalogLayout();
   updateScrollBand();
 }
-matchMedia('(min-width:900px)').addEventListener('change',closePanels); // 跨断点时归位
+desktopCatalog.addEventListener('change',closePanels); // 归位移动抽屉，保留桌面目录偏好
 overlay.addEventListener('click',closePanels);
 document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',closePanels));
-document.getElementById('btnCat').addEventListener('click',()=>openPanel('catalog'));
+catalogButton.addEventListener('click',()=>openPanel('catalog'));
+collapseCat.addEventListener('click',()=>setCatalogCollapsed(true));
 document.getElementById('btnUser').addEventListener('click',()=>openPanel('user'));
+syncCatalogLayout();
 
 /* tabs */
 document.querySelectorAll('.tabs button').forEach(b=>b.addEventListener('click',()=>{
