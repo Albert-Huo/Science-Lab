@@ -209,6 +209,8 @@ trap - EXIT
 
 下面的 `limit_req_zone` 必须放在 nginx 的 `http {}` 上下文中、所有 `server {}` 之外；不要把它放进站点的 `server` 块。它只提供匿名接口的短时突发保护，不是认证机制，也不是全局费用上限。Node 端仍须保留默认每 IP 每分钟 10 次、每 24 小时 20 次的两级限流。
 
+示例中的 `access_log ... main` 复用现网 `nginx.conf` 已定义的 `main` 格式。新环境须先核对格式定义，不能重复定义同名格式；私有报告要求 combined 格式，可在末尾附加 `"$http_x_forwarded_for"`。不要直接覆盖现网站点配置中的证书、ACME 或其他已有规则。
+
 ```nginx
 # 放在 nginx.conf 的 http {} 上下文中，且位于所有 server {} 之外
 limit_req_zone $binary_remote_addr zone=science_lab_ai:10m rate=10r/m;
@@ -216,6 +218,7 @@ limit_req_zone $binary_remote_addr zone=science_lab_ai:10m rate=10r/m;
 server {
     listen 443 ssl http2;
     server_name lab.xingnian.net.cn;             # 换成你的子域名
+    access_log /var/log/nginx/science-lab-access.log main;
 
     ssl_certificate     /etc/nginx/ssl/lab.crt;
     ssl_certificate_key /etc/nginx/ssl/lab.key;
@@ -287,6 +290,7 @@ server {
 server {                                          # 80 跳 443
     listen 80;
     server_name lab.xingnian.net.cn;
+    access_log /var/log/nginx/science-lab-access.log main;
     return 301 https://$host$request_uri;
 }
 ```
@@ -306,6 +310,14 @@ sudo nginx -t && sudo systemctl reload nginx
   ```
 
 - 浏览器打开 `https://lab.xingnian.net.cn/` 看到 App
+
+### 独立日志与私有报告
+
+HTTP 和 HTTPS 两个实验馆 `server` 块都必须保留独立 `access_log`，避免与主站混写。现网 `/etc/logrotate.d/nginx` 的 `/var/log/nginx/*log` 已覆盖新文件：每日轮转、保留 10 份历史、压缩但延迟一轮、空文件不轮转。本次未修改该策略；新环境须自行确认轮转匹配，不要强制轮转已有日志来测试。
+
+修改前保存站点配置备份，先运行 `nginx -t`，通过后才 reload；重载命令返回不代表新 worker 已接管请求。应带 `ScienceLab-Log-Check/` 验收标记重复探测至独立日志出现新记录，再验证正式验收请求不再进入共享日志，同时确认首页与 `/api/health` 正常。报告会从入口指标中排除带该标记的请求；失败则恢复备份并重新检查、reload。
+
+`tools/traffic-report.cjs` 仅处理 `science-lab-access.log`、日期后缀轮转文件及其 `.gz`，不会读取旧 `access.log`。按需生成步骤见 README「私有访问统计」。不部署新服务、数据库或定时任务，不公开统计页面和原始日志；Nginx 主配置、API 与静态 release 均无需随工具变更发布。
 
 ## 5. 启用内置 AI
 

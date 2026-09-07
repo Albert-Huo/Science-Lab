@@ -26,6 +26,27 @@
 
 赞赏弹层仅在用户点击后打开，展示 `assets/support/wechat-reward.jpg` 原图，支持微信扫码与保存原图。实验仍免费、免登录，支持完全自愿，不提供会员、专属内容或优先服务等回报。弹层提醒未满18周岁勿支付，并提供监护人处理误付款的微信联系入口。联系与赞赏无需新增后端接口。
 
+## 私有访问统计
+
+2026-09-07 21:41（北京时间）起，实验馆使用独立 Nginx 访问日志。无需新增数据库、统计服务或网页追踪脚本，只使用现有服务器的日志存储和按需汇总计算；电脑不用一直开机。
+
+报告提供每日入口请求、访客估算、设备和来源分类。入口请求不是精确浏览量：浏览器缓存、预取、机器人以及共享网络都会带来误差。访客估算不是登录人数；本版不统计地区、停留时间和 GitHub Pages 中各实验的使用情况。
+
+维护者在本机仓库中运行以下命令即可生成新的私有 HTML；需已有 SSH 密钥授权、已核验的服务器主机指纹及本机 Node.js：
+
+```bash
+cd /Users/lx100/projects/HTML-GitHub/Science-Lab
+SCIENCE_LAB_REPORT_DIR=$(mktemp -d /private/tmp/science-lab-report.XXXXXX)
+node tools/traffic-report.cjs \
+  --remote root@47.97.174.49 \
+  --node /opt/science-lab-runtime/node-v22.23.2-linux-x64/bin/node \
+  --output "$SCIENCE_LAB_REPORT_DIR/report.html"
+```
+
+汇总在服务器内存中完成，原始 IP、浏览器标识、来源网址和查询参数不会下载到本机。报告没有脚本和外部资源，文件权限为 `0600`，已有文件不会被覆盖；请勿提交报告或日志到 Git，也不要放进网站目录。工具和报告均不需要上传到网站。
+
+日志沿用每日轮转、保留 10 份历史文件的现有规则；空文件不轮转，因此不是严格的十天留存。本报告只是生成时的快照，不自动刷新，不回填旧混合日志，也不保存永久历史。长期留存可自行将汇总报告保存到私有目录。配置及上线记录见 `docs/aliyun-deploy.md` 和 `docs/superpowers/plans/2026-09-07-private-traffic-report.md`。
+
 ## 文件结构
 
 | 文件 | 说明 |
