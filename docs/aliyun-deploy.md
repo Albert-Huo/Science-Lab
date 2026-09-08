@@ -315,6 +315,8 @@ sudo nginx -t && sudo systemctl reload nginx
 
 HTTP 和 HTTPS 两个实验馆 `server` 块都必须保留独立 `access_log`，避免与主站混写。现网 `/etc/logrotate.d/nginx` 的 `/var/log/nginx/*log` 已覆盖新文件：每日轮转、保留 10 份历史、压缩但延迟一轮、空文件不轮转。本次未修改该策略；新环境须自行确认轮转匹配，不要强制轮转已有日志来测试。
 
+私有统计服务不保留额外系统能力，依赖root组读取独立日志。首次创建日志及每次reload后都要确认实际文件至少为 `nginx:root` 且root组可读；现网初建文件采用0640，轮转规则的 `create 0664 nginx root` 同样满足读取。若发现初建文件为0600，应先核实它不是符号链接且所有者仍为nginx:root，再只修正该文件为0640。不要给统计服务增加跨系统文件读取能力，也不要放宽其他日志。
+
 修改前保存站点配置备份，先运行 `nginx -t`，通过后才 reload；重载命令返回不代表新 worker 已接管请求。应带 `ScienceLab-Log-Check/` 验收标记重复探测至独立日志出现新记录，再验证正式验收请求不再进入共享日志，同时确认首页与 `/api/health` 正常。报告会从入口指标中排除带该标记的请求；失败则恢复备份并重新检查、reload。
 
 `tools/traffic-report.cjs` 仅处理 `science-lab-access.log`、日期后缀轮转文件及其 `.gz`，不会读取旧 `access.log`。它的按需本地快照功能继续保留。

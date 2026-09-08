@@ -15,6 +15,7 @@ PrivateNetwork=true
 ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths=/var/lib/science-lab-traffic
+# Logs must remain readable by group root after Nginx reopens them as nginx.
 CapabilityBoundingSet=
 ProtectKernelTunables=true
 ProtectKernelModules=true
