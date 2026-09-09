@@ -187,7 +187,7 @@
  },
  {
   "path": "physics-middle/初中物理实验31.html",
-  "title": "初中物理实验31｜测量铝块所受的浮力（交互版）",
+  "title": "初中物理实验31｜探究浮力产生的原因（交互版）",
   "subject": "物理",
   "level": "初中"
  },
@@ -295,7 +295,7 @@
  },
  {
   "path": "physics-middle/初中物理实验49.html",
-  "title": "初中物理实验49｜制作简易直流电动机",
+  "title": "初中物理实验49｜设计与制作简易直流电动机模型",
   "subject": "物理",
   "level": "初中"
  },
@@ -343,13 +343,13 @@
  },
  {
   "path": "physics-middle/初中物理实验56.html",
-  "title": "初中物理实验56｜观察动能和势能相互转化的实验现象",
+  "title": "初中物理实验56｜观察动能和势能相互转化",
   "subject": "物理",
   "level": "初中"
  },
  {
   "path": "physics-middle/初中物理实验57.html",
-  "title": "初中物理实验57｜测量某种简单机械的机械效率",
+  "title": "初中物理实验57｜测量滑轮组的机械效率",
   "subject": "物理",
   "level": "初中"
  },
@@ -528,289 +528,289 @@
   "level": "高中"
  },
  {
-  "path": "physics-demos/三个宇宙速度交互版.html",
+  "path": "physics-popular-science/三个宇宙速度交互版.html",
   "title": "三个宇宙速度 · 互动演示",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/三原色光交互版-模板.html",
+  "path": "physics-popular-science/三原色光交互版-模板.html",
   "title": "三原色光互动闯关",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/三态下的分子运动交互版.html",
+  "path": "physics-popular-science/三态下的分子运动交互版.html",
   "title": "三态下的分子运动 · 互动闯关",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/不同波长的波绕过障碍物交互版.html",
+  "path": "physics-popular-science/不同波长的波绕过障碍物交互版.html",
   "title": "不同波长的波遇到障碍物",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/两个铁球同时落地交互版.html",
+  "path": "physics-popular-science/两个铁球同时落地交互版.html",
   "title": "自由落体实验模拟",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/为什么冰刀在冰上那么滑交互版.html",
+  "path": "physics-popular-science/为什么冰刀在冰上那么滑交互版.html",
   "title": "冰刀为何在冰上那么滑 · 互动演示（放大镜与命中修复）",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/为什么地球是圆的交互版.html",
+  "path": "physics-popular-science/为什么地球是圆的交互版.html",
   "title": "地球为什么是圆的？—交互版（空间感增强）",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/人体对不同大气压的反应交互版.html",
+  "path": "physics-popular-science/人体对不同大气压的反应交互版.html",
   "title": "人体与大气压实验室",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/充满电磁波的世界交互版.html",
+  "path": "physics-popular-science/充满电磁波的世界交互版.html",
   "title": "充满电磁波的世界",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/光帆交互版.html",
+  "path": "physics-popular-science/光帆交互版.html",
   "title": "光帆推进",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/冰块取火交互版.html",
+  "path": "physics-popular-science/冰块取火交互版.html",
   "title": "冰块🧊取火🔥",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/分子运动和压力交互版.html",
+  "path": "physics-popular-science/分子运动和压力交互版.html",
   "title": "分子运动与压力",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/加农炮射击交互版.html",
+  "path": "physics-popular-science/加农炮射击交互版.html",
   "title": "抛物线运动交互闯关",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/千里江陵一日还-单程修正版.html",
+  "path": "physics-popular-science/千里江陵一日还-单程修正版.html",
   "title": "李白「千里江陵一日还」",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/千里江陵一日还.html",
+  "path": "physics-popular-science/千里江陵一日还.html",
   "title": "李白「千里江陵一日还」物理模拟",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/双缝干涉观测与否交互版.html",
+  "path": "physics-popular-science/双缝干涉观测与否交互版.html",
   "title": "双缝干涉：观测与否",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/同步卫星交互版.html",
+  "path": "physics-popular-science/同步卫星交互版.html",
   "title": "地球同步卫星 - 交互探索",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/四种基本力交互版.html",
+  "path": "physics-popular-science/四种基本力交互版.html",
   "title": "宇宙之源：四大基本力",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/声的频谱有声交互版.html",
+  "path": "physics-popular-science/声的频谱有声交互版.html",
   "title": "声的频谱",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/声音绕过村庄交互版.html",
+  "path": "physics-popular-science/声音绕过村庄交互版.html",
   "title": "声音为什么会“舍近求远”？",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/大小错觉交互版.html",
+  "path": "physics-popular-science/大小错觉交互版.html",
   "title": "艾宾浩斯大小错觉",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/太阳忽然消失后的地球交互版.html",
+  "path": "physics-popular-science/太阳忽然消失后的地球交互版.html",
   "title": "太阳忽然消失后的地球 · 交互演示",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/太阳消失后的地球交互版.html",
+  "path": "physics-popular-science/太阳消失后的地球交互版.html",
   "title": "太阳忽然消失后的地球 · 交互演示",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/小狗听到的声交互版.html",
+  "path": "physics-popular-science/小狗听到的声交互版.html",
   "title": "小狗听到的声｜交互闯关（模板同款+自动判定｜最终版）",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/小船撞大船交互版.html",
+  "path": "physics-popular-science/小船撞大船交互版.html",
   "title": "小船为什么会被大船“吸”过去？互动闯关",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/弹簧交互版.html",
+  "path": "physics-popular-science/弹簧交互版.html",
   "title": "胡克定律：弹簧、原子与 F = k·Δx（严格步骤判定·帽扣对齐）",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/感知加速度交互版.html",
+  "path": "physics-popular-science/感知加速度交互版.html",
   "title": "感知加速度：极速对决",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/手掌受到的大气压力交互版.html",
+  "path": "physics-popular-science/手掌受到的大气压力交互版.html",
   "title": "惊人的大气压：手掌上的100公斤",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/抛石块计算枯井深度交互版.html",
+  "path": "physics-popular-science/抛石块计算枯井深度交互版.html",
   "title": "枯井投石 - 逼真人物版",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/日地月间的引力交互版.html",
+  "path": "physics-popular-science/日地月间的引力交互版.html",
   "title": "引力真相：太阳 vs 地球",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/月光下的水和路交互版.html",
+  "path": "physics-popular-science/月光下的水和路交互版.html",
   "title": "月光下的水和路",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/望山跑死马交互版.html",
+  "path": "physics-popular-science/望山跑死马交互版.html",
   "title": "望山跑死马",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/核聚变交互版.html",
+  "path": "physics-popular-science/核聚变交互版.html",
   "title": "恒星引擎：核聚变模拟",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/核裂变交互版.html",
+  "path": "physics-popular-science/核裂变交互版.html",
   "title": "核裂变链式反应",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/比邻星上看地球互动版.html",
+  "path": "physics-popular-science/比邻星上看地球互动版.html",
   "title": "比邻星上观察地球",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/波粒二象性交互版.html",
+  "path": "physics-popular-science/波粒二象性交互版.html",
   "title": "波粒二象性 · 双缝与观测",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/海底气泡沉船交互版.html",
+  "path": "physics-popular-science/海底气泡沉船交互版.html",
   "title": "海底气泡沉船 · 交互版",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/物体为什么有不同颜色交互版.html",
+  "path": "physics-popular-science/物体为什么有不同颜色交互版.html",
   "title": "物体为什么有不同颜色",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/草丛中的老虎交互版.html",
+  "path": "physics-popular-science/草丛中的老虎交互版.html",
   "title": "草丛中的老虎 · 互动演示",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/蝙蝠穿越铃铛交互版.html",
+  "path": "physics-popular-science/蝙蝠穿越铃铛交互版.html",
   "title": "蝙蝠穿越铃铛",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/货船神秘失踪交互版.html",
+  "path": "physics-popular-science/货船神秘失踪交互版.html",
   "title": "货船神秘失踪",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/路面撒盐交互版.html",
+  "path": "physics-popular-science/路面撒盐交互版.html",
   "title": "路面撒盐融雪",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/跳入地球隧道交互版.html",
+  "path": "physics-popular-science/跳入地球隧道交互版.html",
   "title": "跳入地球隧道 · 速度变化互动演示",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/酒香不怕巷子深交互版.html",
+  "path": "physics-popular-science/酒香不怕巷子深交互版.html",
   "title": "酒香不怕巷子深",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/银河系.html",
-  "title": "银河系示例",
+  "path": "physics-popular-science/银河系.html",
+  "title": "银河系结构与太阳系位置",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/飞机穿过音障交互版.html",
+  "path": "physics-popular-science/飞机穿过音障交互版.html",
   "title": "飞机穿过音障",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/飞矢不动互动版.html",
+  "path": "physics-popular-science/飞矢不动互动版.html",
   "title": "飞矢不动",
   "subject": "物理",
   "level": "科普演示"
  },
  {
-  "path": "physics-demos/飞行员抓子弹交互版.html",
+  "path": "physics-popular-science/飞行员抓子弹交互版.html",
   "title": "飞行员抓子弹 - 相对运动原理",
   "subject": "物理",
   "level": "科普演示"

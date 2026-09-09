@@ -23,7 +23,7 @@ const expectedNames = expectedNumbers.map(number => `初中物理实验${number}
 const fixtures = [
   ['physics-middle', '物理', '初中', [...expectedNames].reverse().concat('说明.html')],
   ['physics-high', '物理', '高中', ['实验2.html', '实验10.html', '实验1.html']],
-  ['physics-demos', '物理', '科普演示', ['演示2.html', '演示10.html', '演示1.html']],
+  ['physics-popular-science', '物理', '科普演示', ['演示2.html', '演示10.html', '演示1.html']],
   ['biology-high', '生物', '高中', ['实验2.html', '实验10.html', '实验1.html']]
 ];
 const expectedItems = [];

@@ -182,7 +182,7 @@ function assertActiveRateZonePlacement(nginxBlock) {
     fixtures[0],
     fixtures[1],
     fixtures[2],
-    { path: 'physics-demos/d.html', title: '科普实验 D', subject: '物理', level: '科普演示' }
+    { path: 'physics-popular-science/d.html', title: '科普实验 D', subject: '物理', level: '科普演示' }
   ];
   const visible = [source[0], source[3]];
   assert.strictEqual(

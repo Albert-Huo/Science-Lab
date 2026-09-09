@@ -16,7 +16,7 @@ import sys
 DIRS = {
     "physics-middle": ("物理", "初中"),
     "physics-high": ("物理", "高中"),
-    "physics-demos": ("物理", "科普演示"),
+    "physics-popular-science": ("物理", "科普演示"),
     "biology-high": ("生物", "高中"),
 }
 
