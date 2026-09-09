@@ -57,7 +57,9 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const AI_MESSAGE_MAX = 20;
 const AI_MESSAGE_LENGTH_MAX = 4000;
 const AI_MAX_TOKENS = 2048;
-const AI_MODELS = new Set(['deepseek-v4-flash']);
+const configuredAiModel = String(process.env.DEEPSEEK_MODEL || '').trim();
+const DEFAULT_AI_MODEL = configuredAiModel || 'deepseek-v4-flash';
+const AI_MODELS = new Set([DEFAULT_AI_MODEL]);
 
 function sign(user) { return jwt.sign({ uid: user.id, email: user.email }, JWT_SECRET, { expiresIn: JWT_EXPIRES }); }
 
@@ -114,7 +116,7 @@ const aiDayLimiter = rateLimit({
 });
 
 function sanitizeAiBody(body) {
-  const model = body && body.model ? String(body.model) : 'deepseek-v4-flash';
+  const model = body && body.model ? String(body.model) : DEFAULT_AI_MODEL;
   if (!AI_MODELS.has(model)) return { error: 'invalid_model' };
 
   if (!body || !Array.isArray(body.messages) || body.messages.length < 1 || body.messages.length > AI_MESSAGE_MAX) {

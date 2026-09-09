@@ -76,6 +76,7 @@ cp .env.example .env
 #   JWT_SECRET: ai-only 可留空；仅 full 需要长随机密钥
 #     生成示例：node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 #   DEEPSEEK_API_KEY: 服务端专用 DeepSeek API Key（不要提交到 Git）
+#   DEEPSEEK_MODEL: 实际模型 ID，默认 deepseek-v4-flash；版本升级时只需改此项
 #   AI_RATE_LIMIT_MINUTE_MAX: 单 IP 每分钟上限，默认 10
 #   AI_RATE_LIMIT_DAY_MAX: 单 IP 每 24 小时上限，默认 20
 #   AI_UPSTREAM_TIMEOUT_MS: DeepSeek 单次请求总超时，默认 120000 毫秒
@@ -306,7 +307,7 @@ sudo nginx -t && sudo systemctl reload nginx
   ```bash
   curl -N https://lab.xingnian.net.cn/api/ai/chat/completions \
     -H 'Content-Type: application/json' \
-    -d '{"model":"deepseek-v4-flash","messages":[{"role":"user","content":"用一句话解释惯性"}]}'
+    -d '{"messages":[{"role":"user","content":"用一句话解释惯性"}]}'
   ```
 
 - 浏览器打开 `https://lab.xingnian.net.cn/` 看到 App
@@ -397,7 +398,7 @@ pm2 restart science-lab-api --update-env
 - `full` 模式：注册/登录限流（15 分钟 30 次/IP）；`ai-only` 不开放账号与同步接口。
 - AI 路由叠加每分钟和每 24 小时两级 IP 限流，默认分别为 10 次和 20 次，可用 `AI_RATE_LIMIT_MINUTE_MAX`、`AI_RATE_LIMIT_DAY_MAX` 调整。
 - AI 上游请求默认在 120 秒后中止，客户端断开连接时也会中止；可用 `AI_UPSTREAM_TIMEOUT_MS` 调整总超时。
-- AI 请求仅接受最多 20 条 `messages`；角色和单条长度受限；模型仅允许 `deepseek-v4-flash`；服务端强制流式响应、关闭思考模式、`max_tokens ≤ 2048`、`temperature ∈ [0,2]`，其他字段不会透传。
+- AI 请求仅接受最多 20 条 `messages`；角色和单条长度受限；模型省略时使用 `DEEPSEEK_MODEL`，显式传入时也仅允许该配置值；服务端强制流式响应、关闭思考模式、`max_tokens ≤ 2048`、`temperature ∈ [0,2]`，其他字段不会透传。
 - `DEEPSEEK_API_KEY` 只放在服务端 `.env`。错误响应不会回显 Key 或 DeepSeek 原始错误正文；使用独立低余额账户、关闭不受控自动充值，并定期轮换 Key。
 - Node 仅监听 127.0.0.1，对外只经 nginx 443。
 - 同源部署天然规避跨站；如分域部署再依赖 `CORS_ORIGINS` 白名单。

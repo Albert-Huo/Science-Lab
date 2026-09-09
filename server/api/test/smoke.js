@@ -8,12 +8,13 @@ process.env.CORS_ORIGINS = 'https://albert-huo.github.io';
 process.env.AI_RATE_LIMIT_MINUTE_MAX = '2';
 process.env.AI_RATE_LIMIT_DAY_MAX = '100';
 process.env.AI_UPSTREAM_TIMEOUT_MS = '25';
+process.env.DEEPSEEK_MODEL = 'test-deepseek-flash-model';
 delete process.env.DEEPSEEK_API_KEY;
 
 const assert = require('assert');
 const nativeFetch = global.fetch.bind(globalThis);
 const app = require('../server');
-const AI_MODEL = 'deepseek-v4-flash';
+const AI_MODEL = process.env.DEEPSEEK_MODEL;
 
 let base;
 function api(path, opts) { return nativeFetch(base + path, opts); }
@@ -59,7 +60,7 @@ function aiRequest(body, ip) {
       });
     };
     r = await aiRequest({
-      model: AI_MODEL, stream: false, max_tokens: 9999, temperature: 1.5,
+      stream: false, max_tokens: 9999, temperature: 1.5,
       messages: [{ role: 'user', content: '解释实验' }], ignored: 'do-not-forward',
     }, '203.0.113.3');
     const sse = await r.text();

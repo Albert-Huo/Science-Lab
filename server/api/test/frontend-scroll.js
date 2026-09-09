@@ -17,7 +17,7 @@ test('host version-pins the scroll module and exposes opt-in local diagnostics',
   const version = serviceWorker.match(/const VERSION = '(v\d+\.\d+\.\d+)';/)?.[1];
   const scrollVersion = hostHtml.match(/<script src="experiment-scroll\.js\?app=(v\d+\.\d+\.\d+)"><\/script>/)?.[1];
   const moduleVersion = scrollModule.match(/const VERSION='(v\d+\.\d+\.\d+)'/)?.[1];
-  assert.equal(version, 'v0.8.8');
+  assert.equal(version, 'v0.8.9');
   assert.equal(scrollVersion, version);
   assert.equal(moduleVersion, version);
   assert.ok(hostHtml.includes("qs.get('scroll-debug')==='1'"));

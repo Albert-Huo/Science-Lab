@@ -13,7 +13,7 @@ const aiStart = html.indexOf('const CHAT_TOTAL_MAX=200');
 const aiEnd = html.indexOf("let chatPath='', chatHistory=[], chatBusy=false;", aiStart);
 assert.ok(aiStart >= 0 && aiEnd > aiStart, '找不到 index.html 中的 AI 存储逻辑');
 const source = storageSource + '\n' + html.slice(aiStart, aiEnd) +
-  '\nthis.storageApi={safeGet,safeSet,safeRemove};this.chatApi={loadChatStore,persistChat,toAiMessages};';
+  '\nthis.storageApi={safeGet,safeSet,safeRemove};this.chatApi={loadChatStore,persistChat,toAiMessages,aiCfg,buildAiRequestBody:typeof buildAiRequestBody===\'function\'?buildAiRequestBody:null};';
 
 function harness(initial) {
   const values = new Map(Object.entries(initial || {}));
@@ -150,7 +150,41 @@ function assertSingleStorageWarning(warnings, operation, key, error) {
   ok('发往内置 AI 的历史限制为最近 12 条且每条不超过 4000 字符');
 }
 
-assert.ok(html.includes("model:'deepseek-v4-flash'"), '前端默认模型必须使用 DeepSeek V4 Flash');
+{
+  const test = harness();
+  assert.strictEqual(test.api.aiCfg().model, 'DeepSeek');
+  assert.strictEqual(typeof test.api.buildAiRequestBody, 'function');
+  const messages = [{ role: 'user', content: '测试' }];
+  assert.deepStrictEqual(
+    JSON.parse(JSON.stringify(test.api.buildAiRequestBody({ byok: false, model: 'DeepSeek' }, messages))),
+    { stream: true, messages }
+  );
+  assert.deepStrictEqual(
+    JSON.parse(JSON.stringify(test.api.buildAiRequestBody({ byok: true, model: 'DeepSeek' }, messages))),
+    { model: 'deepseek-v4-flash', stream: true, messages }
+  );
+  assert.deepStrictEqual(
+    JSON.parse(JSON.stringify(test.api.buildAiRequestBody({ byok: true, model: 'custom-model' }, messages))),
+    { model: 'custom-model', stream: true, messages }
+  );
+  ok('界面使用稳定模型名，发送时解析为当前 Flash 模型');
+}
+
+{
+  const test = harness({
+    'expfeed.ai': JSON.stringify({
+      byok: true,
+      endpoint: 'https://api.deepseek.com/chat/completions',
+      model: 'deepseek-v4-flash',
+      key: 'test-key',
+    }),
+  });
+  assert.strictEqual(test.api.aiCfg().model, 'DeepSeek');
+  ok('旧版默认模型设置迁移为稳定名称且保留 API Key');
+}
+
+assert.ok(html.includes('placeholder="DeepSeek"'), '模型输入框应展示稳定名称 DeepSeek');
+assert.ok(html.includes("model:DEEPSEEK_NAME"), '前端默认模型名称必须使用稳定的 DeepSeek 常量');
 const runtimeWithoutStorageHelper = html.slice(0, storageStart) + html.slice(storageEnd);
 assert.ok(
   !/localStorage\.(?:getItem|setItem|removeItem)\s*\(/.test(runtimeWithoutStorageHelper),

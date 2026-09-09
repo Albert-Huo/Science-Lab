@@ -137,7 +137,7 @@ git add manifest.json && git commit -m "chore: 更新实验清单" && git push
 
 "我的"侧栏 → AI 问答，使用 DeepSeek（OpenAI 兼容协议），系统提示自动注入当前实验的标题/学科/学段。
 
-默认使用部署在本站 `/api/ai/chat/completions` 的内置 AI 代理，学习者无需填写接口、模型或 API Key。站点管理员在服务端 `.env` 配置 `DEEPSEEK_API_KEY`，浏览器不会接触该 Key。
+默认使用部署在本站 `/api/ai/chat/completions` 的内置 AI 代理，学习者无需填写接口、模型或 API Key。界面统一显示 `DeepSeek`；站点管理员在服务端 `.env` 通过 `DEEPSEEK_MODEL` 配置实际模型 ID，并通过 `DEEPSEEK_API_KEY` 配置密钥，浏览器不会接触服务端 Key。
 
 为生成回答，当前实验信息、最近对话和本次问题会经本站代理发送给 DeepSeek；站点不做账号绑定或云端会话保存，但模型服务商仍会按其服务条款处理请求。请勿提交姓名、联系方式等敏感个人信息。
 
