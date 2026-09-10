@@ -51,7 +51,7 @@ Redis最低需要支持TIME、EVAL、字符串计数、PEXPIRE与有序集合。
 ## 发布与回退
 
 1. 本地构建资料并检查，运行下方测试。API完整发布 `server.js`、`ai-policy.js`、`ai-quota.js`、`ai-context.json`、现有db.js/schema.sql、package.json/package-lock.json；依赖执行 `npm ci --omit=dev`，Node需18.19+（建议沿用现网22）。不得仅替换server.js。
-2. 运维先准备Redis、持久化和私密环境变量，验证连接与配置。保留原API release和配置备份；此仓库修改未在现网安装Redis。
+2. 运维先准备Redis、持久化和私密环境变量，验证连接与配置。保留原API release和配置备份；2026-09-10发布已复用现有Redis程序部署独立额度实例，后续发布应保留其数据和稳定密钥，不重新初始化。
 3. 先发布API并检查健康与一条受控AI请求，再发布静态页面。静态清单新增ai-chat.js；index、sw、experiment-scroll版本统一v0.8.11。Nginx保留精确AI路径、真实IP转发、SSE无缓冲以及匿名日志；Cookie和额度响应头不能被缓存或丢弃。详情见aliyun-deploy.md。
 4. 新前端依赖服务端生成提示词：如回退API，须先回退静态页面到旧客户端；只回退静态页面且保留新API可兼容。资料和策略模块随API成组回退；不得清空Redis键来“修复”故障。
 5. 若曾部署独立旧Worker，管理员需单独停用远端Worker并撤销它的Secret。本地退役文件返回410、不再触发上游；不会自动改变远端部署。

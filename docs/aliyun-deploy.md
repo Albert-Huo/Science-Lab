@@ -23,9 +23,9 @@
 
 启用真实 AI 时，通过服务器私密环境配置提供 Key，不要写入前端、Git 或聊天记录；重启后再做一次受控真实请求验收。旧版本只使用进程内限流，不能额外启动第二实例；升级后的共享额度版本要求全部实例使用相同Redis、签名密钥和限额配置。现网仍按既有单实例流程运维。
 
-### AI 助手新版本升级要求（本地待发布）
+### AI 助手升级要求（2026-09-10已发布v0.8.11）
 
-本版本新增 `server/api/ai-policy.js`、`ai-quota.js`、`ai-context.json` 和redis依赖，必须成组发布API目录；静态新增 `ai-chat.js`。生产须设置 `NODE_ENV=production`、`AI_REDIS_URL` 和 `AI_SESSION_SECRET`，先准备Redis与持久化，再按“API先、静态后”发布。缺少配置会拒绝启动。构建、验证、隐私与兼容回退细节见 [AI 助手运维说明](ai-assistant.md)。这些是下一次发布要求，不表示已在现网完成。
+本版本新增 `server/api/ai-policy.js`、`ai-quota.js`、`ai-context.json` 和redis依赖，必须成组发布API目录；静态新增 `ai-chat.js`。生产须设置 `NODE_ENV=production`、`AI_REDIS_URL` 和 `AI_SESSION_SECRET`，先准备Redis与持久化，再按“API先、静态后”发布。缺少配置会拒绝启动。构建、验证、隐私与兼容回退细节见 [AI 助手运维说明](ai-assistant.md)。现网已发布 `5cc08bd`，独立额度Redis为 `science-lab-quota-redis.service`、`127.0.0.1:16379`，原6379实例及Nginx配置未改变。详见 [发布验收记录](superpowers/plans/2026-09-10-ai-assistant-hardening.md)。
 
 > GitHub 仓库继续用于存代码/版本管理；对外网页由阿里云提供。国内访问比 GitHub Pages 更快更稳。
 

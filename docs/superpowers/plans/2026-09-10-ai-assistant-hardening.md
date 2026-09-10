@@ -24,3 +24,17 @@
 复核额外修复：畸形model对象触发String转换异常会令Express4进程退出，改为严格类型校验和async错误边界；Redis错误URL的构造异常可能包含凭据，改为固定脱敏异常；历史内存缓存同步200条/6000字符限制；资料包来自不同模式的片段不可被当作当前连续步骤，已明确写入提示词。
 
 验证范围：自动测试与浏览器使用模拟模型响应，没有真实DeepSeek费用或现网配置修改。资料包中4项文字较少、10项截断、1项动态步骤数组不支持，详见ai-assistant.md。生成资料仍需教学内容抽查，模型真实回答质量未通过付费调用验证。浏览器图片在output/playwright/ai-assistant-mobile.png、ai-assistant-desktop.png；不是生产截图。
+
+## 2026-09-10生产发布结果
+
+- [x] 功能提交 `5cc08bdaa653bf99da2eb7dfc63a55501d5e4df4` 已推送 `origin/main`；仅提交34项功能/测试/文档文件，原未跟踪文件保留。
+- [x] 本地完整npm测试、Redis集成测试、138项资料来源校验通过。服务器Node 22.23.2与Redis 6.2.20实测原子全站限额、跨进程保留、租约过期、故障返回通过；HTTP策略与17项启动模式测试通过。
+- [x] API和静态release均为 `20260910-5cc08bd`，分别位于 `/opt/science-lab-api-releases/` 与 `/var/www/science-lab-releases/`，current链接均已切换。API先、静态后，健康检查及14个公开静态文件字节校验通过，未触发回滚。
+- [x] 新增独立 `science-lab-quota-redis.service`，复用 `/usr/bin/redis-server`，仅监听127.0.0.1:16379；有密码、AOF everysec、64MiB/noeviction、192MiB服务总内存上限，开机启动。隔离验收命名空间写入额度后重启实例，下一次请求仍返回全站额度429，证明持久化保留。验收键24小时自动过期，不计入正式额度。
+- [x] 原Redis 6379服务和 `/etc/redis.conf` 未修改，Nginx站点配置逐字节未变。API继续非root运行；私密环境文件600 root:root，Redis配置640 root:redis、数据目录700 redis:redis。签名密钥与Redis密码服务器随机生成，未写入Git或输出；DeepSeek Key原值保留。
+- [x] 独立无界面浏览器对正式站点进行一次真实DeepSeek请求（温度计读数要求）：HTTP200、界面完整回答、两条完整问答记录且无中断标记、发送按钮恢复、无重试按钮，额度19/20。Secure/HttpOnly/SameSite=Lax签名Cookie验证通过；正式Redis计数1、活动并发0、AOF写入正常。未修改模型账户或预算。
+- [x] 390×844手机布局文档宽390、无横向溢出，浏览器控制台0错误/0警告。生产截图 `output/playwright/ai-hardening-production-mobile.png`。浏览器唯一句柄 `task-b41e209c`，验证后精确关闭；未操作其他浏览器。
+
+发布备份：`/var/backups/science-lab/ai-hardening-20260910-5cc08bd`（root-only），含旧API环境、API服务、Nginx配置及旧release指针。旧API/静态均为 `20260910-a9b2f53b`。staging `/var/tmp/science-lab-ai-hardening-20260910-5cc08bd` 保留发布脚本、校验程序及私密候选环境，目录700；不要重复执行初始化/切换脚本。需要回滚时先核实现网仍是本次版本，再先恢复旧静态、随后旧API链接与备份环境，重启API并轮询健康；保留Redis数据和密钥，不清库。
+
+验收工具限制：首次服务器HTTP测试因API扁平部署目录缺少仓库级Worker文件而失败；在独立staging恢复仓库目录结构后复跑通过，无应用修补。浏览器SSE完成后主动取消读取，DevTools再次提取响应正文不可用；未重复付费调用，改用HTTP200、页面完整回答、解析器成功保存的完整问答及Redis计数核验。真实回答仅抽查温度计一个场景，不代表全部138项教学质量已人工审定。
