@@ -21,7 +21,11 @@
 - nginx 仅转发精确的 `/api/health` 和 `/api/ai/chat/completions`；旧 `/api/` 接口继续维持部署前的 `503 sync_api_not_configured`。
 - 静态页面使用 `/var/www/science-lab-current` 发布链接；原 `/var/www/science-lab` 保留供证书续期及回滚使用。
 
-启用真实 AI 时，通过服务器私密环境配置提供 Key，不要写入前端、Git 或聊天记录；重启后再做一次有费用上限的真实请求验收。不要在本站额外启动第二个 PM2/API 实例，否则进程内的每日限额不能统一计数。
+启用真实 AI 时，通过服务器私密环境配置提供 Key，不要写入前端、Git 或聊天记录；重启后再做一次受控真实请求验收。旧版本只使用进程内限流，不能额外启动第二实例；升级后的共享额度版本要求全部实例使用相同Redis、签名密钥和限额配置。现网仍按既有单实例流程运维。
+
+### AI 助手新版本升级要求（本地待发布）
+
+本版本新增 `server/api/ai-policy.js`、`ai-quota.js`、`ai-context.json` 和redis依赖，必须成组发布API目录；静态新增 `ai-chat.js`。生产须设置 `NODE_ENV=production`、`AI_REDIS_URL` 和 `AI_SESSION_SECRET`，先准备Redis与持久化，再按“API先、静态后”发布。缺少配置会拒绝启动。构建、验证、隐私与兼容回退细节见 [AI 助手运维说明](ai-assistant.md)。这些是下一次发布要求，不表示已在现网完成。
 
 > GitHub 仓库继续用于存代码/版本管理；对外网页由阿里云提供。国内访问比 GitHub Pages 更快更稳。
 
@@ -100,7 +104,7 @@ pm2 save && pm2 startup    # 按提示执行输出命令，开机自启
 每次把仓库根目录这些文件放到一个新的只读 release 目录，再原子切换 `/var/www/science-lab-current` 符号链接：
 
 ```
-index.html  catalog-control.js  content-source.js  experiment-scroll.js  catalog-control.json  manifest.json  manifest.webmanifest  sw.js  assets/
+index.html  ai-chat.js  catalog-control.js  content-source.js  experiment-scroll.js  catalog-control.json  manifest.json  manifest.webmanifest  sw.js  assets/
 ```
 
 ```bash
@@ -110,15 +114,16 @@ set -euo pipefail
 SCIENCE_LAB_RELEASE_ID=$(date '+%Y%m%d-%H%M%S')
 SCIENCE_LAB_RELEASE_DIR="/var/www/science-lab-releases/${SCIENCE_LAB_RELEASE_ID}"
 sudo install -d -m 755 "$SCIENCE_LAB_RELEASE_DIR"
-sudo install -m 644 index.html catalog-control.js content-source.js experiment-scroll.js catalog-control.json manifest.json manifest.webmanifest sw.js "$SCIENCE_LAB_RELEASE_DIR/"
+sudo install -m 644 index.html ai-chat.js catalog-control.js content-source.js experiment-scroll.js catalog-control.json manifest.json manifest.webmanifest sw.js "$SCIENCE_LAB_RELEASE_DIR/"
 sudo cp -a assets "$SCIENCE_LAB_RELEASE_DIR/"
 sudo chown -R root:root "$SCIENCE_LAB_RELEASE_DIR"
 sudo find "$SCIENCE_LAB_RELEASE_DIR" -type d -exec chmod 755 {} +
 sudo find "$SCIENCE_LAB_RELEASE_DIR" -type f -exec chmod 644 {} +
 
-# 根 URL 与 index.html 是同一份内容，因此 App 壳有以下十二个物理文件。
+# 根 URL 与 index.html 是同一份内容，因此 App 壳有以下十三个物理文件。
 SCIENCE_LAB_SHELL_FILES=(
   "index.html"
+  "ai-chat.js"
   "catalog-control.js"
   "content-source.js"
   "experiment-scroll.js"
@@ -314,7 +319,7 @@ sudo nginx -t && sudo systemctl reload nginx
   ```bash
   curl -N https://lab.xingnian.net.cn/api/ai/chat/completions \
     -H 'Content-Type: application/json' \
-    -d '{"messages":[{"role":"user","content":"用一句话解释惯性"}]}'
+    -d '{"context":{"experimentPath":"physics-middle/初中物理实验1.html"},"messages":[{"role":"user","content":"用一句话说明温度计为什么要等示数稳定"}]}'
   ```
 
 - 浏览器打开 `https://lab.xingnian.net.cn/` 看到 App
@@ -394,7 +399,7 @@ sudo tar -C /opt -xzf /var/backups/science-lab/science-lab-api-${SCIENCE_LAB_BAC
 pm2 restart science-lab-api --update-env
 ```
 
-恢复后重新验证 `/api/health` 和 AI SSE；无需切换静态 release 或重载 nginx。
+恢复后重新验证 `/api/health` 和 AI SSE；同一请求契约内回退无需重载nginx。若从本次服务端提示词版本回退到旧API，必须先按上节回退静态页面：新前端不再提交system，不能与旧API混用。保留新API只回退旧静态页面可兼容。
 
 本次没有数据库迁移，不要为应用回滚而重建或回滚数据库结构。
 
@@ -417,11 +422,11 @@ pm2 restart science-lab-api --update-env
 - `full` 模式：注册/登录限流（15 分钟 30 次/IP）；`ai-only` 不开放账号与同步接口。
 - AI 路由叠加每分钟和每 24 小时两级 IP 限流，默认分别为 10 次和 20 次，可用 `AI_RATE_LIMIT_MINUTE_MAX`、`AI_RATE_LIMIT_DAY_MAX` 调整。
 - AI 上游请求默认在 120 秒后中止，客户端断开连接时也会中止；可用 `AI_UPSTREAM_TIMEOUT_MS` 调整总超时。
-- AI 请求仅接受最多 20 条 `messages`；角色和单条长度受限；模型省略时使用 `DEEPSEEK_MODEL`，显式传入时也仅允许该配置值；服务端强制流式响应、关闭思考模式、`max_tokens ≤ 2048`、`temperature ∈ [0,2]`，其他字段不会透传。
+- AI 必须提供资料包内的 `context.experimentPath`。最多接受 20 条 `messages`、单条最多 4000 UTF-16 字符；旧客户端 system 被剥离。服务端生成唯一的实验助手 system，仅保留当前问题与最近 5 个完整问答、聊天正文最多 12000 字符，另加有界教材资料。模型固定为 `DEEPSEEK_MODEL`，强制流式、关闭思考、`max_tokens ≤ 2048`，温度默认 0.4、范围 `[0,2]`，其他字段不透传。
 - `DEEPSEEK_API_KEY` 只放在服务端 `.env`。错误响应不会回显 Key 或 DeepSeek 原始错误正文；使用独立低余额账户、关闭不受控自动充值，并定期轮换 Key。
 - Node 仅监听 127.0.0.1，对外只经 nginx 443。
 - 同源部署天然规避跨站；如分域部署再依赖 `CORS_ORIGINS` 白名单。
-- 当前限流计数保存在单个 Node 进程内。若用 PM2 cluster、多个容器或多台机器，实际总额度会按实例放大，应改用共享 Redis store 或在网关/WAF 再加全局限流。
+- 生产须设置 `NODE_ENV=production`、`AI_REDIS_URL`、至少32字符的 `AI_SESSION_SECRET`；缺失拒绝启动。Redis 原子共享 IP、会话、全站额度及并发租约；Redis 故障返回503，不退回内存。开发模式才允许内存计数。部署与新配置详见 [AI 助手运维说明](ai-assistant.md)。
 - CORS 不是滥用防护。上线后应监控 429、502、调用量与供应商费用；遭遇攻击时先在 nginx/WAF 封禁异常来源并下调限额。
 
 ## 上线风险解除清单

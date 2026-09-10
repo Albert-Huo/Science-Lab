@@ -145,6 +145,14 @@ async function withChild(dbPort, env, run) {
     }
   }
   try {
+    await test('生产缺少共享额度配置时拒绝启动', { APP_MODE: 'ai-only', NODE_ENV: 'production' }, async service => {
+      await service.fails(/quota.*Redis/);
+    });
+    await test('生产缺少稳定会话签名密钥时拒绝启动', {
+      APP_MODE: 'ai-only', NODE_ENV: 'production', AI_REDIS_URL: 'redis://127.0.0.1:1',
+    }, async service => {
+      await service.fails(/session secret/);
+    });
     await test('ai-only 无 JWT / 数据库也能真实启动，健康检查 200', { APP_MODE: 'ai-only' }, async service => {
       const before = connections;
       await service.ready();
@@ -161,7 +169,7 @@ async function withChild(dbPort, env, run) {
       const before = connections;
       await service.ready();
       const response = await service.request('/ai/chat/completions', {
-        method: 'POST', body: { messages: [{ role: 'user', content: '你好' }] },
+        method: 'POST', body: { context: { experimentPath: 'physics-middle/初中物理实验1.html' }, messages: [{ role: 'user', content: '你好' }] },
       });
       assert.strictEqual(response.status, 503);
       assert.strictEqual(response.json.error, 'ai_unavailable');

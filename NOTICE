@@ -11,5 +11,10 @@ The interactive experiment HTML files loaded by the app are stored in the
 separate Albert-Huo/HTML- repository and are not licensed by this repository's
 MIT License. Their own license and notices apply.
 
+The generated server/api/ai-context.json contains excerpts from those experiment
+HTML files. These excerpts retain the source content's license and notices and
+are not relicensed under the application shell's MIT License. Each entry records
+the source path and SHA256 for attribution and traceability.
+
 API keys, model provider credentials, and deployed worker secrets are not part
 of this repository and must not be committed.

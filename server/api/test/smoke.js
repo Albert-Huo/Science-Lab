@@ -1,4 +1,5 @@
 'use strict';
+require('./ai-test-env');
 /* 端到端冒烟测试：内存 DB，覆盖注册/登录/鉴权/进度合并/CORS。
  * 运行：DB_DRIVER=memory JWT_SECRET=testsecret_testsecret node test/smoke.js
  */
@@ -23,7 +24,7 @@ function aiRequest(body, ip) {
   return api('/ai/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': ip },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ context: { experimentPath: 'physics-middle/初中物理实验1.html' }, ...body }),
   });
 }
 
@@ -69,23 +70,25 @@ function aiRequest(body, ip) {
     const sse = await r.text();
     assert.strictEqual(r.status, 200); assert.match(sse, /答案/);
     assert.strictEqual(r.headers.get('x-science-lab-ai-experiment'), crypto.createHash('sha256').update(experimentPath).digest('hex'));
-    assert.strictEqual(r.headers.get('x-science-lab-ai-messages'), '1');
-    assert.strictEqual(r.headers.get('x-science-lab-ai-input-chars'), String('解释实验'.length));
+    assert.strictEqual(r.headers.get('x-science-lab-ai-messages'), '2');
+    assert.strictEqual(r.headers.get('x-science-lab-ai-input-chars'), String(captured.body.messages.reduce((sum, item) => sum + item.content.length, 0)));
     assert.strictEqual(captured.url, 'https://api.deepseek.com/chat/completions');
     assert.deepStrictEqual(captured.body, {
       model: AI_MODEL, stream: true, max_tokens: 2048, temperature: 1.5,
       thinking: { type: 'disabled' },
-      messages: [{ role: 'user', content: '解释实验' }],
+      messages: [captured.body.messages[0], { role: 'user', content: '解释实验' }],
     });
+    assert.strictEqual(captured.body.messages[0].role, 'system');
+    assert.match(captured.body.messages[0].content, /实验馆/);
     assert.strictEqual(Object.hasOwn(captured.body, 'context'), false);
     assert.strictEqual(captured.opts.headers.Authorization, 'Bearer test-deepseek-key'); ok('AI 字段收紧 + SSE 透传');
 
     r = await aiRequest({ messages: [{ role: 'user', content: '路径过长' }], context: { experimentPath: 'x'.repeat(301) } }, '203.0.113.30');
     await r.text();
-    assert.strictEqual(r.status, 200);
+    assert.strictEqual(r.status, 400);
     assert.strictEqual(r.headers.get('x-science-lab-ai-experiment') || '', '');
-    assert.strictEqual(r.headers.get('x-science-lab-ai-messages'), '1');
-    ok('AI 统计拒绝过长实验路径且保留数值元数据');
+    assert.strictEqual(r.headers.get('x-science-lab-ai-messages'), null);
+    ok('AI 拒绝不可信实验路径，不转发上游');
 
     // AI proxy: stalled upstream calls are aborted by a total timeout
     let timeoutSignal;

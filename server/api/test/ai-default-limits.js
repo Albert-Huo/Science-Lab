@@ -1,4 +1,5 @@
 'use strict';
+require('./ai-test-env');
 
 process.env.DB_DRIVER = 'memory';
 process.env.JWT_SECRET = 'testsecret_testsecret_0123456789';
@@ -37,6 +38,7 @@ const app = require('../server');
     },
     body: JSON.stringify({
       model: 'deepseek-v4-flash',
+      context: { experimentPath: 'physics-middle/初中物理实验1.html' },
       messages: [{ role: 'user', content: '默认限额测试' }],
     }),
   });

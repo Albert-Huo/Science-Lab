@@ -15,6 +15,8 @@ const rateLimit = require('express-rate-limit');
 const { createHash } = require('node:crypto');
 const { Readable } = require('stream');
 const { pipeline } = require('stream/promises');
+const { createAiPolicy } = require('./ai-policy');
+const { createQuota } = require('./ai-quota');
 const db = AI_ONLY ? null : require('./db');
 
 const PORT = Number(process.env.PORT || 8970);
@@ -31,6 +33,17 @@ function positiveInt(value, fallback) {
 const AI_RATE_LIMIT_MINUTE_MAX = positiveInt(process.env.AI_RATE_LIMIT_MINUTE_MAX, 10);
 const AI_RATE_LIMIT_DAY_MAX = positiveInt(process.env.AI_RATE_LIMIT_DAY_MAX, 20);
 const AI_UPSTREAM_TIMEOUT_MS = positiveInt(process.env.AI_UPSTREAM_TIMEOUT_MS, 120000);
+const quota = createQuota({
+  minuteMax: AI_RATE_LIMIT_MINUTE_MAX,
+  ipDayMax: AI_RATE_LIMIT_DAY_MAX,
+  sessionDayMax: positiveInt(process.env.AI_SESSION_DAY_MAX, 20),
+  globalDayMax: positiveInt(process.env.AI_GLOBAL_DAY_MAX, 500),
+  concurrentMax: positiveInt(process.env.AI_GLOBAL_CONCURRENT_MAX, 5),
+  timeoutMs: AI_UPSTREAM_TIMEOUT_MS,
+  secret: process.env.AI_SESSION_SECRET,
+  redisUrl: process.env.AI_REDIS_URL,
+  production: process.env.NODE_ENV === 'production',
+});
 
 if (!AI_ONLY && (!JWT_SECRET || JWT_SECRET.length < 16)) {
   console.error('启动失败：请在 .env 设置足够长的 JWT_SECRET'); process.exit(1);
@@ -49,18 +62,18 @@ app.use(cors({
   origin(origin, cb) {
     if (!origin) return cb(null, true);            // 同源/curl 等无 Origin
     if (ORIGINS.includes(origin)) return cb(null, true);
-    return cb(new Error('Origin not allowed'));
+    const error = new Error('Origin not allowed');
+    error.code = 'origin_not_allowed';
+    return cb(error);
   },
+  exposedHeaders: ['Retry-After', 'X-AI-Quota-Limit', 'X-AI-Quota-Remaining', 'X-AI-Quota-Reset', 'X-AI-Quota-Scope'],
 }));
 
 const HISTORY_MAX = 100;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const AI_MESSAGE_MAX = 20;
-const AI_MESSAGE_LENGTH_MAX = 4000;
-const AI_MAX_TOKENS = 2048;
 const configuredAiModel = String(process.env.DEEPSEEK_MODEL || '').trim();
 const DEFAULT_AI_MODEL = configuredAiModel || 'deepseek-v4-flash';
-const AI_MODELS = new Set([DEFAULT_AI_MODEL]);
+const sanitizeAiBody = createAiPolicy(require('./ai-context.json'), DEFAULT_AI_MODEL);
 
 function sign(user) { return jwt.sign({ uid: user.id, email: user.email }, JWT_SECRET, { expiresIn: JWT_EXPIRES }); }
 
@@ -106,53 +119,8 @@ const aiMinuteLimiter = rateLimit({
   max: AI_RATE_LIMIT_MINUTE_MAX,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'rate_limited' },
+  message: { error: 'rate_limited', scope: 'ip_minute', message: '请求较频繁，请稍后再试。' },
 });
-const aiDayLimiter = rateLimit({
-  windowMs: 24 * 60 * 60 * 1000,
-  max: AI_RATE_LIMIT_DAY_MAX,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'rate_limited' },
-});
-
-function sanitizeAiBody(body) {
-  const model = body && body.model ? String(body.model) : DEFAULT_AI_MODEL;
-  if (!AI_MODELS.has(model)) return { error: 'invalid_model' };
-
-  if (!body || !Array.isArray(body.messages) || body.messages.length < 1 || body.messages.length > AI_MESSAGE_MAX) {
-    return { error: 'invalid_messages' };
-  }
-  const messages = [];
-  for (const item of body.messages) {
-    if (!item || !['system', 'user', 'assistant'].includes(item.role) || typeof item.content !== 'string') {
-      return { error: 'invalid_messages' };
-    }
-    const content = item.content.trim();
-    if (!content || content.length > AI_MESSAGE_LENGTH_MAX) return { error: 'invalid_messages' };
-    messages.push({ role: item.role, content });
-  }
-
-  const rawMaxTokens = body.max_tokens === undefined ? AI_MAX_TOKENS : body.max_tokens;
-  if (typeof rawMaxTokens !== 'number' || !Number.isFinite(rawMaxTokens) || rawMaxTokens < 1) {
-    return { error: 'invalid_max_tokens' };
-  }
-  const rawTemperature = body.temperature === undefined ? 0.7 : body.temperature;
-  if (typeof rawTemperature !== 'number' || !Number.isFinite(rawTemperature) || rawTemperature < 0 || rawTemperature > 2) {
-    return { error: 'invalid_temperature' };
-  }
-
-  return {
-    value: {
-      model,
-      stream: true,
-      max_tokens: Math.min(Math.floor(rawMaxTokens), AI_MAX_TOKENS),
-      temperature: rawTemperature,
-      thinking: { type: 'disabled' },
-      messages,
-    },
-  };
-}
 
 function setAiMetricHeaders(res, messages, context) {
   const rawPath = context && typeof context.experimentPath === 'string' ? context.experimentPath : '';
@@ -168,15 +136,22 @@ function setAiMetricHeaders(res, messages, context) {
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
-app.post('/ai/chat/completions', aiMinuteLimiter, aiDayLimiter, async (req, res) => {
+// Express 4 does not automatically forward rejected async handlers to error middleware.
+app.post('/ai/chat/completions', aiMinuteLimiter, (req, res, next) => handleAiChat(req, res).catch(next));
+async function handleAiChat(req, res) {
+  res.set('Cache-Control', 'no-store');
   const parsed = sanitizeAiBody(req.body);
   if (parsed.error) return res.status(400).json({ error: parsed.error });
-  setAiMetricHeaders(res, parsed.value.messages, req.body && req.body.context);
+  setAiMetricHeaders(res, parsed.value.messages, { experimentPath: parsed.experimentPath });
 
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) {
     return res.status(503).json({ error: 'ai_unavailable', message: 'AI 助手暂未配置，请稍后再试' });
   }
+
+  const release = await quota.reserve(req, res);
+  if (!release) return;
+  if (res.destroyed) { await release(); return; }
 
   const controller = new AbortController();
   let abortKind = '';
@@ -203,7 +178,7 @@ app.post('/ai/chat/completions', aiMinuteLimiter, aiDayLimiter, async (req, res)
       body: JSON.stringify(parsed.value),
       signal: controller.signal,
     });
-    if (!upstream.ok || !upstream.body) {
+    if (!upstream.ok || !upstream.body || !(upstream.headers.get('content-type') || '').includes('text/event-stream')) {
       console.error('DeepSeek 请求失败，状态码：' + upstream.status);
       if (upstream.body) {
         try { await upstream.body.cancel(); }
@@ -215,7 +190,7 @@ app.post('/ai/chat/completions', aiMinuteLimiter, aiDayLimiter, async (req, res)
     res.status(200);
     res.set({
       'Content-Type': upstream.headers.get('content-type') || 'text/event-stream; charset=utf-8',
-      'Cache-Control': 'no-cache, no-transform',
+      'Cache-Control': 'no-store, no-transform',
       Connection: 'keep-alive',
       'X-Accel-Buffering': 'no',
     });
@@ -235,8 +210,9 @@ app.post('/ai/chat/completions', aiMinuteLimiter, aiDayLimiter, async (req, res)
   } finally {
     clearTimeout(timeout);
     res.removeListener('close', abortOnClientClose);
+    await release();
   }
-});
+}
 
 app.post('/auth/register', authLimiter, async (req, res) => {
   try {
@@ -287,8 +263,18 @@ app.put('/progress', auth, async (req, res) => {
   } catch (e) { console.error(e); res.status(500).json({ error: 'server_error' }); }
 });
 
+app.use((error, _req, res, _next) => {
+  if (res.headersSent) return res.end();
+  if (error.code === 'origin_not_allowed') return res.status(403).json({ error: 'origin_not_allowed' });
+  if (error.type === 'entity.too.large') return res.status(413).json({ error: 'request_too_large' });
+  if (error.type === 'entity.parse.failed') return res.status(400).json({ error: 'invalid_json' });
+  console.error('API 请求失败：internal_error');
+  return res.status(500).json({ error: 'server_error' });
+});
+
 async function start() {
   if (!AI_ONLY) await db.init();
+  await quota.connect();
   app.listen(PORT, '127.0.0.1', () => console.log('science-lab-api listening on 127.0.0.1:' + PORT));
 }
 if (require.main === module) start().catch(e => { console.error('启动失败：', e); process.exit(1); });

@@ -6,7 +6,7 @@ import { parseArgs } from 'node:util';
 
 const APP_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const APP_FILES = new Set([
-  'index.html', 'catalog-control.js', 'content-source.js', 'experiment-scroll.js',
+  'index.html', 'catalog-control.js', 'content-source.js', 'experiment-scroll.js', 'ai-chat.js',
   'experiment-scroll-receiver.js', 'scroll-preview.html', 'manifest.json', 'catalog-control.json', 'manifest.webmanifest',
   'assets/icons/icon-192.png', 'assets/icons/icon-512.png',
   'assets/icons/icon-maskable-512.png', 'assets/icons/apple-touch-icon.png'

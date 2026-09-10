@@ -277,6 +277,7 @@ function assertActiveRateZonePlacement(nginxBlock) {
   assert.ok(deployGuide.includes('npm ci --omit=dev'), '生产依赖必须从 lock 文件安装');
   const shellFiles = [
     'index.html',
+    'ai-chat.js',
     'catalog-control.js',
     'content-source.js',
     'experiment-scroll.js',
@@ -442,7 +443,7 @@ function assertActiveRateZonePlacement(nginxBlock) {
   assert.ok(deployGuide.includes('### 仅回滚 Node API'), 'Node API 回滚必须是独立操作');
   assert.ok(deployGuide.includes('deepseek-v4-flash'), '真实 AI 验证必须使用当前模型');
   assert.ok(
-    /install -m 644 index\.html catalog-control\.js content-source\.js experiment-scroll\.js catalog-control\.json manifest\.json manifest\.webmanifest sw\.js/.test(deployGuide),
+    /install -m 644 index\.html ai-chat\.js catalog-control\.js content-source\.js experiment-scroll\.js catalog-control\.json manifest\.json manifest\.webmanifest sw\.js/.test(deployGuide),
     '原子发布必须复制全部 App 壳文件'
   );
   assert.ok(

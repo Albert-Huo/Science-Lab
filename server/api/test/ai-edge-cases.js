@@ -1,4 +1,5 @@
 'use strict';
+require('./ai-test-env');
 process.env.DB_DRIVER = 'memory';
 process.env.JWT_SECRET = 'testsecret_testsecret_0123456789';
 process.env.CORS_ORIGINS = '';
@@ -51,7 +52,7 @@ function waitFor(predicate, timeoutMs = 500) {
   const ok = name => { console.log('  ✓', name); pass++; };
 
   try {
-    const body = JSON.stringify({ messages: [{ role: 'user', content: 'test' }] });
+    const body = JSON.stringify({ context: { experimentPath: 'physics-middle/初中物理实验1.html' }, messages: [{ role: 'user', content: 'test' }] });
     const request = (ip, signal) => clientFetch(base + '/ai/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': ip },

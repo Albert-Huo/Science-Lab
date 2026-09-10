@@ -38,6 +38,7 @@ function harness(initial) {
     localStorage,
     location: { protocol: 'https:', hostname: 'lab.example', origin: 'https://lab.example' },
     LS: { ai: 'expfeed.ai', chat: 'expfeed.chat' },
+    ScienceAiChat: require('../../../ai-chat.js'), URL,
     console: { warn(message) { warnings.push(String(message)); } },
     toast(message) { toasts.push(message); },
   });
@@ -142,12 +143,13 @@ function assertSingleStorageWarning(warnings, operation, key, error) {
   const test = harness();
   const input = Array.from({ length: 13 }, (_, index) => ({
     role: index % 2 ? 'assistant' : 'user',
-    content: 'x'.repeat(5000),
+    content: 'x'.repeat(1000),
   }));
   const sent = JSON.parse(JSON.stringify(test.api.toAiMessages(input)));
-  assert.strictEqual(sent.length, 12);
-  assert.strictEqual(sent[0].content.length, 4000);
-  ok('发往内置 AI 的历史限制为最近 12 条且每条不超过 4000 字符');
+  assert.strictEqual(sent.length, 11);
+  assert.strictEqual(sent[0].role, 'user');
+  assert.strictEqual(sent[0].content.length, 1000);
+  ok('发往内置 AI 的历史限制为最近 5 个完整问答轮次与当前问题');
 }
 
 {
@@ -162,14 +164,28 @@ function assertSingleStorageWarning(warnings, operation, key, error) {
   );
   assert.deepStrictEqual(
     JSON.parse(JSON.stringify(test.api.buildAiRequestBody({ byok: true, model: 'DeepSeek' }, messages, experimentPath))),
-    { model: 'deepseek-v4-flash', stream: true, messages }
+    { model: 'deepseek-v4-flash', stream: true, messages: [{ role: 'system', content: '你是中文实验学习助手。请根据用户提供的信息解释实验原理；无法看到实时页面、实验操作或测量值，不要假装已经观察到。' }, ...messages], max_tokens: 2048, thinking: { type: 'disabled' } }
   );
   assert.deepStrictEqual(
     JSON.parse(JSON.stringify(test.api.buildAiRequestBody({ byok: true, model: 'custom-model' }, messages, experimentPath))),
-    { model: 'custom-model', stream: true, messages }
+    { model: 'custom-model', stream: true, messages: [{ role: 'system', content: '你是中文实验学习助手。请根据用户提供的信息解释实验原理；无法看到实时页面、实验操作或测量值，不要假装已经观察到。' }, ...messages] }
   );
-  assert.ok(html.includes("buildAiRequestBody(cfg,[{role:'system',content:sys},...toAiMessages(conversation)],path)"));
+  const compatible = test.api.buildAiRequestBody({ byok: true, endpoint: 'https://provider.example/v1/chat/completions', model: 'deepseek-v4-flash' }, messages, experimentPath);
+  assert.strictEqual(compatible.thinking, undefined);
+  assert.strictEqual(compatible.max_tokens, undefined);
+  assert.ok(html.includes('buildAiRequestBody(cfg,messages,path,sys)'));
   ok('内置请求携带实验路径，BYOK 保持直连格式且使用当前 Flash 模型');
+}
+
+{
+  const test = harness({ 'expfeed.ai': JSON.stringify({ byok: false, key: 'old-key' }) });
+  assert.strictEqual(test.api.aiCfg().key, '');
+  assert.strictEqual(JSON.parse(test.localStorage.getItem('expfeed.ai')).key, '');
+  test.api.persistChat('experiment', [{ role: 'user', content: 'question', incomplete: true }, { role: 'assistant', content: 'partial', incomplete: true, notice: '已停止生成。' }]);
+  const history = test.api.loadChatStore().experiment;
+  assert.strictEqual(history[0].incomplete, true);
+  assert.strictEqual(history[1].notice, '已停止生成。');
+  ok('关闭 BYOK 时清除旧 Key，持久化保留未完成标记与原因');
 }
 
 {
