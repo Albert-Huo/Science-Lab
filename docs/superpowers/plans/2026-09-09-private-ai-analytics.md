@@ -685,13 +685,13 @@ Present the test summary, screenshots, changed-file list, privacy audit, product
 - Commit the reviewed feature files
 - Modify production only after the Task 8 approval
 
-- [ ] **Step 1: Inspect production read-only before committing**
+- [x] **Step 1: Inspect production read-only before committing**
 
 Run a non-interactive SSH inspection against `root@47.97.174.49` to collect `nginx -T` include placement, the exact HTTPS AI location, `/etc/logrotate.d/nginx`, `systemctl cat science-lab-api`, `systemctl cat science-lab-traffic`, current release links, file ownership/modes, service/timer status and current report hashes. Do not print environment-file contents or any API key.
 
 Expected: confirm the source Nginx format can be installed in an `http`-context include, `*log` rotation covers the new file, the service can read `nginx:root` mode 0640 logs and every rollback target exists. If any assumption differs, stop and revise the deployment steps before mutation.
 
-- [ ] **Step 2: Commit and push the reviewed diff**
+- [x] **Step 2: Commit and push the reviewed diff**
 
 After confirming only approved files are staged, run:
 
@@ -704,40 +704,54 @@ git push origin main
 
 If an listed file has no change, omit it from `git add` after verifying that the corresponding behavior is covered elsewhere. Expected: one feature commit pushed to `origin/main`; existing untracked files remain uncommitted.
 
-- [ ] **Step 3: Back up production and install inactive files**
+- [x] **Step 3: Back up production and install inactive files**
 
 Create a root-only backup directory with `mktemp -d /var/tmp/science-lab-ai-analytics.XXXXXX`. Copy the active API release reference, seven traffic runtime files, Nginx site/main configuration, logrotate config, traffic unit, environment file if present, current history and current report into it while preserving modes. Upload the new API/static release and traffic/config source files to new inactive paths; do not switch links or reload services yet.
 
 Expected: uploaded file SHA-256 values match the committed local files, backups are readable only by root, and active public/service state is unchanged.
 
-- [ ] **Step 4: Validate inactive configuration and establish the collection start**
+- [x] **Step 4: Validate inactive configuration and establish the collection start**
 
 Write `/etc/science-lab-traffic.env` atomically as root mode 0600 with `AI_COLLECTION_START` set to the UTC timestamp immediately before Nginx activation. Create `/var/log/nginx/science-lab-ai-access.log` as `nginx:root` mode 0640. Install the Nginx log-format include and modified exact AI location, then run `nginx -t`; install the traffic unit and run `systemd-analyze verify` before `daemon-reload`.
 
 Expected: both validators exit 0, the dedicated log format contains no prohibited identifying variables, and no service has been restarted yet.
 
-- [ ] **Step 5: Switch API/static releases and reload logging safely**
+- [x] **Step 5: Switch API/static releases and reload logging safely**
 
 Atomically point `/opt/science-lab-api-current` and `/var/www/science-lab-current` to the new commit-based releases, restart `science-lab-api`, verify local health, then reload Nginx so new workers begin the dedicated AI log. Keep the previous release links and configuration backups intact.
 
 Expected: API service active, local/public health return `{"ok":true}`, homepage serves `v0.8.10`, and Nginx master remains running with new workers.
 
-- [ ] **Step 6: Generate and validate the first AI-aware report**
+- [x] **Step 6: Generate and validate the first AI-aware report**
 
 Install the seven traffic runtime files as a group, start `science-lab-traffic.service`, and inspect only service status plus sanitized summary output. Use one short real built-in AI request to verify HTTP 200/SSE `[DONE]`, then inspect the dedicated AI log structurally without printing the line: validate its JSON keys/types and assert prohibited fields/known prompt text are absent. Run the traffic service again and verify the private page contains the AI section and the new request count.
 
 Expected: AI request is absent from `science-lab-access.log`, present once in `science-lab-ai-access.log`, no IP/User-Agent/request text is stored in that line, private page remains Basic-Auth protected and all aggregate counts are consistent.
 
-- [ ] **Step 7: Verify rotation, timer, public regressions and rollback readiness**
+- [x] **Step 7: Verify rotation, timer, public regressions and rollback readiness**
 
 Use `logrotate --debug /etc/logrotate.d/nginx` without forcing rotation. Verify the traffic timer next run, public homepage/security headers, API health, AI malformed-request behavior, old `/api/` 503 behavior, private unauthorized 401/authorized 200 behavior and current file modes. Compare deployed hashes to Git.
 
 Expected: all checks pass, no secret is printed, no unrelated service/config changed, and the backup plus previous release links can restore the prior state.
 
-- [ ] **Step 8: Roll back on any failed production check**
+- [x] **Step 8: Roll back on any failed production check**
 
 If a production validation fails, restore the exact backed-up Nginx/unit/runtime files, atomically restore both previous release links, run `nginx -t`, reload Nginx, restart only the affected API/traffic service, and verify old homepage/API/private dashboard behavior. Preserve the anonymous AI log outside the Web root for audit; do not delete history or the prior report.
 
-- [ ] **Step 9: Record final evidence**
+- [x] **Step 9: Record final evidence**
 
 Update this plan with the commit SHA, production release paths, backup directory, activation timestamp, sanitized test results and rollback targets. Run `git diff --check`, commit only that evidence update after user-visible deployment succeeds, push it, and report the final URLs and privacy boundary.
+
+#### Production evidence — 2026-09-10
+
+- Feature commit: `a9b2f5337bc7b030bc77607a96b99b7159bd7929`, pushed to `origin/main` before deployment.
+- Active releases: API `/opt/science-lab-api-releases/20260910-a9b2f53b`; static `/var/www/science-lab-releases/20260910-a9b2f53b`.
+- Rollback releases: API `/opt/science-lab-api-releases/20260909-82332b2e5ea6`; static `/var/www/science-lab-releases/20260909-82332b2e5ea6`; pre-deploy traffic runtime `/opt/science-lab-traffic.predeploy-20260910-a9b2f53b`.
+- Root-only backup: `/var/tmp/science-lab-ai-analytics.oOCsIi` (mode 0700). It contains the previous release targets, Nginx site/main and logrotate configuration, traffic unit/runtime, history and generated report.
+- AI collection activation: `2026-09-10T01:03:25Z` (`2026-09-10 09:03:25` Asia/Shanghai). `/etc/science-lab-traffic.env` is root:root 0600; the anonymous log is nginx:root 0640.
+- Inactive validation: uploaded API/static/traffic archive SHA-256 values matched locally and remotely; `nginx -t` and `systemd-analyze verify` passed before reload; the API service user could read the new release and Node syntax/JSON checks passed.
+- A first switch attempt hit the expected service-readiness race because the health request ran before Node bound port 8970. The automatic rollback restored both old releases, the old Nginx config and the old traffic unit; local health then returned `{"ok":true}`. The retry used bounded condition polling and completed successfully.
+- Runtime validation: API and Nginx are active; public health/home/manifest returned 200; the shell serves `v0.8.10`; legacy `/api/` remains 503; private traffic without credentials remains 401 with the unchanged Basic-Auth location. An authenticated 200 was not repeated because no plaintext dashboard credential was read or reset; the unchanged location source and generated page file were verified directly.
+- AI validation: one short built-in request returned HTTP 200 with SSE `[DONE]`; a malformed request returned 400. Both were absent from the normal log and present in the anonymous log. All anonymous records had exactly the seven approved keys; prompt text, API key material, IP, User-Agent and deployment markers were absent. Internal metric response headers were not exposed publicly.
+- Aggregation validation: live data correctly remained at the completed 08:00 window; an isolated next-window publish counted two AI requests, one HTTP 2xx and one invalid 400 without changing the live report. The production timer was active with its next run at 10:00 Asia/Shanghai.
+- Retention and integrity: `logrotate --debug` included `science-lab-ai-access.log`; history migrated to schema 2; 20 committed deployed files plus the reviewed Nginx site candidate matched SHA-256; `origin/main` matched local HEAD.
