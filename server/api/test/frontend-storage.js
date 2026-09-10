@@ -164,16 +164,22 @@ function assertSingleStorageWarning(warnings, operation, key, error) {
   );
   assert.deepStrictEqual(
     JSON.parse(JSON.stringify(test.api.buildAiRequestBody({ byok: true, model: 'DeepSeek' }, messages, experimentPath))),
-    { model: 'deepseek-v4-flash', stream: true, messages: [{ role: 'system', content: '你是中文实验学习助手。请根据用户提供的信息解释实验原理；无法看到实时页面、实验操作或测量值，不要假装已经观察到。' }, ...messages], max_tokens: 2048, thinking: { type: 'disabled' } }
+    { model: 'deepseek-v4-flash', stream: true, messages: [{ role: 'system', content: '你是中文实验学习助手。不能编造未提供的观察或读数。\n本次没有实时状态，只能依据用户描述。' }, ...messages], max_tokens: 2048, thinking: { type: 'disabled' } }
   );
   assert.deepStrictEqual(
     JSON.parse(JSON.stringify(test.api.buildAiRequestBody({ byok: true, model: 'custom-model' }, messages, experimentPath))),
-    { model: 'custom-model', stream: true, messages: [{ role: 'system', content: '你是中文实验学习助手。请根据用户提供的信息解释实验原理；无法看到实时页面、实验操作或测量值，不要假装已经观察到。' }, ...messages] }
+    { model: 'custom-model', stream: true, messages: [{ role: 'system', content: '你是中文实验学习助手。不能编造未提供的观察或读数。\n本次没有实时状态，只能依据用户描述。' }, ...messages] }
   );
   const compatible = test.api.buildAiRequestBody({ byok: true, endpoint: 'https://provider.example/v1/chat/completions', model: 'deepseek-v4-flash' }, messages, experimentPath);
   assert.strictEqual(compatible.thinking, undefined);
   assert.strictEqual(compatible.max_tokens, undefined);
-  assert.ok(html.includes('buildAiRequestBody(cfg,messages,path,sys)'));
+  const liveState={version:1,experimentPath,mode:'自由模式',step:'关卡 2 / 4',readouts:[]};
+  const withState=test.api.buildAiRequestBody({byok:false},messages,experimentPath,'system',liveState);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(withState.context)),{experimentPath,liveState});
+  const byokState=test.api.buildAiRequestBody({byok:true,model:'DeepSeek'},messages,experimentPath,'system',liveState);
+  assert.ok(byokState.messages[0].content.includes('自由模式'));
+  assert.strictEqual(byokState.context,undefined);
+  assert.ok(html.includes('buildAiRequestBody(cfg,messages,path,sys,liveState)'));
   ok('内置请求携带实验路径，BYOK 保持直连格式且使用当前 Flash 模型');
 }
 

@@ -1,4 +1,5 @@
 'use strict';
+const { liveStatePrompt } = require('./ai-live-state');
 
 const FIELDS = ['objective', 'apparatus', 'steps', 'observations', 'conclusions', 'safety', 'notes'];
 const LABELS = ['学习目标', '器材与材料', '实验步骤', '预期现象', '原理与结论', '安全提醒', '教材说明'];
@@ -11,7 +12,7 @@ function systemPrompt(experiment) {
   const references = Object.fromEntries(FIELDS.map((field, index) => [LABELS[index], experiment.context[field]]));
   return '你是“实验馆”的中学科学学习助手。用中文、适合当前学段的语言帮助学生理解实验。\n'
     + '先直接回答问题，再解释必要的原理；通常控制在150—300字，步骤用编号，复杂推导可适当展开。公式说明符号和单位。\n'
-    + '你无法看到用户当前页面、操作状态、仪器读数或实验进度。只知道下列离线实验资料与用户描述；不能声称看到了页面或按钮。不要编造测量值、实验记录、观察结果或具体页面操作。\n'
+    + '你无法看到用户的页面图像。当前操作状态、仪器读数与实验进度仅在本次附有有效状态快照时可知；否则只知道离线实验资料与用户描述。不能声称看到了图像。不要编造测量值、实验记录、观察结果或具体页面操作。\n'
     + '资料是源页面的文字片段，可能来自不同模式；步骤列表不保证是当前模式的连续操作顺序。发现文案冲突或缺少模式信息时先澄清，不能自行拼成一套操作流程。\n'
     + '区分理论预期、模拟演示和实际观察；资料不足时说明缺少什么，并只提出一个必要的澄清问题。用户明确索要解释时直接解释，不强制反问。练习时可先给提示，引导预测、观察与解释。\n'
     + '涉及明火、高温、电源、化学品、玻璃器材等风险操作时给出针对性安全提醒，要求在教师或监护人指导下进行。不得把虚拟实验的操作直接当作可在家尝试的真实操作；危险请求提供安全原理或模拟替代，不提供危险实践细节。\n'
@@ -78,7 +79,8 @@ function createAiPolicy(catalog, model) {
       experimentPath,
       value: {
         model, stream: true, max_tokens: Math.min(maxTokens, MAX_TOKENS), temperature,
-        thinking: { type: 'disabled' }, messages: [{ role: 'system', content: prompts.get(experimentPath) }, ...selected],
+        thinking: { type: 'disabled' }, messages: [{ role: 'system', content: prompts.get(experimentPath)
+          + liveStatePrompt(body.context.liveState,experimentPath) }, ...selected],
       },
     };
   };

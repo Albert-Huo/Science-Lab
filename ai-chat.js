@@ -3,6 +3,46 @@
   else root.ScienceAiChat=factory();
 })(typeof globalThis!=='undefined'?globalThis:this,function(){
   'use strict';
+  function requestSnapshot(view,frame,path,signal){
+    if(!/^physics-middle\/初中物理实验\d+(?:-\d+)?\.html$/.test(path)||!frame||!frame.contentWindow||signal?.aborted) return Promise.resolve(null);
+    const target=frame.contentWindow,origin=new URL(frame.src,view.location.href).origin;
+    if(origin==='null') return Promise.resolve(null);
+    const channel='science-lab.experiment-state.v1',requestId=view.crypto.randomUUID();
+    return new Promise(resolve=>{
+      let timer;
+      function finish(state){
+        view.clearTimeout(timer);view.removeEventListener('message',receive);
+        frame.removeEventListener('load',cancel);signal?.removeEventListener('abort',cancel);
+        resolve(state);
+      }
+      function cancel(){finish(null);}
+      function receive(event){
+        const data=event.data;
+        if(event.source!==target||event.origin!==origin||!data||data.channel!==channel||
+          data.type!=='snapshot'||data.requestId!==requestId) return;
+        const raw=data.state;
+        if(!raw||raw.version!==1||raw.experimentPath!==path||!Number.isSafeInteger(raw.capturedAt)||
+          Math.abs(Date.now()-raw.capturedAt)>5000) return;
+        const state={version:1,experimentPath:path,capturedAt:raw.capturedAt};
+        for(const [key,max] of Object.entries({mode:100,status:160,step:80,task:240,hint:240})){
+          if(typeof raw[key]!=='string'||raw[key].length>max) return;
+          state[key]=raw[key];
+        }
+        if(!state.mode||!state.step||!Array.isArray(raw.readouts)||raw.readouts.length>16) return;
+        state.readouts=[];
+        for(const row of raw.readouts){
+          if(!row||typeof row.label!=='string'||row.label.length>40||typeof row.value!=='string'||row.value.length>100) return;
+          state.readouts.push({label:row.label,value:row.value});
+        }
+        finish(state);
+      }
+      view.addEventListener('message',receive);frame.addEventListener('load',cancel);
+      signal?.addEventListener('abort',cancel);
+      timer=view.setTimeout(cancel,800);
+      try{target.postMessage({channel,type:'snapshot-request',requestId,experimentPath:path},origin);}
+      catch(error){console.warn('实验状态通信不可用：'+error.name);finish(null);}
+    });
+  }
   function selectMessages(messages){
     const current=messages[messages.length-1];
     if(!current||current.role!=='user'||typeof current.content!=='string'||!current.content.trim()) throw new Error('请输入问题');
@@ -98,5 +138,5 @@
     const scope={session_day:'会话额度',ip_day:'网络额度',global_day:'全站额度',ip_minute:'当前网络每分钟',concurrency:'同时请求'}[headers.get('X-AI-Quota-Scope')]||'当前';
     return scope+'剩余 '+remaining+' / '+limit+(reset>0?' · '+new Date(reset*1000).toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})+' 重置':'');
   }
-  return {selectMessages,validateEndpoint,createSseParser,responseError,quotaText};
+  return {requestSnapshot,selectMessages,validateEndpoint,createSseParser,responseError,quotaText};
 });
