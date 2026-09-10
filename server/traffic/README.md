@@ -56,9 +56,9 @@ journalctl -u science-lab-traffic.service -n 20 --no-pager
 - 原始日志、历史状态和凭据均不能放入Web目录或Git。统计页面自身访问不写访问日志，公开App缓存也不拦截这两个私有页面路径。
 - 页面与下载文件共享同一内嵌快照，使用脚本散列限制可执行脚本，响应设置no-store、noindex、nosniff、no-referrer和禁止嵌入。
 
-## AI 观测升级（待发布配置）
+## AI 观测升级与配置
 
-此次代码修改不自动改生产配置。新能力沿用现有云服务器与额度Redis，不增加收费监控服务；也不读取供应商账单。
+2026-09-10已按用户授权发布，见[发布验收记录](../../docs/plans/2026-09-10-traffic-production-deployment.md)。新能力沿用现有云服务器与额度Redis，不增加收费监控服务；也不读取供应商账单。
 
 新增 Node `ai-events.js`，由 `AI_EVENT_LOG_PATH` 启用。记录每个到达 Node 的请求最终结果、耗时与匿名长度计数；每请求最多一条。服务端看到有效 SSE `[DONE]` 才记 `completed`，不保证浏览器送达或客户端业务校验通过。取消、超时、上游错误、缺少模型配置、Redis故障分别统计。首内容耗时从请求开始到首个非空正文片段，排除仅响应头和心跳。预响应头取消的HTTP状态为空，不虚构499。
 

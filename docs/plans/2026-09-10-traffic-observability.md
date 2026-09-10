@@ -2,6 +2,8 @@
 
 Approved scope: local fixes only; no commit, push, production changes, paid requests, or new personal data.
 
+Subsequent explicit approval authorized commit/push/deployment. Production evidence and the authenticated-Redis compatibility fix are recorded in [deployment acceptance](2026-09-10-traffic-production-deployment.md).
+
 ## Plan
 
 - [x] Backend: `server/api/ai-events.js`, `server/api/server.js`, focused tests. Emit one bounded anonymous terminal event, distinguish SSE completion, cancellation, timeout, rejection, and service failure.
