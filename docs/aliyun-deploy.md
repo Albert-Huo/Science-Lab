@@ -208,7 +208,7 @@ trap - EXIT
 
 ## 4. nginx：一个 server 同时托管页面与接口
 
-下面的 `limit_req_zone` 必须放在 nginx 的 `http {}` 上下文中、所有 `server {}` 之外；不要把它放进站点的 `server` 块。它只提供匿名接口的短时突发保护，不是认证机制，也不是全局费用上限。Node 端仍须保留默认每 IP 每分钟 10 次、每 24 小时 20 次的两级限流。
+下面的 `limit_req_zone` 和 `server/traffic/nginx-ai-log-format.conf` 中的 `log_format` 都必须放在 nginx 的 `http {}` 上下文中、所有 `server {}` 之外；不要把它们放进站点的 `server` 块。限流只提供匿名接口的短时突发保护，不是认证机制，也不是全局费用上限。Node 端仍须保留默认每 IP 每分钟 10 次、每 24 小时 20 次的两级限流。
 
 示例中的 `access_log ... main` 复用现网 `nginx.conf` 已定义的 `main` 格式。新环境须先核对格式定义，不能重复定义同名格式；私有报告要求 combined 格式，可在末尾附加 `"$http_x_forwarded_for"`。不要直接覆盖现网站点配置中的证书、ACME 或其他已有规则。
 
@@ -229,6 +229,8 @@ server {
 
     # 匿名 AI 接口的精确突发保护；请求转发到 Node 的 /ai/chat/completions。
     location = /api/ai/chat/completions {
+        # location 级日志会替代 server 级继承；这里只写不含 IP/UA/正文的匿名 AI JSON。
+        access_log /var/log/nginx/science-lab-ai-access.log science_lab_ai;
         limit_req zone=science_lab_ai burst=3 nodelay;
         limit_req_status 429;
 
@@ -243,6 +245,9 @@ server {
         # DeepSeek 使用 SSE；关闭缓冲和缓存，允许长响应。
         proxy_buffering off;
         proxy_cache off;
+        proxy_hide_header X-Science-Lab-AI-Experiment;
+        proxy_hide_header X-Science-Lab-AI-Messages;
+        proxy_hide_header X-Science-Lab-AI-Input-Chars;
         proxy_read_timeout 300s;
     }
 
@@ -296,6 +301,8 @@ server {                                          # 80 跳 443
 }
 ```
 
+AI 精确 location 不得同时写入 `science-lab-access.log`：上面的 location 级 `access_log` 会覆盖 server 级继承，使 AI 请求不与普通日志中的 IP、浏览器和来源直接关联。统计生成器会从匿名 AI 日志把请求量及 4xx/5xx 数字加回私有看板的总体汇总。
+
 ```bash
 sudo nginx -t && sudo systemctl reload nginx
 ```
@@ -323,6 +330,18 @@ HTTP 和 HTTPS 两个实验馆 `server` 块都必须保留独立 `access_log`，
 `tools/traffic-report.cjs` 仅处理 `science-lab-access.log`、日期后缀轮转文件及其 `.gz`，不会读取旧 `access.log`。它的按需本地快照功能继续保留。
 
 2026-09-07起另有受密码保护的 `/admin/traffic/` 在线看板，使用 `tools/traffic-dashboard.cjs`，每个北京时间双数整点由服务器 `science-lab-traffic.timer` 生成滚动24小时报告。站点配置在 `http` 上下文增加 `limit_req_zone $binary_remote_addr zone=science_lab_traffic:1m rate=2r/s;`，仅在HTTPS `server` 中包含 `/opt/science-lab-traffic/nginx-locations.conf`。后续替换站点配置时须保留这两处及原独立日志配置。
+
+AI统计启用时，将 `server/traffic/nginx-ai-log-format.conf` 安装到经 `nginx -T` 核实位于 `http` 上下文的 include 目录；创建 `/var/log/nginx/science-lab-ai-access.log` 为 `nginx:root`、0640，并确认现有 `/var/log/nginx/*log` 轮转规则覆盖它。AI精确location只写这份匿名日志，不再继承含IP和浏览器的普通日志。
+
+在reload Nginx前立即记录UTC时间，并原子写入root:root、0600的 `/etc/science-lab-traffic.env`：
+
+```ini
+AI_COLLECTION_START=2026-09-09T12:00:00Z
+```
+
+上面的时间只是格式示例，生产值必须是本次实际启用时刻，不能照抄。统计服务通过 `--ai-log-dir /var/log/nginx --manifest-file /var/www/science-lab-current/manifest.json --ai-collection-start ${AI_COLLECTION_START}` 读取；缺失或空值会拒绝生成新报告并保留旧页面。首次成功生成会把历史schema 1迁移为schema 2，旧日期的AI字段标为未采集。7个统计运行文件必须成组备份、安装和回退，其中新增 `traffic-ai-report.cjs` 与 `traffic-dashboard-ai.css`。
+
+私有页面只展示内置AI的匿名汇总；BYOK不在统计范围。HTTP 2xx不是完整SSE回答证明，耗时包含传输，响应字节不是token。专用日志及页面均不保存问题或回答正文、API Key、IP、浏览器标识、来源或用户身份；当前窗口实验排行不进入400天历史。
 
 报告目录、密码散列、每日归档与运行代码相互分离。只有报告目录的index.html可以通过认证访问，原始日志和状态文件均不对外映射。维护流程及具体文件见 `server/traffic/README.md`。App静态release和API未随本次统计功能重新部署。
 

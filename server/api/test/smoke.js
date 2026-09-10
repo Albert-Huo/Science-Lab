@@ -12,6 +12,7 @@ process.env.DEEPSEEK_MODEL = 'test-deepseek-flash-model';
 delete process.env.DEEPSEEK_API_KEY;
 
 const assert = require('assert');
+const crypto = require('node:crypto');
 const nativeFetch = global.fetch.bind(globalThis);
 const app = require('../server');
 const AI_MODEL = process.env.DEEPSEEK_MODEL;
@@ -48,7 +49,8 @@ function aiRequest(body, ip) {
     global.fetch = async () => { upstreamCalled = true; throw new Error('不应调用上游'); };
     r = await aiRequest({ model: AI_MODEL, messages: 'invalid' }, '203.0.113.2');
     j = await r.json();
-    assert.strictEqual(r.status, 400); assert.strictEqual(j.error, 'invalid_messages'); assert.strictEqual(upstreamCalled, false); ok('AI 非法 messages 400');
+    assert.strictEqual(r.status, 400); assert.strictEqual(j.error, 'invalid_messages'); assert.strictEqual(upstreamCalled, false);
+    assert.strictEqual(r.headers.get('x-science-lab-ai-messages'), null); ok('AI 非法 messages 400');
 
     // AI proxy: only approved fields reach DeepSeek, while SSE is streamed back
     let captured;
@@ -59,19 +61,31 @@ function aiRequest(body, ip) {
         headers: { 'Content-Type': 'text/event-stream' },
       });
     };
+    const experimentPath = 'physics-middle/初中物理实验1.html';
     r = await aiRequest({
       stream: false, max_tokens: 9999, temperature: 1.5,
-      messages: [{ role: 'user', content: '解释实验' }], ignored: 'do-not-forward',
+      messages: [{ role: 'user', content: '解释实验' }], context: { experimentPath }, ignored: 'do-not-forward',
     }, '203.0.113.3');
     const sse = await r.text();
     assert.strictEqual(r.status, 200); assert.match(sse, /答案/);
+    assert.strictEqual(r.headers.get('x-science-lab-ai-experiment'), crypto.createHash('sha256').update(experimentPath).digest('hex'));
+    assert.strictEqual(r.headers.get('x-science-lab-ai-messages'), '1');
+    assert.strictEqual(r.headers.get('x-science-lab-ai-input-chars'), String('解释实验'.length));
     assert.strictEqual(captured.url, 'https://api.deepseek.com/chat/completions');
     assert.deepStrictEqual(captured.body, {
       model: AI_MODEL, stream: true, max_tokens: 2048, temperature: 1.5,
       thinking: { type: 'disabled' },
       messages: [{ role: 'user', content: '解释实验' }],
     });
+    assert.strictEqual(Object.hasOwn(captured.body, 'context'), false);
     assert.strictEqual(captured.opts.headers.Authorization, 'Bearer test-deepseek-key'); ok('AI 字段收紧 + SSE 透传');
+
+    r = await aiRequest({ messages: [{ role: 'user', content: '路径过长' }], context: { experimentPath: 'x'.repeat(301) } }, '203.0.113.30');
+    await r.text();
+    assert.strictEqual(r.status, 200);
+    assert.strictEqual(r.headers.get('x-science-lab-ai-experiment') || '', '');
+    assert.strictEqual(r.headers.get('x-science-lab-ai-messages'), '1');
+    ok('AI 统计拒绝过长实验路径且保留数值元数据');
 
     // AI proxy: stalled upstream calls are aborted by a total timeout
     let timeoutSignal;

@@ -139,6 +139,8 @@ git add manifest.json && git commit -m "chore: 更新实验清单" && git push
 
 默认使用部署在本站 `/api/ai/chat/completions` 的内置 AI 代理，学习者无需填写接口、模型或 API Key。界面统一显示 `DeepSeek`；站点管理员在服务端 `.env` 通过 `DEEPSEEK_MODEL` 配置实际模型 ID，并通过 `DEEPSEEK_API_KEY` 配置密钥，浏览器不会接触服务端 Key。
 
+受密码保护的访问观察台同时展示内置 AI 请求的匿名汇总，包括请求状态、耗时、上下文长度、响应流量和当前 24 小时热门实验。不保存问题或回答正文，也不记录 AI 请求的 IP、浏览器标识或用户身份；BYOK 由浏览器直连第三方，不在统计范围内。
+
 为生成回答，当前实验信息、最近对话和本次问题会经本站代理发送给 DeepSeek；站点不做账号绑定或云端会话保存，但模型服务商仍会按其服务条款处理请求。请勿提交姓名、联系方式等敏感个人信息。
 
 需要使用其他 OpenAI 兼容服务时，可在聊天框左下 ⚙ 开启“使用自己的 API Key”，再填写 endpoint、model 和 Key。BYOK 配置只保存在当前浏览器；共用设备请勿填写个人 Key。

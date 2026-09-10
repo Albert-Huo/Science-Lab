@@ -107,9 +107,9 @@ async function summarizeDirectory(directory, options) {
   return result.finish(files);
 }
 
-async function visitLogDirectory(directory, visit) {
-  const names = fs.readdirSync(directory).filter(name => LOG_NAME.test(name)).sort();
-  if (!names.length) throw new Error('未找到实验馆独立日志；不会使用旧混合日志代替。');
+async function visitMatchingLogs(directory, pattern, missingMessage, visit) {
+  const names = fs.readdirSync(directory).filter(name => pattern.test(name)).sort();
+  if (!names.length) throw new Error(missingMessage);
   const files = [];
   for (const name of names) {
     const file = path.join(directory, name), stat = fs.lstatSync(file);
@@ -128,6 +128,10 @@ async function visitLogDirectory(directory, visit) {
     } finally { reader.close(); source.destroy(); if (input !== source) input.destroy(); }
   }
   return files;
+}
+
+function visitLogDirectory(directory, visit) {
+  return visitMatchingLogs(directory, LOG_NAME, '未找到实验馆独立日志；不会使用旧混合日志代替。', visit);
 }
 
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -185,5 +189,5 @@ async function main(args) {
   console.log('入口请求 '+data.totals.entryRequests+'；访客估算 '+data.totals.visitorEstimate+'；解析失败 '+data.totals.invalid+'。');
 }
 
-module.exports = { summarize, summarizeDirectory, renderHtml, parseRecord, visitLogDirectory };
+module.exports = { summarize, summarizeDirectory, renderHtml, parseRecord, visitLogDirectory, visitMatchingLogs };
 if (require.main === module || module.id === '[stdin]') main(process.argv.slice(2)).catch(error=>{console.error('生成私有统计失败：'+error.message);process.exitCode=1;});

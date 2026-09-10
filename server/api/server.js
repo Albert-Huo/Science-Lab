@@ -12,6 +12,7 @@ const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
+const { createHash } = require('node:crypto');
 const { Readable } = require('stream');
 const { pipeline } = require('stream/promises');
 const db = AI_ONLY ? null : require('./db');
@@ -153,11 +154,24 @@ function sanitizeAiBody(body) {
   };
 }
 
+function setAiMetricHeaders(res, messages, context) {
+  const rawPath = context && typeof context.experimentPath === 'string' ? context.experimentPath : '';
+  const experiment = rawPath && rawPath.length <= 300
+    ? createHash('sha256').update(rawPath).digest('hex')
+    : '';
+  res.set({
+    'X-Science-Lab-AI-Experiment': experiment,
+    'X-Science-Lab-AI-Messages': String(messages.length),
+    'X-Science-Lab-AI-Input-Chars': String(messages.reduce((sum, item) => sum + item.content.length, 0)),
+  });
+}
+
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
 app.post('/ai/chat/completions', aiMinuteLimiter, aiDayLimiter, async (req, res) => {
   const parsed = sanitizeAiBody(req.body);
   if (parsed.error) return res.status(400).json({ error: parsed.error });
+  setAiMetricHeaders(res, parsed.value.messages, req.body && req.body.context);
 
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) {

@@ -52,6 +52,7 @@ const CURRENT_RELEASE_SWITCH =
 const CANONICAL_AI_PROXY = 'proxy_pass http://127.0.0.1:8970/ai/chat/completions;';
 const AI_RATE_ZONE = 'limit_req_zone $binary_remote_addr zone=science_lab_ai:10m rate=10r/m;';
 const CANONICAL_AI_DIRECTIVES = [
+  'access_log /var/log/nginx/science-lab-ai-access.log science_lab_ai;',
   'limit_req zone=science_lab_ai burst=3 nodelay;',
   'limit_req_status 429;',
   CANONICAL_AI_PROXY,
@@ -63,6 +64,9 @@ const CANONICAL_AI_DIRECTIVES = [
   'proxy_set_header X-Forwarded-Proto $scheme;',
   'proxy_buffering off;',
   'proxy_cache off;',
+  'proxy_hide_header X-Science-Lab-AI-Experiment;',
+  'proxy_hide_header X-Science-Lab-AI-Messages;',
+  'proxy_hide_header X-Science-Lab-AI-Input-Chars;',
   'proxy_read_timeout 300s;'
 ];
 
@@ -231,7 +235,26 @@ function assertActiveRateZonePlacement(nginxBlock) {
   const serviceWorker = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
   const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
   const deployGuide = fs.readFileSync(path.join(root, 'docs/aliyun-deploy.md'), 'utf8');
+  const aiLogFormat = fs.readFileSync(path.join(root, 'server/traffic/nginx-ai-log-format.conf'), 'utf8');
+  const trafficService = fs.readFileSync(path.join(root, 'server/traffic/science-lab-traffic.service'), 'utf8');
+  const trafficReadme = fs.readFileSync(path.join(root, 'server/traffic/README.md'), 'utf8');
   const packageJson = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../package.json'), 'utf8'));
+  assert.match(aiLogFormat, /log_format science_lab_ai escape=json/);
+  assert.match(aiLogFormat, /\$time_iso8601/);
+  assert.match(aiLogFormat, /\$request_time/);
+  assert.match(aiLogFormat, /\$body_bytes_sent/);
+  assert.match(aiLogFormat, /\$upstream_http_x_science_lab_ai_experiment/);
+  assert.doesNotMatch(aiLogFormat, /\$remote_addr|\$http_user_agent|\$http_referer|\$request_body|authorization/i);
+  assert.ok(trafficService.includes('--ai-log-dir /var/log/nginx'));
+  assert.ok(trafficService.includes('--manifest-file /var/www/science-lab-current/manifest.json'));
+  assert.ok(trafficService.includes('--ai-collection-start ${AI_COLLECTION_START}'));
+  assert.ok(deployGuide.includes('AI 精确 location 不得同时写入 `science-lab-access.log`'));
+  assert.ok(deployGuide.includes('AI_COLLECTION_START'));
+  assert.ok(readme.includes('内置 AI 请求的匿名汇总'));
+  assert.ok(trafficReadme.includes('science-lab-ai-access.log'));
+  assert.ok(trafficReadme.includes('traffic-dashboard-ai.css'));
+  assert.ok(trafficReadme.includes('不保存问题或回答正文'));
+  assert.ok(trafficReadme.includes('BYOK'));
   assert.match(
     serviceWorker,
     /const VERSION = 'v\d+\.\d+\.\d+';/,

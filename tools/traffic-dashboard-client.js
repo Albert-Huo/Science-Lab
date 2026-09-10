@@ -1,22 +1,28 @@
 (() => {
-  const labels = { entryRequests: '入口请求', visitorEstimate: '访客估算', requests: '全部请求' };
+  const labels = { entryRequests: '入口请求', visitorEstimate: '访客估算', requests: '全部请求',
+    'ai.requests': 'AI 请求', 'ai.httpSuccesses': 'AI HTTP 2xx' };
   let metric = 'entryRequests', selected = null, checking = false;
   const format = value => new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(value));
+  const valueOf = (hour, key) => key.startsWith('ai.') ? hour.ai[key.slice(3)] : hour[key];
+  const coverageOf = (hour, key) => key.startsWith('ai.') ? hour.ai.coverage : hour.coverage;
   const hours = [...document.querySelectorAll('[data-hour]')];
   function detail(index) {
-    const hour = trafficData.hours[index];
+    const hour = trafficData.hours[index], coverage = coverageOf(hour, metric);
     document.querySelector('#chart-detail').textContent = format(hour.start) + ' — ' + format(hour.end).slice(-5) + ' · ' +
-      (hour.coverage === 'unavailable' ? '尚未开始采集' : labels[metric] + ' ' + hour[metric].toLocaleString('zh-CN') + (hour.coverage === 'partial' ? '（部分采集）' : ''));
+      (coverage === 'unavailable' ? '尚未开始采集' : labels[metric] + ' ' + valueOf(hour, metric).toLocaleString('zh-CN') + (coverage === 'partial' ? '（部分采集）' : ''));
   }
   function paint() {
-    const max = Math.max(1, ...trafficData.hours.map(hour => hour[metric]));
+    const values = trafficData.hours.map(hour => valueOf(hour, metric));
+    const max = Math.max(1, ...values);
     hours.forEach((element, index) => {
-      const hour = trafficData.hours[index];
-      element.querySelector('.fill').style.height = hour[metric] / max * 100 + '%';
-      element.setAttribute('aria-label', format(hour.start) + '，' + (hour.coverage === 'unavailable' ? '未采集' : labels[metric] + ' ' + hour[metric]));
+      const hour = trafficData.hours[index], coverage = coverageOf(hour, metric), value = values[index];
+      element.querySelector('.fill').style.height = value / max * 100 + '%';
+      element.classList.toggle('unavailable', coverage === 'unavailable');
+      element.setAttribute('aria-label', format(hour.start) + '，' + (coverage === 'unavailable' ? '未采集' : labels[metric] + ' ' + value));
     });
     document.querySelector('#metric-label').textContent = labels[metric];
-    document.querySelector('#chart-scale').textContent = '最高 ' + Math.max(...trafficData.hours.map(hour => hour[metric])).toLocaleString('zh-CN');
+    document.querySelector('#chart-scale').textContent = '最高 ' + Math.max(...values).toLocaleString('zh-CN');
+    document.querySelector('#metric-note').textContent = metric === 'visitorEstimate' ? '小时访客估算不可相加为全天人数' : metric.startsWith('ai.') ? 'AI 指标只包含内置模式' : '时间区间含开始、不含结束';
     if (selected !== null) detail(selected);
   }
   for (const button of document.querySelectorAll('[data-metric]')) button.addEventListener('click', () => {

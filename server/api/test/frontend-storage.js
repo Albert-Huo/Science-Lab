@@ -155,19 +155,21 @@ function assertSingleStorageWarning(warnings, operation, key, error) {
   assert.strictEqual(test.api.aiCfg().model, 'DeepSeek');
   assert.strictEqual(typeof test.api.buildAiRequestBody, 'function');
   const messages = [{ role: 'user', content: '测试' }];
+  const experimentPath = 'physics-middle/初中物理实验1.html';
   assert.deepStrictEqual(
-    JSON.parse(JSON.stringify(test.api.buildAiRequestBody({ byok: false, model: 'DeepSeek' }, messages))),
-    { stream: true, messages }
+    JSON.parse(JSON.stringify(test.api.buildAiRequestBody({ byok: false, model: 'DeepSeek' }, messages, experimentPath))),
+    { stream: true, messages, context: { experimentPath } }
   );
   assert.deepStrictEqual(
-    JSON.parse(JSON.stringify(test.api.buildAiRequestBody({ byok: true, model: 'DeepSeek' }, messages))),
+    JSON.parse(JSON.stringify(test.api.buildAiRequestBody({ byok: true, model: 'DeepSeek' }, messages, experimentPath))),
     { model: 'deepseek-v4-flash', stream: true, messages }
   );
   assert.deepStrictEqual(
-    JSON.parse(JSON.stringify(test.api.buildAiRequestBody({ byok: true, model: 'custom-model' }, messages))),
+    JSON.parse(JSON.stringify(test.api.buildAiRequestBody({ byok: true, model: 'custom-model' }, messages, experimentPath))),
     { model: 'custom-model', stream: true, messages }
   );
-  ok('界面使用稳定模型名，发送时解析为当前 Flash 模型');
+  assert.ok(html.includes("buildAiRequestBody(cfg,[{role:'system',content:sys},...toAiMessages(conversation)],path)"));
+  ok('内置请求携带实验路径，BYOK 保持直连格式且使用当前 Flash 模型');
 }
 
 {
