@@ -1,0 +1,33 @@
+[Unit]
+Description=Sample Science Lab AI quota read-only
+After=network.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+EnvironmentFile=/etc/science-lab-api.env
+Environment=SCIENCE_LAB_API_DIR=/opt/science-lab-api-current
+ExecStart=/opt/science-lab-runtime/node-v22.23.2-linux-x64/bin/node /opt/science-lab-traffic/ai-quota-snapshot.cjs --state-dir /var/lib/science-lab-traffic
+TimeoutStartSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+# The collector needs the host loopback Redis; the HTML report remains network-isolated.
+PrivateNetwork=false
+IPAddressDeny=any
+IPAddressAllow=localhost
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/science-lab-traffic/www
+CapabilityBoundingSet=
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+MemoryMax=128M
+TasksMax=32
+Nice=10

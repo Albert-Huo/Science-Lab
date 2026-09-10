@@ -27,6 +27,76 @@ const data = () => ({ ...summary(
   [line('07/Sep/2026:01:00:00 +0800'), line('07/Sep/2026:23:59:59 +0800')],
   [aiLine('2026-09-07T01:00:00+08:00')]
 ), history: [] });
+const terminal = (values = {}) => JSON.stringify({ version: 1, metricVersion: 2,
+  time: '2026-09-07T01:00:00.000Z', outcome: 'completed', scope: '', experiment: '', status: 200,
+  messages: 2, inputChars: 50, promptChars: 20, conversationChars: 30, durationMs: 1000, firstTokenMs: 100, ...values });
+const eventOptions = { aiEventCollectionStart: '2026-09-07T00:00:00+08:00', aiEventLogDir: '/synthetic-events' };
+
+test('终态独立于 HTTP 计数并单独标记启用覆盖', () => {
+  const result = rollingSummary([], { now, collectionStart: started, aiCollectionStart: started,
+    ...eventOptions, aiEventLines: [terminal(), terminal({ outcome: 'client_aborted', firstTokenMs: null }),
+      terminal({ outcome: 'rate_limited', scope: 'global_day', status: 429, promptChars: null, conversationChars: null, firstTokenMs: null })] });
+  assert.equal(result.totals.requests, 0);
+  assert.equal(result.totals.ai.requests, 0);
+  const observation = result.totals.ai.observation;
+  assert.equal(observation.coverage, 'recorded');
+  assert.equal(observation.requests, 3);
+  assert.equal(observation.outcomes.completed, 1);
+  assert.equal(observation.outcomes.client_aborted, 1);
+  assert.equal(observation.scopes.global_day, 1);
+  assert.equal(observation.durationMsTotal, 3000);
+  assert.equal(observation.firstTokenSamples, 1);
+  assert.equal(observation.firstTokenMsTotal, 100);
+  assert.equal(observation.inputSamples, 2);
+  assert.equal(observation.promptCharsTotal, 40);
+  assert.equal(observation.conversationCharsTotal, 60);
+  assert.equal(result.hours[9].ai.observation.requests, 3);
+  assert.equal(summary([]).totals.ai.observation.coverage, 'unavailable');
+  assert.throws(() => rollingSummary([], { now, collectionStart: started, aiCollectionStart: started,
+    aiEventCollectionStart: eventOptions.aiEventCollectionStart }), /终态/);
+  assert.throws(() => rollingSummary([], { now, collectionStart: started, aiCollectionStart: started,
+    ...eventOptions, aiEventLines: ['bad'] }), /保留上一份报告/);
+});
+
+test('503 分类保留原始5xx，只将已退役 API 503 列为预期不可用', () => {
+  const result = summary(['/api/login', '/api/user', '/api/health', '/api/ai/chat/completions', '/index.html'].map(uri =>
+    line('07/Sep/2026:01:00:00 +0800', { uri, status: 503 })), [aiLine('2026-09-07T01:00:00+08:00', { status: 503 })]);
+  assert.equal(result.totals.serverErrors, 6);
+  assert.equal(result.totals.expectedUnavailable, 2);
+  assert.equal(result.totals.serviceErrors, 4);
+  assert.equal(result.hours[1].serviceErrors, 4);
+});
+
+test('HTTP 限流来源独立聚合，旧429保留未知', () => {
+  const time = '2026-09-07T01:00:00+08:00';
+  const base = JSON.parse(aiLine(time, { status: 429 }));
+  const result = summary([], [JSON.stringify(base), ...['ip_minute', 'ip_day', 'session_day', 'global_day', 'concurrency'].map(quotaScope =>
+    JSON.stringify({ ...base, quotaScope, upstreamStatus: '429' })), JSON.stringify({ ...base, quotaScope: '', upstreamStatus: '-' })]);
+  assert.deepEqual(result.totals.ai.limitReasons, { ip_minute: 1, ip_day: 1, session_day: 1, global_day: 1, concurrency: 1, nginx: 1, unknown: 1 });
+});
+
+test('旧历史分类未知，历史终态去标识验证且日志截断不覆盖已有观测', () => {
+  const initial = rollingSummary([], { now, collectionStart: started, aiCollectionStart: started,
+    ...eventOptions, aiEventLines: [terminal()] });
+  const archived = initial.daily.find(day => day.day === '2026-09-07');
+  const { expectedUnavailable, serviceErrors, ...legacy } = archived;
+  const { observation, limitReasons, ...oldAi } = legacy.ai;
+  legacy.ai = oldAi;
+  const migrated = mergeHistory({ schema: 2, days: [legacy] }, [], Date.parse(initial.windowEnd));
+  assert.equal(migrated.days[0].expectedUnavailable, null);
+  assert.equal(migrated.days[0].serviceErrors, null);
+  assert.equal(migrated.days[0].ai.observation.coverage, 'unavailable');
+  const retained = rollingSummary([], { now: now + 2 * DAY, collectionStart: started, aiCollectionStart: started,
+    ...eventOptions, aiEventLines: [terminal({ time: '2026-09-09T01:00:00.000Z' })] });
+  archived.ai.observation.ip = '203.0.113.17';
+  archived.ai.observation.outcomes.private = 'secret';
+  const merged = mergeHistory({ schema: 2, days: [archived] }, retained.daily, Date.parse(retained.windowEnd));
+  assert.equal(merged.days.find(day => day.day === archived.day).ai.observation.requests, 1);
+  assert.ok(!/203\.0\.113|secret/.test(JSON.stringify(merged)));
+  const bad = structuredClone(archived);
+  bad.ai.observation.outcomes.completed = -1;
+  assert.throws(() => mergeHistory({ schema: 2, days: [bad] }, [], Date.parse(initial.windowEnd)), /终态/);
+});
 
 test('滚动窗口含开始不含结束，补齐24小时且去重不累加', () => {
   const result = summary([
@@ -82,7 +152,10 @@ test('匿名 AI 请求计入总量并按状态聚合，不形成访客或长期�
   assert.equal(result.totals.clientErrors, 2);
   assert.equal(result.totals.serverErrors, 1);
   assert.equal(result.totals.automated, 0);
-  assert.deepEqual(result.totals.ai, {
+  const { observation, limitReasons, ...legacyAi } = result.totals.ai;
+  assert.equal(observation.coverage, 'unavailable');
+  assert.equal(limitReasons.unknown, 1);
+  assert.deepEqual(legacyAi, {
     coverage: 'recorded', requests: 5, httpSuccesses: 1, invalidRequests: 1, rateLimited: 1,
     serverErrors: 1, otherStatuses: 1, durationMsTotal: 3428, durationSamples: 1,
     responseBytes: 1532, messageCountTotal: 5, messageSamples: 1,
@@ -262,6 +335,13 @@ test('发布为完整文件；坏日志与坏历史均保留上一份页面，�
   assert.match(before, /初中物理实验1/);
   assert.equal(fs.statSync(path.join(stateDir, 'history.json')).mode & 0o777, 0o600);
   assert.equal(fs.statSync(page).mode & 0o777, 0o644);
+  await assert.rejects(publish({ ...options, aiEventCollectionStart: started }), /终态/);
+  await assert.rejects(publish({ ...options, aiEventCollectionStart: started, aiEventLogDir: logDir }), /终态日志/);
+  assert.equal(fs.readFileSync(page, 'utf8'), before);
+  const eventLog = path.join(logDir, 'ai-events.log');
+  fs.writeFileSync(eventLog, 'bad event\n');
+  await assert.rejects(publish({ ...options, aiEventCollectionStart: started, aiEventLogDir: logDir }), /保留上一份报告/);
+  assert.equal(fs.readFileSync(page, 'utf8'), before);
   fs.appendFileSync(log, 'bad log\n');
   await assert.rejects(publish(options));
   assert.equal(fs.readFileSync(page, 'utf8'), before);

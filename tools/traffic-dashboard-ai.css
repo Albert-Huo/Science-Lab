@@ -4,6 +4,28 @@
   --ai-panel: #102126;
 }
 
+.quota-panel { margin-bottom: 12px; }
+.quota-status { color: var(--muted); font-size: 11px; }
+.quota-status[data-state="ready"] { color: var(--green); }
+.quota-status[data-state="stale"], .quota-status[data-state="unavailable"],
+.quota-status[data-state="invalid"] { color: var(--amber); }
+.quota-grid { display: grid; grid-template-columns: 1fr 1fr 1.3fr; gap: 20px; }
+.quota-grid span { display: block; color: var(--muted); font-size: 11px; }
+.quota-grid strong { display: block; font-size: 19px; font-weight: 500; font-variant-numeric: tabular-nums; margin-top: 5px; overflow-wrap: anywhere; }
+.quota-panel[data-stale="true"] .quota-grid { opacity: .55; }
+.traffic-health { display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 12px 0 22px; color: var(--muted); font-size: 11px; }
+.traffic-health b { color: var(--text); font-weight: 500; }
+.ai-sample-note { position: relative; font-size: 11px; color: var(--muted); margin: 14px 0 22px; line-height: 1.8; }
+.ai-diagnostics { position: relative; border-top: 1px solid var(--ai-line); margin-top: 18px; padding-top: 14px; }
+.ai-diagnostics summary { cursor: pointer; font-size: 12px; color: var(--ai); }
+.ai-diagnostic-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; padding-top: 16px; }
+.ai-diagnostic-grid h3 { font-size: 12px; font-weight: 500; }
+.ai-diagnostic-grid h3 small, .ai-diagnostic-grid p { color: var(--muted); font-size: 11px; font-weight: 400; }
+.diagnostic-list { margin: 0; }
+.diagnostic-list div { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px solid var(--ai-line); font-size: 11px; }
+.diagnostic-list dt { color: var(--muted); }
+.diagnostic-list dd { margin: 0; font-variant-numeric: tabular-nums; }
+
 .ai-panel {
   position: relative;
   overflow: hidden;
@@ -203,6 +225,8 @@
 }
 
 @media (max-width: 700px) {
+  .quota-grid, .ai-diagnostic-grid { grid-template-columns: 1fr; gap: 14px; }
+  .quota-panel .panel-heading { align-items: flex-start; flex-direction: column; gap: 8px; }
   .ai-heading { display: block; }
   .ai-coverage {
     display: inline-block;

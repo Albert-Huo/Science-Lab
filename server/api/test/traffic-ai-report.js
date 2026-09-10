@@ -60,6 +60,33 @@ test('AI 日志拒绝格式漂移、越界数值和可注入文本', () => {
   ]) assert.throws(() => parseAiRecord(line));
 });
 
+test('v2 九字段区分应用限流、Nginx 与旧版未知来源', () => {
+  assert.equal(parseAiRecord(aiLine({ status: '429' })).limitReason, 'unknown');
+  for (const scope of ['ip_minute', 'ip_day', 'session_day', 'global_day', 'concurrency']) {
+    const record = parseAiRecord(aiLine({ status: '429', quotaScope: scope, upstreamStatus: '429' }));
+    assert.equal(record.limitReason, scope);
+  }
+  assert.equal(parseAiRecord(aiLine({ status: '429', quotaScope: '', upstreamStatus: '-' })).limitReason, 'nginx');
+  assert.equal(parseAiRecord(aiLine({ status: '429', quotaScope: '', upstreamStatus: '429' })).limitReason, 'unknown');
+  assert.equal(parseAiRecord(aiLine({ status: '429', quotaScope: '-', upstreamStatus: '-' })).limitReason, 'nginx');
+  assert.equal(parseAiRecord(aiLine({ status: '429', quotaScope: '-', upstreamStatus: '429' })).limitReason, 'unknown');
+  const nginx = parseAiRecord(aiLine({ status: '429', quotaScope: '-', upstreamStatus: '-',
+    experiment: '-', messages: '-', inputChars: '-' }));
+  assert.equal(nginx.limitReason, 'nginx');
+  assert.equal(nginx.experimentHash, null);
+  assert.equal(nginx.messageCount, null);
+  assert.equal(nginx.inputChars, null);
+  for (const overrides of [{ quotaScope: '' }, { quotaScope: 'user-name', upstreamStatus: '429' },
+    { quotaScope: '', upstreamStatus: 'secret' }, { quotaScope: '', upstreamStatus: 429 },
+    { quotaScope: '', upstreamStatus: '999' }]) assert.throws(() => parseAiRecord(aiLine(overrides)));
+});
+
+test('Nginx 九字段读取后端实际 X-AI-Quota-Scope 头', () => {
+  const config = fs.readFileSync(path.resolve(__dirname, '../../traffic/nginx-ai-log-format.conf'), 'utf8');
+  assert.match(config, /"quotaScope":"\$upstream_http_x_ai_quota_scope"/);
+  assert.match(config, /"upstreamStatus":"\$upstream_status"/);
+});
+
 const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'science-lab-ai-report-'));
 after(() => fs.rmSync(fixture, { recursive: true, force: true }));
 

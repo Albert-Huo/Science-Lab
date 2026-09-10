@@ -1,0 +1,11 @@
+[Unit]
+Description=Update Science Lab AI quota snapshot every minute
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=60s
+AccuracySec=1s
+Unit=science-lab-ai-quota-snapshot.service
+
+[Install]
+WantedBy=timers.target

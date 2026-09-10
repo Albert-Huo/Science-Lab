@@ -74,7 +74,39 @@
     }
   }
   document.querySelector('#check-update').addEventListener('click', checkUpdate);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); });
+  let quotaChecking = false, quotaSnapshot = null, quotaProblem = '';
+  function paintQuota() {
+    const presentation = quotaPresentation(quotaSnapshot);
+    const status = document.querySelector('#quota-status');
+    status.textContent = quotaProblem ? quotaProblem + (quotaSnapshot ? ' · 以下为上次采样' : '') : presentation.status;
+    status.dataset.state = quotaProblem ? 'unavailable' : presentation.state;
+    document.querySelector('.quota-panel').dataset.stale = String(!!quotaProblem || presentation.state === 'stale');
+    for (const key of ['remaining', 'active', 'reset', 'sampled']) document.querySelector('#quota-' + key).textContent = presentation[key];
+  }
+  async function checkQuota() {
+    paintQuota();
+    if (quotaChecking || document.hidden || location.protocol !== 'https:') return;
+    quotaChecking = true;
+    const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 10000);
+    try {
+      const response = await fetch(new URL('quota.json', location.href), { cache: 'no-store', credentials: 'same-origin', signal: controller.signal });
+      if (!response.ok) throw new Error('quota_unavailable');
+      const body = await response.text();
+      if (body.length > 4096) throw new Error('quota_invalid');
+      const snapshot = JSON.parse(body);
+      if (quotaPresentation(snapshot).state === 'invalid') throw new Error('quota_invalid');
+      quotaSnapshot = snapshot; quotaProblem = '';
+    } catch {
+      // Do not show upstream bodies/errors: they can contain infrastructure details.
+      quotaProblem = '无法读取新额度快照，当前状态未知';
+    } finally {
+      clearTimeout(timeout); quotaChecking = false; paintQuota();
+    }
+  }
+  document.querySelector('#check-update').addEventListener('click', checkQuota);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { checkUpdate(); checkQuota(); } });
   setInterval(checkUpdate, 60000);
+  setInterval(checkQuota, 60000);
+  checkQuota();
   updateStatus();
 })();

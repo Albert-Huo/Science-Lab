@@ -9,8 +9,11 @@ const AI_LOG_NAME = /^science-lab-ai-access\.log(?:-\d{8}(?:\.gz)?)?$/;
 const HASH = /^[a-f0-9]{64}$/;
 const DECIMAL = /^\d+(?:\.\d+)?$/;
 const FIELDS = ['bytes', 'duration', 'experiment', 'inputChars', 'messages', 'status', 'time'];
+const V2_FIELDS = [...FIELDS, 'quotaScope', 'upstreamStatus'].sort();
+const QUOTA_SCOPES = ['ip_minute', 'ip_day', 'session_day', 'global_day', 'concurrency'];
 const MANIFEST_BYTES_MAX = 1024 * 1024;
 const MANIFEST_ITEMS_MAX = 1000;
+const missing = value => value === '' || value === '-';
 
 function integer(value, maximum) {
   if (typeof value !== 'string' || !/^\d+$/.test(value)) return null;
@@ -35,19 +38,24 @@ function parseIsoTime(value) {
 function parseAiRecord(line) {
   if (!line.trim()) return null;
   const value = JSON.parse(line);
-  if (!value || Array.isArray(value) || Object.keys(value).sort().join('\n') !== FIELDS.join('\n')) {
+  const fields = value && Object.keys(value).sort().join('\n');
+  const v2 = fields === V2_FIELDS.join('\n');
+  if (!value || Array.isArray(value) || !v2 && fields !== FIELDS.join('\n')) {
     throw new Error('AI 日志字段无效');
   }
+  if (v2 && (typeof value.quotaScope !== 'string' || !['', '-', ...QUOTA_SCOPES].includes(value.quotaScope) ||
+      typeof value.upstreamStatus !== 'string' || value.upstreamStatus.length > 100 ||
+      !/^(?:-|[1-5]\d\d(?:[, :] +[1-5]\d\d)*)$/.test(value.upstreamStatus))) throw new Error('AI 日志来源字段无效');
   const timestamp = parseIsoTime(value.time);
   const status = integer(value.status, 599);
   const bytes = integer(value.bytes, Number.MAX_SAFE_INTEGER);
-  const messageCount = value.messages === '' ? null : integer(value.messages, 20);
-  const inputChars = value.inputChars === '' ? null : integer(value.inputChars, 80000);
+  const messageCount = missing(value.messages) ? null : integer(value.messages, 20);
+  const inputChars = missing(value.inputChars) ? null : integer(value.inputChars, 80000);
   const duration = typeof value.duration === 'string' && DECIMAL.test(value.duration) ? Number(value.duration) : NaN;
   if (!Number.isFinite(timestamp) || status === null || status < 100 || bytes === null ||
       !Number.isFinite(duration) || duration < 0 || duration > 86400 ||
-      (typeof value.experiment !== 'string' || value.experiment !== '' && !HASH.test(value.experiment)) ||
-      messageCount === null && value.messages !== '' || inputChars === null && value.inputChars !== '') {
+      (typeof value.experiment !== 'string' || !missing(value.experiment) && !HASH.test(value.experiment)) ||
+      messageCount === null && !missing(value.messages) || inputChars === null && !missing(value.inputChars)) {
     throw new Error('AI 日志数值无效');
   }
   return {
@@ -55,9 +63,11 @@ function parseAiRecord(line) {
     status,
     durationMs: Math.round(duration * 1000),
     bytes,
-    experimentHash: value.experiment || null,
+    experimentHash: missing(value.experiment) ? null : value.experiment,
     messageCount,
     inputChars,
+    ...(status === 429 ? { limitReason: !v2 ? 'unknown' : value.upstreamStatus === '-' ? 'nginx' :
+      QUOTA_SCOPES.includes(value.quotaScope) ? value.quotaScope : 'unknown' } : {}),
   };
 }
 
@@ -86,4 +96,4 @@ function visitAiLogDirectory(directory, visit) {
   return visitMatchingLogs(directory, AI_LOG_NAME, '未找到匿名 AI 日志', visit);
 }
 
-module.exports = { parseAiRecord, loadExperimentMap, visitAiLogDirectory };
+module.exports = { parseAiRecord, loadExperimentMap, visitAiLogDirectory, QUOTA_SCOPES };

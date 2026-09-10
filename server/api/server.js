@@ -17,6 +17,7 @@ const { Readable } = require('stream');
 const { pipeline } = require('stream/promises');
 const { createAiPolicy } = require('./ai-policy');
 const { createQuota } = require('./ai-quota');
+const { createEventLogger, createSseObserver } = require('./ai-events');
 const db = AI_ONLY ? null : require('./db');
 
 const PORT = Number(process.env.PORT || 8970);
@@ -51,6 +52,28 @@ if (!AI_ONLY && (!JWT_SECRET || JWT_SECRET.length < 16)) {
 
 const app = express();
 app.set('trust proxy', 1); // 处于 nginx 反代之后，限流取真实 IP
+const aiEvents = createEventLogger({ path: process.env.AI_EVENT_LOG_PATH });
+// Install before body parsing so malformed/oversized requests also have a terminal event.
+app.use((req, res, next) => {
+  if (req.method !== 'POST' || !/^\/ai\/chat\/completions\/?$/i.test(req.path)) return next();
+  const started = performance.now();
+  let recorded = false;
+  const event = { scope: '', firstTokenMs: null };
+  const elapsed = () => Math.max(0, Math.round(performance.now() - started));
+  res.locals.aiEvent = {
+    event,
+    firstToken() { if (event.firstTokenMs === null) event.firstTokenMs = elapsed(); },
+    finish(outcome) {
+      if (recorded) return;
+      recorded = true;
+      aiEvents.record({ ...event, outcome, status: res.headersSent ? res.statusCode : null, durationMs: elapsed() });
+    },
+  };
+  // Defer close fallback until the stream pipeline can classify upstream failures.
+  res.once('close', () => setImmediate(() => res.locals.aiEvent.finish(
+    res.writableFinished ? 'internal_error' : 'client_aborted')));
+  next();
+});
 if (AI_ONLY) {
   // 在 CORS 预检和 JSON 解析前禁用，确保旧接口的所有方法统一返回 503。
   app.use(['/auth', '/progress'], (_req, res) => res.status(503).json({ error: 'sync_disabled' }));
@@ -120,6 +143,12 @@ const aiMinuteLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'rate_limited', scope: 'ip_minute', message: '请求较频繁，请稍后再试。' },
+  handler(req, res, _next, options) {
+    res.set('X-AI-Quota-Scope', 'ip_minute');
+    res.status(429).json(options.message);
+    res.locals.aiEvent.event.scope = 'ip_minute';
+    res.locals.aiEvent.finish('rate_limited');
+  },
 });
 
 function setAiMetricHeaders(res, messages, context) {
@@ -132,6 +161,10 @@ function setAiMetricHeaders(res, messages, context) {
     'X-Science-Lab-AI-Messages': String(messages.length),
     'X-Science-Lab-AI-Input-Chars': String(messages.reduce((sum, item) => sum + item.content.length, 0)),
   });
+  Object.assign(res.locals.aiEvent.event, { experiment, messages: messages.length,
+    inputChars: messages.reduce((sum, item) => sum + item.content.length, 0),
+    promptChars: messages.filter(item => item.role === 'system').reduce((sum, item) => sum + item.content.length, 0),
+    conversationChars: messages.filter(item => item.role !== 'system').reduce((sum, item) => sum + item.content.length, 0) });
 }
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
@@ -139,28 +172,39 @@ app.get('/health', (_req, res) => res.json({ ok: true }));
 // Express 4 does not automatically forward rejected async handlers to error middleware.
 app.post('/ai/chat/completions', aiMinuteLimiter, (req, res, next) => handleAiChat(req, res).catch(next));
 async function handleAiChat(req, res) {
+  const terminal = res.locals.aiEvent;
   res.set('Cache-Control', 'no-store');
   const parsed = sanitizeAiBody(req.body);
-  if (parsed.error) return res.status(400).json({ error: parsed.error });
+  if (parsed.error) {
+    res.status(400).json({ error: parsed.error });
+    terminal.finish('invalid_request'); return;
+  }
   setAiMetricHeaders(res, parsed.value.messages, { experimentPath: parsed.experimentPath });
 
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) {
-    return res.status(503).json({ error: 'ai_unavailable', message: 'AI 助手暂未配置，请稍后再试' });
+    res.status(503).json({ error: 'ai_unavailable', message: 'AI 助手暂未配置，请稍后再试' });
+    terminal.finish('not_configured'); return;
   }
 
   const release = await quota.reserve(req, res);
-  if (!release) return;
-  if (res.destroyed) { await release(); return; }
+  if (!release) {
+    if (res.statusCode === 429) terminal.event.scope = res.getHeader('X-AI-Quota-Scope') || '';
+    terminal.finish(res.destroyed ? 'client_aborted' : res.statusCode === 429 ? 'rate_limited' : 'quota_unavailable');
+    return;
+  }
+  if (res.destroyed) { terminal.finish('client_aborted'); await release(); return; }
 
   const controller = new AbortController();
   let abortKind = '';
+  let upstreamFailed = false;
   const timeout = setTimeout(() => {
+    if (abortKind) return;
     abortKind = 'timeout';
     controller.abort();
   }, AI_UPSTREAM_TIMEOUT_MS);
   const abortOnClientClose = () => {
-    if (!res.writableEnded) {
+    if (!res.writableEnded && !abortKind && !upstreamFailed) {
       abortKind = 'client';
       controller.abort();
     }
@@ -184,7 +228,8 @@ async function handleAiChat(req, res) {
         try { await upstream.body.cancel(); }
         catch { console.error('DeepSeek 错误响应体清理失败'); }
       }
-      return res.status(502).json({ error: 'ai_upstream_error' });
+      res.status(502).json({ error: 'ai_upstream_error' });
+      terminal.finish('upstream_error'); return;
     }
 
     res.status(200);
@@ -195,18 +240,24 @@ async function handleAiChat(req, res) {
       'X-Accel-Buffering': 'no',
     });
     res.flushHeaders();
-    await pipeline(Readable.fromWeb(upstream.body), res);
+    const source = Readable.fromWeb(upstream.body);
+    source.once('error', () => { upstreamFailed = true; });
+    await pipeline(source, createSseObserver({ onFirstToken: () => terminal.firstToken(),
+      onDone: () => terminal.finish('completed'), onError: () => terminal.finish('upstream_error') }), res);
+    terminal.finish('stream_incomplete');
   } catch {
-    if (abortKind === 'client') return;
+    if (abortKind === 'client') { terminal.finish('client_aborted'); return; }
     if (abortKind === 'timeout') {
       console.error('DeepSeek 代理失败：upstream_timeout');
-      if (!res.headersSent) return res.status(504).json({ error: 'ai_upstream_timeout' });
+      if (!res.headersSent) res.status(504).json({ error: 'ai_upstream_timeout' });
       if (!res.writableEnded) res.end();
+      terminal.finish('upstream_timeout');
       return;
     }
     console.error('DeepSeek 代理失败：upstream_unavailable');
-    if (!res.headersSent) return res.status(502).json({ error: 'ai_upstream_unavailable' });
+    if (!res.headersSent) res.status(502).json({ error: 'ai_upstream_unavailable' });
     if (!res.writableEnded) res.end();
+    terminal.finish('upstream_error');
   } finally {
     clearTimeout(timeout);
     res.removeListener('close', abortOnClientClose);
@@ -264,12 +315,20 @@ app.put('/progress', auth, async (req, res) => {
 });
 
 app.use((error, _req, res, _next) => {
-  if (res.headersSent) return res.end();
-  if (error.code === 'origin_not_allowed') return res.status(403).json({ error: 'origin_not_allowed' });
-  if (error.type === 'entity.too.large') return res.status(413).json({ error: 'request_too_large' });
-  if (error.type === 'entity.parse.failed') return res.status(400).json({ error: 'invalid_json' });
+  const finish = outcome => res.locals.aiEvent?.finish(outcome);
+  if (error.type === 'request.aborted') { finish('client_aborted'); return; }
+  if (res.headersSent) { res.end(); finish('internal_error'); return; }
+  if (error.code === 'origin_not_allowed') {
+    res.status(403).json({ error: 'origin_not_allowed' }); finish('invalid_request'); return;
+  }
+  if (error.type === 'entity.too.large') {
+    res.status(413).json({ error: 'request_too_large' }); finish('invalid_request'); return;
+  }
+  if (error.type === 'entity.parse.failed') {
+    res.status(400).json({ error: 'invalid_json' }); finish('invalid_request'); return;
+  }
   console.error('API 请求失败：internal_error');
-  return res.status(500).json({ error: 'server_error' });
+  res.status(500).json({ error: 'server_error' }); finish('internal_error');
 });
 
 async function start() {

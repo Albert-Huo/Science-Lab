@@ -1,0 +1,13 @@
+/var/log/science-lab/ai-events.log {
+    daily
+    rotate 10
+    dateext
+    dateformat -%Y%m%d
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 science-lab root
+    su science-lab root
+    # The API opens each append anew; no copytruncate or restart is needed.
+}
