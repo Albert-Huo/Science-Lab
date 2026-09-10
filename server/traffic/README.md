@@ -83,6 +83,8 @@ Nginx 新格式额外记录 `quotaScope` 和 `upstreamStatus`，区分IP分钟�
 
 ## 原看板回退
 
+兼容注意：部分旧内核不支持systemd的BPF IP防火墙，出现该警告时不能把IP过滤视为已生效。采样程序另行只接受 `127.0.0.1` 或 `::1` 的Redis地址，拒绝远程主机；这不是进程级网络防火墙的替代声明。认证握手需要多个内部命令，因此队列保留16个有界槽位，实际采样仍只有一条只读EVAL、2秒超时且不重试。
+
 先停用本任务定时器：`systemctl disable --now science-lab-traffic.timer`。需要移除网页入口时，从已核验的站点配置备份恢复，执行 `nginx -t` 后reload并验证公开首页/API。保留已生成的汇总和凭据文件，避免在回退时丢失数据。
 
 首次上线备份与验证证据见 `docs/superpowers/plans/2026-09-07-rolling-traffic-dashboard.md`。历史数据应自行定期下载到私有存储；服务器上的400天归档不等于异地备份。

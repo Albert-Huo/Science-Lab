@@ -70,6 +70,10 @@ async function readSnapshot({ env = process.env, namespace = 'science-lab:ai', c
       !namespace.length || namespace.length > 256 || /[\s{}\x00-\x1f]/.test(namespace) ||
       !limit(deadlineMs) || deadlineMs > 2000) return unavailable('invalid_config');
   if (!env.AI_REDIS_URL) return unavailable('redis_not_configured');
+  try {
+    const endpoint = new URL(env.AI_REDIS_URL);
+    if (!['redis:', 'rediss:'].includes(endpoint.protocol) || !['127.0.0.1', '[::1]'].includes(endpoint.hostname)) return unavailable('invalid_config');
+  } catch { return unavailable('invalid_config'); }
   if (!createClient) {
     try {
       const apiDir = env.SCIENCE_LAB_API_DIR || path.resolve(__dirname, '../server/api');
@@ -81,7 +85,8 @@ async function readSnapshot({ env = process.env, namespace = 'science-lab:ai', c
   let timer;
   let reason = 'redis_unavailable';
   try {
-    client = createClient({ url: env.AI_REDIS_URL, disableOfflineQueue: true, commandsQueueMaxLength: 1,
+    // AUTH and library handshake commands share this queue before our single EVAL.
+    client = createClient({ url: env.AI_REDIS_URL, disableOfflineQueue: true, commandsQueueMaxLength: 16,
       socket: { connectTimeout: deadlineMs, reconnectStrategy: false } });
     // The terminal result reports a fixed reason; Redis errors can contain connection credentials.
     client.on('error', () => { reason = 'redis_unavailable'; });

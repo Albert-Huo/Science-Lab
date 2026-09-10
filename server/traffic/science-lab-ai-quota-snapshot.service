@@ -17,6 +17,7 @@ PrivateTmp=true
 PrivateNetwork=false
 IPAddressDeny=any
 IPAddressAllow=localhost
+# Some older kernels cannot enforce these IP filters; the collector additionally rejects non-loopback Redis URLs.
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 ProtectSystem=strict
 ProtectHome=true

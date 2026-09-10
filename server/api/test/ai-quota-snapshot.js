@@ -70,6 +70,13 @@ test('unconfigured or invalid configuration never fabricates actual usage', asyn
   }
 });
 
+test('collector rejects non-loopback Redis even without a systemd IP firewall', async () => {
+  for (const url of ['redis://example.org:6379', 'redis://192.0.2.10:6379', 'https://127.0.0.1:6379', 'not-a-url']) {
+    const result = await api().readSnapshot({ env: { ...env, AI_REDIS_URL: url }, createClient() { assert.fail('remote Redis must not connect'); } });
+    assert.equal(result.reason, 'invalid_config');
+  }
+});
+
 test('Redis failures and total deadline are bounded, sanitized and close the client', async () => {
   const failed = fakeClient(null, { async connect() { throw new Error('redis://secret:password@private-host'); } });
   const result = await api().readSnapshot({ env, now: () => timestamp, createClient: () => failed });
@@ -131,7 +138,7 @@ test('CLI resolves missing API dependency without exposing config and publishes 
   fs.mkdirSync(path.join(stateDir, 'www'));
   try {
     const output = execFileSync(process.execPath, [moduleFile, '--state-dir', stateDir], {
-      env: { ...process.env, AI_REDIS_URL: 'redis://secret:password@private-host', SCIENCE_LAB_API_DIR: path.join(stateDir, 'missing-api') },
+      env: { ...process.env, AI_REDIS_URL: 'redis://secret:password@127.0.0.1', SCIENCE_LAB_API_DIR: path.join(stateDir, 'missing-api') },
       encoding: 'utf8', timeout: 5000,
     });
     const result = JSON.parse(fs.readFileSync(path.join(stateDir, 'www/quota.json'), 'utf8'));
@@ -140,7 +147,7 @@ test('CLI resolves missing API dependency without exposing config and publishes 
   } finally { fs.rmSync(stateDir, { recursive: true, force: true }); }
 });
 
-test('isolated real Redis: active leases, absent keys and snapshot leave counters and ZSET unchanged', async t => {
+test('isolated authenticated Redis: handshake, active leases and snapshot leave counters and ZSET unchanged', async t => {
   const binary = process.env.REDIS_SERVER_BIN || '/usr/local/bin/redis-server';
   if (!fs.existsSync(binary)) { t.skip('local redis-server unavailable'); return; }
   api();
@@ -148,7 +155,8 @@ test('isolated real Redis: active leases, absent keys and snapshot leave counter
   await once(probe, 'listening');
   const port = probe.address().port;
   await new Promise(resolve => probe.close(resolve));
-  const child = spawn(binary, ['--bind', '127.0.0.1', '--port', String(port), '--save', '', '--appendonly', 'no'], { stdio: ['ignore', 'pipe', 'pipe'] });
+  const password = require('node:crypto').randomUUID();
+  const child = spawn(binary, ['--bind', '127.0.0.1', '--port', String(port), '--save', '', '--appendonly', 'no', '--requirepass', password], { stdio: ['ignore', 'pipe', 'pipe'] });
   let client;
   try {
     await new Promise((resolve, reject) => {
@@ -159,7 +167,7 @@ test('isolated real Redis: active leases, absent keys and snapshot leave counter
       child.stderr.resume();
     });
     const { createClient } = require('redis');
-    const redisEnv = { ...env, AI_REDIS_URL: `redis://127.0.0.1:${port}` };
+    const redisEnv = { ...env, AI_REDIS_URL: `redis://:${password}@127.0.0.1:${port}` };
     client = createClient({ url: redisEnv.AI_REDIS_URL });
     client.on('error', () => t.diagnostic('Owned Redis test client reported a connection error'));
     await client.connect();
@@ -169,7 +177,9 @@ test('isolated real Redis: active leases, absent keys and snapshot leave counter
     await client.set(global, '7', { PX: 60000 });
     await client.zAdd(active, [{ score: Date.now() - 1000, value: 'expired' }, { score: Date.now() + 60000, value: 'live' }]);
     const before = await client.sendCommand(['DUMP', active]);
-    const expiryBefore = await client.sendCommand(['PEXPIRETIME', global]);
+    // Redis 6 has no PEXPIRETIME; an atomic read computes the same absolute deadline.
+    const expiry = () => client.eval("local t=redis.call('TIME'); return tonumber(t[1])*1000+math.floor(tonumber(t[2])/1000)+redis.call('PTTL',KEYS[1])", { keys: [global], arguments: [] });
+    const expiryBefore = await expiry();
     const result = await api().readSnapshot({ env: redisEnv, namespace: 'snapshot-integration' });
     assert.equal(result.available, true);
     assert.equal(result.globalUsed, 7);
@@ -177,7 +187,7 @@ test('isolated real Redis: active leases, absent keys and snapshot leave counter
     assert.equal(Date.parse(result.globalResetAt), expiryBefore);
     assert.deepEqual(await client.sendCommand(['DUMP', active]), before);
     assert.equal(await client.get(global), '7');
-    assert.equal(await client.sendCommand(['PEXPIRETIME', global]), expiryBefore);
+    assert.equal(await expiry(), expiryBefore);
     const keysBefore = await client.keys('*');
     const empty = await api().readSnapshot({ env: redisEnv, namespace: 'absent' });
     assert.equal(empty.globalUsed, 0);
