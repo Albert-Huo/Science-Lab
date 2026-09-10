@@ -39,7 +39,7 @@ const quota = createQuota({
   ipDayMax: AI_RATE_LIMIT_DAY_MAX,
   sessionDayMax: positiveInt(process.env.AI_SESSION_DAY_MAX, 20),
   globalDayMax: positiveInt(process.env.AI_GLOBAL_DAY_MAX, 500),
-  concurrentMax: positiveInt(process.env.AI_GLOBAL_CONCURRENT_MAX, 5),
+  concurrentMax: positiveInt(process.env.AI_GLOBAL_CONCURRENT_MAX, 10),
   timeoutMs: AI_UPSTREAM_TIMEOUT_MS,
   secret: process.env.AI_SESSION_SECRET,
   redisUrl: process.env.AI_REDIS_URL,

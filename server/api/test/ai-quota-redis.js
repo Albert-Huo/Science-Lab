@@ -82,6 +82,20 @@ async function request(quota, ip = '192.0.2.1') {
     });
     assert.deepEqual(JSON.parse(restart.stdout), { code: 429, scope: 'global_day' });
 
+    const { concurrentMax: _oldOverride, ...defaultOptions } = options;
+    const tenOptions = { ...defaultOptions, globalDayMax: 100, namespace: `concurrent-ten-${randomUUID()}` };
+    const tenA = createQuota(tenOptions), tenB = createQuota(tenOptions);
+    clients.push(tenA, tenB);
+    await Promise.all([tenA.connect(), tenB.connect()]);
+    const tenAttempts = await Promise.all(Array.from({ length: 11 }, (_, i) => request(i % 2 ? tenA : tenB, `198.51.100.${i + 1}`)));
+    const admitted = tenAttempts.filter(item => item.release);
+    assert.equal(admitted.length, 10, 'shared default concurrency must admit ten across instances');
+    assert.equal(tenAttempts.find(item => !item.release).res.body.scope, 'concurrency');
+    await admitted[0].release();
+    const next = await request(tenB, '198.51.100.12');
+    assert.equal(typeof next.release, 'function');
+    await Promise.all([...admitted, next].map(item => item.release()));
+
     const a = new RedisStore({ url: redisUrl });
     const b = new RedisStore({ url: redisUrl });
     clients.push(a, b);

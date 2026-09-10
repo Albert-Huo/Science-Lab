@@ -166,7 +166,7 @@ class RedisStore {
 }
 
 function createQuota({ minuteMax = 10, ipDayMax = 20, sessionDayMax = 20, globalDayMax = 500,
-  concurrentMax = 5, timeoutMs = 120000, secret, redisUrl, production = false,
+  concurrentMax = 10, timeoutMs = 120000, secret, redisUrl, production = false,
   namespace = 'science-lab:ai', store, now = Date.now } = {}) {
   for (const [name, value] of Object.entries({ minuteMax, ipDayMax, sessionDayMax, globalDayMax, concurrentMax, timeoutMs })) {
     if (!Number.isSafeInteger(value) || value <= 0) throw new Error(`Invalid AI quota ${name}`);

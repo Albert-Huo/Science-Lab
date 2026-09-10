@@ -62,7 +62,7 @@ function configuredLimit(value, fallback) {
 async function readSnapshot({ env = process.env, namespace = 'science-lab:ai', createClient,
   deadlineMs = 2000, now = Date.now } = {}) {
   const globalLimit = configuredLimit(env.AI_GLOBAL_DAY_MAX, 500);
-  const concurrentLimit = configuredLimit(env.AI_GLOBAL_CONCURRENT_MAX, 5);
+  const concurrentLimit = configuredLimit(env.AI_GLOBAL_CONCURRENT_MAX, 10);
   const unavailable = reason => validateSnapshot({ schema: 1, capturedAt: new Date(now()).toISOString(),
     available: false, reason, globalUsed: null, globalLimit, globalRemaining: null, globalResetAt: null,
     activeRequests: null, concurrentLimit });

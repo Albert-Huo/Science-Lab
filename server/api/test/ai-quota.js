@@ -74,6 +74,17 @@ async function request(quota, { ip = '192.0.2.1', cookie = '', secure = false } 
   const movedSession = await request(instanceTwo, { ip: '192.0.2.2', cookie: sessionOne.cookie });
   assert.equal(movedSession.res.body.scope, 'session_day', 'stable signed sessions survive IP and instance changes');
 
+  const tenConcurrent = make({});
+  const ten = await Promise.all(Array.from({ length: 11 }, (_, i) => request(tenConcurrent, { ip: `192.0.2.${i + 1}` })));
+  assert.equal(ten.filter(item => item.release).length, 10, 'default concurrency admits ten requests');
+  assert.equal(ten[10].res.body.scope, 'concurrency');
+  assert.equal(ten[10].res.headers['x-ai-quota-limit'], '10');
+  await ten[0].release();
+  const replacement = await request(tenConcurrent, { ip: '192.0.2.12' });
+  assert.equal(typeof replacement.release, 'function', 'released slot is reusable');
+  await Promise.all([...ten.filter(item => item.release), replacement].map(item => item.release()));
+  await tenConcurrent.close();
+
   const concurrency = make({ concurrentMax: 1, globalDayMax: 2, timeoutMs: 100 });
   const active = await request(concurrency);
   assert.equal((await request(concurrency, { ip: '192.0.2.2' })).res.body.scope, 'concurrency');

@@ -56,7 +56,7 @@ test('missing global counter is verified zero with unknown reset; exhausted rema
 
 test('unconfigured or invalid configuration never fabricates actual usage', async () => {
   for (const [config, reason, globalLimit, concurrentLimit] of [
-    [{}, 'redis_not_configured', 500, 5],
+    [{}, 'redis_not_configured', 500, 10],
     [{ ...env, AI_GLOBAL_DAY_MAX: '-5' }, 'invalid_config', null, 5],
     [{ ...env, AI_GLOBAL_CONCURRENT_MAX: 'Infinity' }, 'invalid_config', 500, null],
   ]) {

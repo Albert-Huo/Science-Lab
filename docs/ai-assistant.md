@@ -25,7 +25,7 @@ python3 tools/build-ai-context.py --check
 | AI_RATE_LIMIT_DAY_MAX | 20 | 每IP每24小时上游调用 |
 | AI_SESSION_DAY_MAX | 20 | 每签名匿名会话每24小时 |
 | AI_GLOBAL_DAY_MAX | 500 | 全站每24小时调用上限 |
-| AI_GLOBAL_CONCURRENT_MAX | 5 | 全站同时进行的请求 |
+| AI_GLOBAL_CONCURRENT_MAX | 10 | 全站同时进行的请求；满额时返回429，不自动排队 |
 | AI_UPSTREAM_TIMEOUT_MS | 120000 | 单次上游总超时 |
 
 日额度窗口从该计数键首次使用开始，并非北京时间零点。有效请求预占调用次数后，即使取消、超时或上游失败也不退款，因为上游可能已计算；格式错误、缺Key、并发/日额度拒绝不会消耗日额度。Node还在校验前保留便宜的进程内分钟限流，畸形请求计入该短时保护；正常调用的分钟额度由Redis跨实例原子计数。Nginx的10r/m和burst=3继续保护入口。
