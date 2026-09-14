@@ -3,6 +3,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { quotaPresentation } = require('./traffic-quota-view.cjs');
+const { CATEGORIES, REASONS, cleanAutomation } = require('./traffic-automation.cjs');
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const count = value => Number(value).toLocaleString('zh-CN');
 const time = value => new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(value));
@@ -17,11 +18,15 @@ function toCsv(data, scope = 'current') {
   const outcomeLabels = { completed: 'AI服务端完成', client_aborted: 'AI客户端中断', upstream_timeout: 'AI上游超时', upstream_error: 'AI上游错误', stream_incomplete: 'AI流未完整结束', invalid_request: 'AI结果_无效请求', rate_limited: 'AI结果_限流', quota_unavailable: 'AI额度服务不可用', not_configured: 'AI模型未配置', internal_error: 'AI内部错误' };
   const scopeLabels = { ip_minute: 'IP分钟', ip_day: 'IP日', session_day: '会话日', global_day: '全站日', concurrency: '并发' };
   const reasonLabels = { ...scopeLabels, nginx: 'Nginx入口', unknown: '原因未知' };
+  const automationReasons = { verified_google: 'Google官方来源', verified_bing: 'Bing官方来源', ua_tool: '工具客户端', ua_declared_bot: '自称爬虫未验证', multi_probe: '成组敏感探测', probe_pattern: '多敏感路径', navigation_burst: '页面突发', periodic_navigation: '规律导航' };
+  const categories = ['verified', 'high', 'suspected', 'unclassified'];
   const coverageText = value => value === 'unavailable' ? '未采集' : value === 'partial' ? '部分时段已采集' : '按日志统计';
   const headers = ['记录类型', '区间开始_北京时间', '区间结束_北京时间', '生成时间_北京时间', '采集状态', '入口请求', '访客估算_不可跨行相加', '全部请求', '已识别自动请求', '4xx请求', '5xx请求', '电脑入口', '手机入口', '平板入口', '站内来源', '外部来源', '无来源信息', 'AI采集状态', 'AI请求', 'AI_HTTP_2xx', 'AI无效请求_400', 'AI限流_429', 'AI_5xx', 'AI其他状态', 'AI_2xx平均耗时毫秒', 'AI平均上下文消息数', 'AI平均输入字符数_历史混合口径', 'AI平均响应字节数',
     ...Object.values(reasonLabels).map(label => 'AI限流_' + label), '预期停用接口_503', '其他服务端_5xx',
     'AI结果采集状态', 'AI结果口径版本', 'AI已观察结果', ...Object.values(outcomeLabels),
-    ...Object.values(scopeLabels).map(label => 'AI结果限流_' + label), 'AI平均首内容耗时毫秒', 'AI平均规则资料字符数_v2', 'AI平均对话字符数_v2'];
+    ...Object.values(scopeLabels).map(label => 'AI结果限流_' + label), 'AI平均首内容耗时毫秒', 'AI平均规则资料字符数_v2', 'AI平均对话字符数_v2',
+    '自动分类状态', '自动分类版本', '已验证爬虫请求', '高置信自动特征请求', '疑似自动访问请求', '未命中自动规则请求',
+    '已验证爬虫入口', '高置信自动特征入口', '疑似自动入口', '未标记入口', '匿名AI未判定请求', ...Object.values(automationReasons).map(label => '自动原因_' + label)];
   const format = value => new Date(Date.parse(value) + 8 * 3600000).toISOString().replace('T', ' ').slice(0, 19) + '+08:00';
   const row = (kind, start, end, item, coverage) => {
     const metrics = coverage === 'unavailable' ? Array(12).fill('') : [item.entryRequests, item.visitorEstimate, item.requests, item.automated, item.clientErrors, item.serverErrors,
@@ -37,9 +42,13 @@ function toCsv(data, scope = 'current') {
       ...Object.keys(outcomeLabels).map(key => observation.outcomes[key] ?? 0),
       ...Object.keys(scopeLabels).map(key => observation.scopes[key] ?? 0),
       mean(observation.firstTokenMsTotal, observation.firstTokenSamples), mean(observation.promptCharsTotal, observation.inputSamples), mean(observation.conversationCharsTotal, observation.inputSamples)] : Array(20).fill('');
+    const automation = coverage === 'unavailable' ? null : item.automation;
+    const automationMetrics = automation ? [automation.version, ...categories.map(key => automation[key]),
+      ...categories.map(key => automation.entries[key]), automation.aiUnclassified, ...Object.keys(automationReasons).map(key => automation.reasons[key])] : Array(18).fill('');
     return [kind, format(start), format(end), format(data.generatedAt), coverageText(coverage), ...metrics,
       coverageText(ai.coverage), ...aiMetrics, ...reasons, item.expectedUnavailable ?? '', item.serviceErrors ?? '',
-      coverageText(observation?.coverage || 'unavailable'), ...results];
+      coverageText(observation?.coverage || 'unavailable'), ...results,
+      coverage === 'unavailable' ? '未采集' : automation ? '按规则回算' : '未知（旧数据）', ...automationMetrics];
   };
   const rows = scope === 'history'
     ? data.history.map(day => row('每日汇总', day.start, day.end, day, day.partial ? 'partial' : 'recorded'))
@@ -61,23 +70,45 @@ function renderDashboard(data) {
       data.totals.ai.experiments.some(item => !validExperiment(item))) {
     throw new Error('看板数据无效');
   }
-  const css = ['traffic-dashboard.css', 'traffic-dashboard-ai.css']
+  for (const item of [data.totals, ...data.hours, ...data.history]) cleanAutomation(item.automation, item.requests, item.entryRequests);
+  const css = ['traffic-dashboard.css', 'traffic-dashboard-ai.css', 'traffic-dashboard-automation.css']
     .map(file => fs.readFileSync(path.join(__dirname, file), 'utf8')).join('\n');
   const client = fs.readFileSync(path.join(__dirname, 'traffic-dashboard-client.js'), 'utf8');
   const json = JSON.stringify(data).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
   const script = `'use strict';\nconst trafficData = ${json};\nconst toCsv = ${toCsv.toString()};\nconst quotaPresentation = ${quotaPresentation.toString()};\n${client}`;
   const hash = crypto.createHash('sha256').update(script).digest('base64');
   const csp = `default-src 'none'; script-src 'sha256-${hash}'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'`;
-  const max = Math.max(1, ...data.hours.map(hour => hour.entryRequests));
+  const max = Math.max(1, ...data.hours.map(hour => hour.automation?.entries.unclassified ?? 0));
   const bars = data.hours.map((hour, i) => {
     const label = time(hour.start).slice(-5);
     const unavailable = hour.coverage === 'unavailable';
-    return `<button class="hour ${unavailable ? 'unavailable' : ''}" type="button" data-hour="${i}" aria-label="${escape(time(hour.start))}，${unavailable ? '未采集' : '入口请求 ' + hour.entryRequests}"><span class="column"><span class="fill" style="height:${hour.entryRequests / max * 100}%"></span></span><span class="hour-label">${i % 3 === 0 || i === 23 ? escape(label) : ''}</span></button>`;
+    const value = hour.automation?.entries.unclassified ?? 0;
+    return `<button class="hour ${unavailable ? 'unavailable' : ''}" type="button" data-hour="${i}" aria-label="${escape(time(hour.start))}，${unavailable ? '未采集' : '未标记入口 ' + value}"><span class="column"><span class="fill" style="height:${value / max * 100}%"></span></span><span class="hour-label">${i % 3 === 0 || i === 23 ? escape(label) : ''}</span></button>`;
   }).join('');
   const metric = (label, value, hint, className = '') => `<article class="metric ${className}"><span class="metric-label">${label}</span><strong>${count(value)}</strong><p>${hint}</p></article>`;
   const distribution = (label, value, total, symbol) => `<div class="distribution"><div class="distribution-line"><span><i aria-hidden="true">${symbol}</i>${label}</span><span><b>${count(value)}</b><small>${total ? Math.round(value / total * 100) + '%' : '—'}</small></span></div><div class="track"><span style="width:${total ? value / total * 100 : 0}%"></span></div></div>`;
   const total = data.totals;
   const ai = total.ai;
+  const automation = total.automation;
+  const classificationLabels = { verified: '已验证爬虫', high: '高置信自动特征', suspected: '疑似自动访问', unclassified: '未命中规则' };
+  const classificationHints = { verified: 'Google / Bing 声明 + 官方来源', high: '工具特征或成组扫描证据', suspected: '存在自动特征，证据尚不足', unclassified: '身份未知，不等于真人' };
+  const feed = data.botVerification;
+  const feedText = feed?.state === 'ready' ? '官方清单有效 · 每日更新' : feed?.state === 'partial' ? '官方清单部分可用 · 仅验证有效来源' : feed?.state === 'stale' ? '官方清单已过期 · 暂停来源验证' : '官方清单不可用 · 无法验证爬虫来源';
+  const providerText = Object.entries({ google: 'Google', bing: 'Bing' }).map(([key,label]) => {
+    const provider = feed?.providers?.[key];
+    return label + '：' + (provider?.state === 'ready' ? '有效' : provider?.state === 'stale' ? '过期' : '不可用') + (provider?.capturedAt ? '（' + time(provider.capturedAt) + ' 更新）' : '');
+  }).join(' · ');
+  const markedEntries = automation ? total.entryRequests - automation.entries.unclassified : null;
+  const reasonRows = automation ? Object.entries(REASONS).filter(([key]) => automation.reasons[key] > 0)
+    .sort(([a],[b]) => automation.reasons[b] - automation.reasons[a])
+    .map(([key,label]) => `<div><dt>${escape(label)}<small>${key}</small></dt><dd>${count(automation.reasons[key])}<small>次请求</small></dd></div>`).join('') : '';
+  const automationPanel = `<section class="panel automation-panel" aria-labelledby="automation-title"><div class="panel-heading"><div><span class="automation-eyebrow">TRAFFIC / CLASSIFICATION</span><h2 id="automation-title">访问分类</h2><p>规则 v1 · 只影响统计，不封禁访问 · 原始计数不变</p></div><span class="verification-status" data-state="${escape(feed?.state || 'unavailable')}">${escape(feedText)}</span></div>
+<div class="entry-assessment"><div><span>未标记入口</span><strong>${automation ? count(automation.entries.unclassified) : '—'}</strong><small>候选入口，不等于真人访问</small></div><p>原始浏览器特征入口 <b>${count(total.entryRequests)}</b> 次，其中 <b>${markedEntries === null ? '未知' : count(markedEntries)}</b> 次带有自动访问标记。<br>刷新、预取或伪装浏览器仍可能计入；不把剩余请求当成真实人数。</p></div>
+<div class="classification-strip" aria-hidden="true">${CATEGORIES.map(key => `<span class="classification-${key}" style="flex-grow:${automation?.[key] || 0}"></span>`).join('')}</div>
+<div class="classification-grid">${CATEGORIES.map(key => `<article class="classification-item classification-${key}"><span><i aria-hidden="true"></i>${classificationLabels[key]}</span><strong>${automation ? count(automation[key]) : '—'}<small>次请求</small></strong><p>${classificationHints[key]}</p><small>${automation && total.requests ? (automation[key] / total.requests * 100).toFixed(1) + '%' : '—'} · 全部请求占比</small></article>`).join('')}</div>
+<p class="classification-note">${escape(providerText)}</p>
+<p class="classification-note">四类请求互斥，合计为全部请求。${automation?.aiUnclassified ? '其中 ' + count(automation.aiUnclassified) + ' 次匿名 AI 请求缺少身份信息，归入未命中规则。' : '匿名 AI 日志不用于判断真人。'}验证来源不代表行为安全，仍单独保留扫描标记。</p>
+<details class="automation-details"><summary>查看判定原因与规则</summary><div class="automation-reasons"><h3>本期命中的判定原因</h3>${reasonRows ? '<dl>' + reasonRows + '</dl>' : '<p>本期暂无命中的判定原因，或分类尚未启用。</p>'}<p>原因数量代表带该标记的请求，可重叠，不能相加。行为证据来自截至统计窗口结束的北京时间同日 IP 与浏览器组合；标记关联到该组合的请求，不是探测路径条数。</p></div><div class="automation-rules"><h3>保守判定，不等于身份确认</h3><p>自称爬虫而来源未验证，仅列疑似；成组敏感路径探测或工具客户端特征列为高置信。页面突发、长期规律导航仅列疑似，不触发封禁。</p><p>凌晨访问、无来源信息、单个 404、几次刷新和静态资源突发，不单独参与判定。共享出口和相同浏览器仍可能混合多位用户，应结合原因复核。</p><p>Google / Bing 官方清单每天独立更新，报表任务只读本地文件；超过 7 天停止来源验证。其他爬虫未接入官方验证，不能仅凭名称认定正规来源。</p><p>行为观察使用有界样本，无法识别所有自动程序。不采集鼠标轨迹或浏览器指纹；IP、UA、原始路径和完整来源不进入网页、CSV 或历史汇总。旧历史缺少分类时保留未知，不补零。</p><dl>${Object.entries(REASONS).map(([key,label]) => `<div><dt>${key}</dt><dd>${escape(label)}</dd></div>`).join('')}</dl></div></details></section>`;
   const aiMetric = (label, value, hint) => `<article class="ai-metric"><span>${label}</span><strong>${value}</strong><small>${hint}</small></article>`;
   const observation = ai.observation;
   const observed = observation && observation.coverage !== 'unavailable';
@@ -94,7 +125,8 @@ function renderDashboard(data) {
 <div class="update-strip"><span>生成于 <b>${escape(time(data.generatedAt))}</b></span><span>下次更新 <b>${escape(time(data.nextUpdate))}</b></span><span>每次向前滚动 2 小时</span></div>
 <div id="update-warning" class="notice warning" role="status" hidden></div>
 ${data.partial ? `<div class="notice"><span class="notice-symbol">i</span><span>统计自 ${escape(time(data.collectionStart))} 开始，当前窗口尚未覆盖完整 24 小时。图中斜纹表示未采集时段，不计作零访问。</span></div>` : ''}
-<section class="metrics" aria-label="24小时概览">${metric('入口请求', total.entryRequests, '浏览器对实验馆首页的有效请求', 'lead')}${metric('访客估算', total.visitorEstimate, '24 小时内去重 · 不代表真实人数')}${metric('全部请求', total.requests, '包含页面、资源、接口及自动请求')}</section>
+<section class="metrics" aria-label="24小时概览">${metric('浏览器特征入口', total.entryRequests, '原始入口口径 · 不等于真人访问', 'lead')}${metric('入口组合估算', total.visitorEstimate, '原始 IP + UA 去重 · 不代表真实人数')}${metric('全部请求', total.requests, '包含页面、资源、接口及自动请求')}</section>
+${automationPanel}
 ${quotaPanel}
 <p class="traffic-health">HTTP 5xx 原始总数 <b>${count(total.serverErrors)}</b><span>预期停用接口 503 <b>${total.expectedUnavailable == null ? '未知（旧数据）' : count(total.expectedUnavailable)}</b></span><span>其他服务端 5xx <b>${total.serviceErrors == null ? '未知（旧数据）' : count(total.serviceErrors)}</b></span></p>
 <section class="panel ai-panel" aria-labelledby="ai-title"><div class="ai-heading"><div><span class="ai-eyebrow">AI / BUILT-IN</span><h2 id="ai-title">AI 交互 <small>仅内置模式</small></h2><p>匿名请求元数据 · BYOK 不在统计范围</p></div><span class="ai-coverage">${ai.coverage === 'recorded' ? '24 小时已采集' : ai.coverage === 'partial' ? '部分时段已采集' : '尚未开始采集'}</span></div>
@@ -104,12 +136,12 @@ ${quotaPanel}
 <p class="ai-sample-note">输入字符包含服务端规则、实验资料与对话历史，不是本次提问长度，也不是 token 数。HTTP 日志保留历史混合口径；v2 结果日志单独拆分规则／资料和对话，不与旧样本直接比较。${observed ? 'v2 平均规则／资料 ' + (average(observation.promptCharsTotal, observation.inputSamples) ?? '—') + ' 字符，平均对话 ' + (average(observation.conversationCharsTotal, observation.inputSamples) ?? '—') + ' 字符。' : ''}HTTP 2xx 平均耗时 ${duration(average(ai.durationMsTotal, ai.durationSamples))}（含传输）。</p>
 ${resultDetails}
 <p class="ai-privacy">不保存问题或回答正文，不记录 API Key、IP、浏览器标识或用户身份。</p></section>
-<section class="panel trend-panel"><div class="panel-heading"><div><h2>小时趋势</h2><p>查看访问与 AI 请求随时间的变化</p></div><div class="segmented" role="group" aria-label="趋势指标"><button type="button" data-metric="entryRequests" aria-pressed="true">入口请求</button><button type="button" data-metric="visitorEstimate" aria-pressed="false">访客估算</button><button type="button" data-metric="requests" aria-pressed="false">全部请求</button><button type="button" data-metric="ai.requests" aria-pressed="false">AI 请求</button><button type="button" data-metric="ai.httpSuccesses" aria-pressed="false">AI 2xx</button></div></div>
-<div class="chart-topline"><span id="chart-detail" aria-live="polite">轻触柱形或用键盘选择，查看该小时数据</span><span id="chart-scale">最高 ${count(max === 1 && !total.entryRequests ? 0 : max)}</span></div><div class="chart"><div class="chart-guides" aria-hidden="true"></div><div class="bars">${bars}</div></div><div class="chart-footnote"><span><i class="legend"></i> <span id="metric-label">入口请求</span></span><span id="metric-note">小时访客估算不可相加为全天人数</span></div>
-<details class="hour-details"><summary>查看 24 小时明细</summary><div class="table-scroll"><table><thead><tr><th>时段</th><th>入口请求</th><th>访客估算</th><th>全部请求</th><th>AI 请求</th><th>AI 2xx</th></tr></thead><tbody>${data.hours.map(hour => `<tr><th>${escape(time(hour.start))} — ${escape(time(hour.end).slice(-5))}${hour.coverage !== 'recorded' ? '<small>' + (hour.coverage === 'unavailable' ? '未采集' : '部分采集') + '</small>' : ''}</th>${['entryRequests', 'visitorEstimate', 'requests'].map(key => `<td>${hour.coverage === 'unavailable' ? '—' : count(hour[key])}</td>`).join('')}${['requests', 'httpSuccesses'].map(key => `<td>${hour.ai.coverage === 'unavailable' ? '—' : count(hour.ai[key])}</td>`).join('')}</tr>`).join('')}</tbody></table></div></details></section>
+<section class="panel trend-panel"><div class="panel-heading"><div><h2>小时趋势</h2><p>对照原始流量、候选入口与自动访问</p></div><div class="segmented" role="group" aria-label="趋势指标"><button type="button" data-metric="automation.entries.unclassified" aria-pressed="true">未标记入口</button><button type="button" data-metric="entryRequests" aria-pressed="false">原始入口</button><button type="button" data-metric="visitorEstimate" aria-pressed="false">组合估算</button><button type="button" data-metric="requests" aria-pressed="false">全部请求</button><button type="button" data-metric="automation.high" aria-pressed="false">高置信自动</button><button type="button" data-metric="automation.suspected" aria-pressed="false">疑似自动</button><button type="button" data-metric="ai.requests" aria-pressed="false">AI 请求</button><button type="button" data-metric="ai.httpSuccesses" aria-pressed="false">AI 2xx</button></div></div>
+<div class="chart-topline"><span id="chart-detail" aria-live="polite">轻触柱形或用键盘选择，查看该小时数据</span><span id="chart-scale">最高 ${count(Math.max(0, ...data.hours.map(hour => hour.automation?.entries.unclassified ?? 0)))}</span></div><div class="chart"><div class="chart-guides" aria-hidden="true"></div><div class="bars">${bars}</div></div><div class="chart-footnote"><span><i class="legend"></i> <span id="metric-label">未标记入口</span></span><span id="metric-note">未标记不等于真人访问</span></div>
+<details class="hour-details"><summary>查看 24 小时明细</summary><div class="table-scroll"><table><thead><tr><th>时段</th><th>原始入口</th><th>组合估算</th><th>全部请求</th><th>未标记入口</th><th class="classified-heading">已验证爬虫</th><th class="classified-heading">高置信自动</th><th class="classified-heading">疑似自动</th><th>未命中规则</th><th>AI 请求</th><th>AI 2xx</th></tr></thead><tbody>${data.hours.map(hour => `<tr><th>${escape(time(hour.start))} — ${escape(time(hour.end).slice(-5))}${hour.coverage !== 'recorded' ? '<small>' + (hour.coverage === 'unavailable' ? '未采集' : '部分采集') + '</small>' : ''}</th>${['entryRequests', 'visitorEstimate', 'requests'].map(key => `<td>${hour.coverage === 'unavailable' ? '—' : count(hour[key])}</td>`).join('')}<td>${hour.coverage === 'unavailable' || !hour.automation ? '—' : count(hour.automation.entries.unclassified)}</td>${CATEGORIES.map(key => `<td>${hour.coverage === 'unavailable' || !hour.automation ? '—' : count(hour.automation[key])}</td>`).join('')}${['requests', 'httpSuccesses'].map(key => `<td>${hour.ai.coverage === 'unavailable' ? '—' : count(hour.ai[key])}</td>`).join('')}</tr>`).join('')}</tbody></table></div></details></section>
 <div class="breakdowns"><section class="panel"><div class="panel-heading"><h2>访问设备</h2><span class="caption">按入口请求</span></div>${distribution('电脑', total.devices.desktop, total.entryRequests, '▱')}${distribution('手机', total.devices.mobile, total.entryRequests, '▯')}${distribution('平板', total.devices.tablet, total.entryRequests, '▭')}<p class="panel-note">根据浏览器信息粗略识别，可能存在误判。</p></section><section class="panel"><div class="panel-heading"><h2>来源概览</h2><span class="caption">按入口请求</span></div>${distribution('站内跳转', total.sources.internal, total.entryRequests, '↻')}${distribution('外部链接', total.sources.external, total.entryRequests, '↗')}${distribution('无来源信息', total.sources.unknown, total.entryRequests, '–')}<p class="panel-note">无来源信息不一定是直接访问，也可能由隐私设置造成。</p></section></div>
 <section class="archive"><div><span class="archive-label">留一份观察记录</span><h2>历史每日汇总</h2><p>已归档 ${count(data.history.length)} 天 · 最多保留 400 天 · 每天结束后归档</p></div><button id="download-history" class="secondary" type="button" ${data.history.length ? '' : 'disabled'}>${data.history.length ? '下载历史 CSV' : '等待首日归档'} <span aria-hidden="true">↓</span></button></section>
-<details class="methodology"><summary>统计口径与数据说明</summary><div><p>入口请求只计算浏览器特征的 GET 首页请求，状态为 200 / 304，并排除可识别的机器人和验收请求。预取可能多计，缓存或离线访问可能漏计。</p><p>访客按 IP 与浏览器标识组合在内存中去重，共享网络与设备变化会影响估算。小时或每日访客数不能相加作为更长期间的去重人数。</p><p>本期全部请求中识别到 ${count(total.automated)} 条自动请求，${count(total.clientErrors)} 条 4xx、${count(total.serverErrors)} 条 5xx 响应。统计页自身请求不计入访问日志。</p><p>AI 统计只包含本站内置模式，BYOK 不在统计范围。HTTP 2xx 表示流式接口已建立，不保证浏览器最终收到 [DONE]；请求耗时包含响应传输，响应字节不是 token 数。</p><p>AI 专用日志不含 IP、浏览器、来源或请求正文；实验只以定长哈希记录并在当前 24 小时内映射。每日历史不保存实验排行，也不保存问题或回答正文。</p><p>时间区间含开始、不含结束。页面展示最近一个双数整点之前的 24 小时，每 2 小时生成；更新失败时继续展示旧快照并提示延迟。无日志记录无法区分无人访问、离线缓存或服务器中断。</p><p>CSV 与当前屏幕来自同一份快照，仅含汇总数字，使用 UTF-8 编码，可用 Excel 打开。原始 IP、浏览器标识及完整来源网址不进入网页或下载文件。历史 CSV 中首个采集日会标记为部分采集。</p><p>原始日志沿用每日轮转、保留 10 份历史文件。每日汇总保留 400 天；服务器长时间停机、超过原始日志保留期的缺失数据无法补算。本版不包含地区或停留时间。</p></div></details>
+<details class="methodology"><summary>统计口径与数据说明</summary><div><p>浏览器特征入口沿用原入口请求口径：GET 首页、状态 200 / 304，且未命中旧 UA 自动特征规则，不是身份认证。未标记入口是其中未命中新版自动规则的子集，仍不等于真人。预取可能多计，缓存或离线访问可能漏计。</p><p>入口组合估算沿用原访客估算，在内存中按 IP 与浏览器标识去重，包含可能被新版标记的入口。共享网络与设备变化会影响估算；小时或每日组合数不能相加作为更长期间人数。设备和来源仍按原始入口统计，未静默过滤。</p><p>原 UA 规则命中 ${count(total.automated)} 条请求，仅作历史兼容指标，不等于已验证机器人。新分类单独展示并保留原因；${count(total.clientErrors)} 条 4xx、${count(total.serverErrors)} 条 5xx 响应。统计页自身请求不计入访问日志。</p><p>AI 统计只包含本站内置模式，BYOK 不在统计范围。HTTP 2xx 表示流式接口已建立，不保证浏览器最终收到 [DONE]；请求耗时包含响应传输，响应字节不是 token 数。</p><p>AI 专用日志不含 IP、浏览器、来源或请求正文；实验只以定长哈希记录并在当前 24 小时内映射。每日历史不保存实验排行，也不保存问题或回答正文。</p><p>时间区间含开始、不含结束。页面展示最近一个双数整点之前的 24 小时，每 2 小时生成；更新失败时继续展示旧快照并提示延迟。无日志记录无法区分无人访问、离线缓存或服务器中断。</p><p>CSV 与当前屏幕来自同一份快照，仅含汇总数字，使用 UTF-8 编码，可用 Excel 打开。原始 IP、浏览器标识及完整来源网址不进入网页或下载文件。历史 CSV 中首个采集日会标记为部分采集；旧历史无分类证据时显示未知，不补零。</p><p>原始日志沿用每日轮转、保留 10 份历史文件。每日汇总保留 400 天；保留日志内的完整日可按本版规则回算，未来规则版本变化应单独比较。服务器长时间停机、超过原始日志保留期的缺失数据无法补算。本版不包含地区或停留时间。</p></div></details>
 <noscript><div class="notice">浏览器禁用了脚本，请手动刷新查看新一期报告；下载功能需要启用 JavaScript。</div></noscript>
 <footer><span>SCIENCE LAB <span class="footer-dot">·</span> 让每一次探索被看见</span><span>lab.xingnian.net.cn <span class="footer-dot">·</span> 仅维护者可见</span></footer>
 </main><script>${script}</script></body></html>`;

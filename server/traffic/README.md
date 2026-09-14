@@ -19,7 +19,7 @@
 | `/etc/systemd/system/science-lab-traffic.service` | 受限的一次性更新任务，复用现有Node22运行时 |
 | `/etc/systemd/system/science-lab-traffic.timer` | 北京时间每个双数整点更新，开机补跑错过的执行 |
 
-准确的10个运行文件是 `traffic-report.cjs`、`traffic-ai-report.cjs`、`traffic-ai-outcomes.cjs`、`traffic-dashboard.cjs`、`traffic-dashboard-view.cjs`、`traffic-dashboard-client.js`、`traffic-dashboard.css`、`traffic-dashboard-ai.css`、`traffic-quota-view.cjs`、`ai-quota-snapshot.cjs`，不要把整个仓库部署到统计目录。`www`上级目录为root:nginx、0750，网页为0644；历史数据为0600。
+准确的13个运行文件是 `traffic-report.cjs`、`traffic-ai-report.cjs`、`traffic-ai-outcomes.cjs`、`traffic-dashboard.cjs`、`traffic-dashboard-view.cjs`、`traffic-dashboard-client.js`、`traffic-dashboard.css`、`traffic-dashboard-ai.css`、`traffic-quota-view.cjs`、`ai-quota-snapshot.cjs`、`traffic-automation.cjs`、`traffic-bot-ranges.cjs`、`traffic-dashboard-automation.css`，不要把整个仓库部署到统计目录。`www`上级目录为root:nginx、0750，网页为0644；历史数据为0600。
 
 ## 更新与检查
 
@@ -55,6 +55,38 @@ journalctl -u science-lab-traffic.service -n 20 --no-pager
 - 不读取旧混合日志；损坏压缩日志、无法解析的记录或损坏历史文件会明确失败并保留旧页面，需查明原因再恢复，不能默默丢弃原始日志或重建空历史。
 - 原始日志、历史状态和凭据均不能放入Web目录或Git。统计页面自身访问不写访问日志，公开App缓存也不拦截这两个私有页面路径。
 - 页面与下载文件共享同一内嵌快照，使用脚本散列限制可执行脚本，响应设置no-store、noindex、nosniff、no-referrer和禁止嵌入。
+
+## 自动访问分类 v1
+
+仅优化统计，不改变 Nginx 防护、AI 配额或访问权限。没有新增浏览器追踪或收费服务。原入口、访客去重、设备来源和 HTTP 计数保留；网页分别称“浏览器特征入口”“入口组合估算”，不宣称真人。
+
+全部请求互斥分成已验证爬虫、高置信自动特征、疑似自动访问、未命中规则。原入口另按同一判定拆分，“未标记入口”为原入口中未命中规则的子集，不是实际用户数。AI 专用匿名日志不具备身份信息，统一加入未命中并单列数量。`automated` 旧 UA 指标保留用于 CSV 历史兼容，不等于来源已验证。
+
+生成器两遍流式读取独立日志。首遍按北京时间同日 IP+UA 建立行为观察，第二遍将判定关联到同一组合的请求（包括其首页和资源）。只使用截至统计窗口结束的证据，不把之后的扫描反向应用。原因计数可重叠，不能相加，也不是路径条数。共享出口同 UA 可能混合用户；短刷新、单个404、凌晨、无Referer及静态资源突发不单独参与规则。成组探测为高置信；页面突发、规律导航及来源未验证的爬虫声明仅疑似。高置信不等于恶意，更不等于入侵成功。
+
+总扫描最多100万行，包含两遍读取、空行、窗口外记录、AI及终态来源。观察最多8000个按日组合，全局分钟桶最多16000、时间样本128000、保留字符串200万字符单元。每组敏感路径保留3个，页面规律采样保留按字典序前4个页面的最早64次请求；采样不足时不推断身份。原始行最多16KiB、组合标识2048、路径4096字符，保留字段复制为独立字符串，避免短切片滞留完整查询串。UA仅按有限产品token的完整边界匹配，避免设备名中的词片段误判。首遍结束后释放观察数据，只保留固定判定。超长输入、观察预算、分组上限、坏日志、坏历史、分类分区不一致均明确失败，保留旧页面。现有128MB/90秒限制不变。
+
+新增 `science-lab-bot-ranges.service/timer` 每天北京时间05:40起、随机延迟5分钟更新两家官方公开IP清单：
+
+- Google：[common-crawlers.json](https://developers.google.com/static/crawling/ipranges/common-crawlers.json)，连接失败时仅回退到同一 Google 官方开发者中国域名 `developers.google.cn` 下的相同路径。
+- Bing：[bingbot.json](https://www.bing.com/toolbox/bingbot.json)。
+
+仅 GET 固定 HTTPS 地址，拒绝重定向，单次下载4.5秒、整体10秒截止、每响应最多512KB，校验CIDR后原子写入 `/var/lib/science-lab-traffic/bot-ranges.json`（root:root、0600；不对外映射）。独立网络任务不读取日志、环境凭据或客户端地址，不向第三方发送用户数据。报表任务继续 `PrivateNetwork=true`，通过 `--bot-ranges-file` 只读本地清单。
+
+来源独立更新：失败保留对应供应商原清单与原时间，其他供应商可继续更新。部分失败时任务报告失败以便排查，但已成功来源会正常保存；超过7天停止使用该来源验证。页面分别展示Google/Bing有效状态与时间。必须“对应爬虫UA声明 + 对应官方IP段”双匹配，不能仅凭Googlebot名称或Google云IP验证。其他爬虫仍未验证；正规来源也可保留探测行为标记。
+
+历史仍为schema2、页面仍为schema3，新增白名单 `automation.version=1` 字段。旧记录无分类证据时为null，CSV分类列为空而非零；保留日志内的完整日可按v1回算，首个可能截断日仍不覆盖原历史。任一HTTP来源完全无观测时保留已归档的整份HTTP/分类分区（旧AI otherStatuses无法精确拆出4xx，不拼造），独立终态完整观测仍可更新；无观测不新建零归档，AI启用前无需AI日志证据。分类版本变化时应分开比较。网页、CSV、400天历史均不包含原始IP、UA、查询参数、完整路径、完整来源或会话标识；服务器私有官方清单包含的是爬虫供应商公开IP段，不是访问者地址。
+
+部署前运行 `node --test server/api/test/traffic*.js` 与 `npm --prefix server/api test`。暂停统计timer、等任务结束、备份精确代码与私有状态，先在影子目录用真实日志比较原始指标，再成组发布13个运行文件。已有AI终态部署应更新其 `observability.conf` 以包含清单参数，不丢失现有启用时间。安装两个新增systemd文件，`systemd-analyze verify` 后daemon-reload，手动运行官方清单任务与报表任务，成功后启用每日timer及恢复两小时timer。不会重启公开API或reload Nginx。
+
+```bash
+systemctl start science-lab-bot-ranges.service
+systemctl show science-lab-bot-ranges.service -p Result -p ExecMainStatus
+journalctl -u science-lab-bot-ranges.service -n 10 --no-pager
+systemctl start science-lab-traffic.service
+```
+
+回退时暂停两小时timer并停用新增每日timer，确认报表任务不运行；成组恢复旧统计代码和旧service/drop-in，再恢复备份HTML和私有历史（前提是暂停后尚无新归档；否则先备份当前状态并保留新增归档，避免丢失数据）。旧生成器会忽略新增字段，不要求删除原日志或官方清单。daemon-reload并恢复原timer。私有文件不能复制到公开Web根目录。
 
 ## AI 观测升级与配置
 

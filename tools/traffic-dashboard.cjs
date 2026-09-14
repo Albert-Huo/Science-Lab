@@ -8,6 +8,8 @@ const { parseRecord, visitLogDirectory } = require('./traffic-report.cjs');
 const { parseAiRecord, visitAiLogDirectory, loadExperimentMap, QUOTA_SCOPES } = require('./traffic-ai-report.cjs');
 const { parseAiEvent, visitAiEventLogDirectory, observationBucket, addObservation, cleanObservation } = require('./traffic-ai-outcomes.cjs');
 const { renderDashboard } = require('./traffic-dashboard-view.cjs');
+const { createDetector, automationBucket, addAutomation, cleanAutomation } = require('./traffic-automation.cjs');
+const { loadBotRanges } = require('./traffic-bot-ranges.cjs');
 const HOUR = 3600000, DAY = 24 * HOUR, PERIOD = 2 * HOUR;
 const iso = value => new Date(value).toISOString();
 const localDay = time => Math.floor((time + 8 * HOUR) / DAY) * DAY - 8 * HOUR;
@@ -27,7 +29,7 @@ function aiBucket(trackExperiments = false) {
 function bucket(trackAiExperiments = false) {
   return { requests: 0, entryRequests: 0, automated: 0, clientErrors: 0, serverErrors: 0, expectedUnavailable: 0, serviceErrors: 0,
     devices: { desktop: 0, mobile: 0, tablet: 0 }, sources: { internal: 0, external: 0, unknown: 0 },
-    identities: new Set(), ai: aiBucket(trackAiExperiments) };
+    identities: new Set(), ai: aiBucket(trackAiExperiments), automation: automationBucket() };
 }
 function addStatus(target, status, uri = '') {
   target.requests++;
@@ -38,8 +40,9 @@ function addStatus(target, status, uri = '') {
     else target.serviceErrors++;
   }
 }
-function add(target, record) {
+function add(target, record, decision) {
   addStatus(target, record.status, record.uri);
+  addAutomation(target.automation, record, decision);
   if (record.automated) target.automated++;
   if (!record.entry) return;
   target.entryRequests++;
@@ -49,6 +52,7 @@ function add(target, record) {
 }
 function addAi(target, record, experimentMap) {
   addStatus(target, record.status);
+  addAutomation(target.automation, { entry: false }, { category: 'unclassified', reasons: [], anonymousAi: true });
   const ai = target.ai;
   ai.requests++;
   if (record.status >= 200 && record.status < 300) {
@@ -86,7 +90,7 @@ function finish(target, aiState, observationState = 'unavailable') {
   return { ...values, visitorEstimate: identities.size, ai: finishAi(ai, aiState, observationState) };
 }
 
-function createRolling({ now = Date.now(), collectionStart, aiCollectionStart, aiEventCollectionStart, aiEventLogDir, experimentMap = new Map() }) {
+function createRolling({ now = Date.now(), collectionStart, aiCollectionStart, aiEventCollectionStart, aiEventLogDir, experimentMap = new Map(), botRangesFile, maxLogLines = 1000000 }) {
   const started = Date.parse(collectionStart);
   const aiStarted = Date.parse(aiCollectionStart);
   if (!Number.isFinite(now) || !Number.isFinite(started) || started > now) throw new Error('采集开始时间无效');
@@ -95,24 +99,41 @@ function createRolling({ now = Date.now(), collectionStart, aiCollectionStart, a
   const eventStarted = aiEventCollectionStart === undefined ? NaN : Date.parse(aiEventCollectionStart);
   if (aiEventCollectionStart !== undefined && (!Number.isFinite(eventStarted) || eventStarted > now || typeof aiEventLogDir !== 'string' || !aiEventLogDir)) throw new Error('AI 终态采集配置无效');
   if (!(experimentMap instanceof Map)) throw new Error('实验映射无效');
+  if (!Number.isSafeInteger(maxLogLines) || maxLogLines <= 0) throw new Error('扫描行预算无效');
   const end = Math.floor(now / PERIOD) * PERIOD, start = end - DAY;
+  const botRanges = loadBotRanges(botRangesFile, now), detector = createDetector({ botRanges });
   const totals = bucket(true), hours = Array.from({ length: 24 }, () => bucket()), days = new Map();
-  let earliestTraffic = Infinity, earliestAi = Infinity, earliestEvent = Infinity, invalid = 0;
+  let earliestTraffic = Infinity, earliestAi = Infinity, earliestEvent = Infinity, invalid = 0, scannedLines = 0;
+  function scan(line) {
+    if (++scannedLines > maxLogLines) throw new Error('统计扫描行预算超出限制，保留上一份报告');
+    if (line.length > 16384) throw new Error('自动访问观察输入超出限制，保留上一份报告');
+  }
   return {
+    finishObservation() { detector.seal(); },
+    observe(line) {
+      scan(line);
+      let record;
+      try { record = parseRecord(line); } catch { return; } // The counting pass rejects malformed input once, without publishing it.
+      if (!record || record.uri.startsWith('/admin/') || record.timestamp < started || record.timestamp >= end) return;
+      detector.observe(record);
+    },
     add(line) {
+      scan(line);
       let record;
       try { record = parseRecord(line); } catch { invalid++; return; } // Count malformed input; publishing fails closed below.
       if (!record || record.uri.startsWith('/admin/')) return;
       if (record.timestamp < started || record.timestamp >= end) return;
+      const decision = detector.classify(record);
       earliestTraffic = Math.min(earliestTraffic, record.timestamp);
       const date = localDay(record.timestamp);
       if (!days.has(date)) days.set(date, bucket());
-      add(days.get(date), record);
+      add(days.get(date), record, decision);
       if (record.timestamp < start) return;
-      add(totals, record);
-      add(hours[Math.floor((record.timestamp - start) / HOUR)], record);
+      add(totals, record, decision);
+      add(hours[Math.floor((record.timestamp - start) / HOUR)], record, decision);
     },
     addAi(line) {
+      scan(line);
       let record;
       try { record = parseAiRecord(line); } catch { invalid++; return; }
       if (!record || record.timestamp < aiStarted || record.timestamp >= end) return;
@@ -125,6 +146,7 @@ function createRolling({ now = Date.now(), collectionStart, aiCollectionStart, a
       addAi(hours[Math.floor((record.timestamp - start) / HOUR)], record, experimentMap);
     },
     addAiEvent(line) {
+      scan(line);
       let record;
       try { record = parseAiEvent(line); } catch { invalid++; return; }
       if (!record) return;
@@ -159,6 +181,7 @@ function createRolling({ now = Date.now(), collectionStart, aiCollectionStart, a
       return {
         schema: 3, site: 'lab.xingnian.net.cn', generatedAt: iso(now), collectionStart: iso(started), aiCollectionStart: iso(aiStarted),
         aiEventCollectionStart: Number.isFinite(eventStarted) ? iso(eventStarted) : null,
+        automationRulesVersion: 1, botVerification: { state: botRanges.state, capturedAt: botRanges.capturedAt, providers: botRanges.providers },
         windowStart: iso(start), windowEnd: iso(end), nextUpdate: iso(end + PERIOD),
         partial: started > start, totals: finish(totals, aiCoverage(start, end, aiStarted), aiCoverage(start, end, eventStarted)),
         hours: hours.map((hour, index) => ({ start: iso(start + index * HOUR), end: iso(start + (index + 1) * HOUR),
@@ -173,6 +196,8 @@ function createRolling({ now = Date.now(), collectionStart, aiCollectionStart, a
 
 function rollingSummary(lines, options) {
   const accumulator = createRolling(options);
+  for (const line of lines) accumulator.observe(line);
+  accumulator.finishObservation();
   for (const line of lines) accumulator.add(line);
   for (const line of options.aiLines || []) accumulator.addAi(line);
   for (const line of options.aiEventLines || []) accumulator.addAiEvent(line);
@@ -225,6 +250,7 @@ function cleanDaily(record, schema) {
     }
   }
   result.ai = schema === 1 ? unavailableAi() : cleanAi(record.ai);
+  result.automation = cleanAutomation(record.automation, result.requests, result.entryRequests);
   return result;
 }
 function mergeHistory(previous, daily, cutoff) {
@@ -240,7 +266,16 @@ function mergeHistory(previous, daily, cutoff) {
     const day = Date.parse(clean.start);
     if (day >= localDay(cutoff) - 400 * DAY && Date.parse(clean.end) <= cutoff) {
       const prior = entries.get(clean.day);
-      if (prior && clean.ai.observation.coverage === 'unavailable') clean.ai.observation = prior.ai.observation;
+      const missingTraffic = prior && clean.requests === clean.ai.requests && prior.requests > prior.ai.requests;
+      const missingAi = prior && !clean.ai.requests && prior.ai.requests > 0;
+      if (missingTraffic || missingAi) {
+        // Old AI otherStatuses do not separate 4xx: preserve the whole HTTP partition rather than invent a split.
+        if (clean.ai.observation.coverage !== 'unavailable' && clean.ai.observation.requests > 0) prior.ai.observation = clean.ai.observation;
+        continue;
+      }
+      if (!prior && !clean.requests && !clean.ai.observation.requests) continue;
+      if (prior && (clean.ai.observation.coverage === 'unavailable' || !clean.ai.observation.requests && prior.ai.observation.requests > 0)) clean.ai.observation = prior.ai.observation;
+      if (prior && !clean.automation && prior.requests === clean.requests && prior.entryRequests === clean.entryRequests) clean.automation = prior.automation;
       entries.set(clean.day, clean);
     }
   }
@@ -263,12 +298,14 @@ function atomicWrite(file, value, mode) {
 }
 
 async function publish({ logDir, aiLogDir, manifestFile, stateDir, collectionStart, aiCollectionStart,
-  aiEventCollectionStart, aiEventLogDir, now = Date.now() }) {
+  aiEventCollectionStart, aiEventLogDir, botRangesFile, now = Date.now() }) {
   if (!path.isAbsolute(stateDir) || !fs.lstatSync(stateDir).isDirectory()) throw new Error('汇总目录必须是已存在的普通目录');
   const www = path.join(stateDir, 'www');
   if (!fs.lstatSync(www).isDirectory()) throw new Error('网页目录必须是普通目录');
   const experimentMap = loadExperimentMap(manifestFile);
-  const accumulator = createRolling({ now, collectionStart, aiCollectionStart, aiEventCollectionStart, aiEventLogDir, experimentMap });
+  const accumulator = createRolling({ now, collectionStart, aiCollectionStart, aiEventCollectionStart, aiEventLogDir, experimentMap, botRangesFile });
+  await visitLogDirectory(logDir, line => accumulator.observe(line));
+  accumulator.finishObservation();
   await visitLogDirectory(logDir, line => accumulator.add(line));
   await visitAiLogDirectory(aiLogDir, line => accumulator.addAi(line));
   if (aiEventLogDir !== undefined) await visitAiEventLogDirectory(aiEventLogDir, line => accumulator.addAiEvent(line));
@@ -293,14 +330,14 @@ async function main(args) {
   const options = {};
   for (let i = 0; i < args.length; i += 2) {
     if (!['--log-dir', '--ai-log-dir', '--manifest-file', '--state-dir', '--collection-start', '--ai-collection-start',
-      '--ai-event-collection-start', '--ai-event-log-dir'].includes(args[i]) || !args[i + 1]) throw new Error('统计参数无效');
+      '--ai-event-collection-start', '--ai-event-log-dir', '--bot-ranges-file'].includes(args[i]) || !args[i + 1]) throw new Error('统计参数无效');
     options[args[i].slice(2)] = args[i + 1];
   }
   const required = ['log-dir', 'ai-log-dir', 'manifest-file', 'state-dir', 'collection-start', 'ai-collection-start'];
   if (required.some(key => !options[key])) throw new Error('统计参数无效');
   const data = await publish({ logDir: options['log-dir'], aiLogDir: options['ai-log-dir'], manifestFile: options['manifest-file'],
     stateDir: options['state-dir'], collectionStart: options['collection-start'], aiCollectionStart: options['ai-collection-start'],
-    aiEventCollectionStart: options['ai-event-collection-start'], aiEventLogDir: options['ai-event-log-dir'] });
+    aiEventCollectionStart: options['ai-event-collection-start'], aiEventLogDir: options['ai-event-log-dir'], botRangesFile: options['bot-ranges-file'] });
   console.log(`统计已更新：${data.windowStart} 至 ${data.windowEnd}；入口 ${data.totals.entryRequests}；访客估算 ${data.totals.visitorEstimate}；AI ${data.totals.ai.requests}`);
 }
 module.exports = { HOUR, DAY, PERIOD, createRolling, rollingSummary, mergeHistory, publish, atomicWrite };

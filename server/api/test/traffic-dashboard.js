@@ -32,6 +32,100 @@ const terminal = (values = {}) => JSON.stringify({ version: 1, metricVersion: 2,
   messages: 2, inputChars: 50, promptChars: 20, conversationChars: 30, durationMs: 1000, firstTokenMs: 100, ...values });
 const eventOptions = { aiEventCollectionStart: '2026-09-07T00:00:00+08:00', aiEventLogDir: '/synthetic-events' };
 
+test('自动分类保留原入口并识别同日扫描，匿名AI不推断真人', () => {
+  const time = '07/Sep/2026:01:00:00 +0800';
+  const result = summary(['/.env','/.git/config','/wp-login.php','/wp-admin/','/actuator/env','/phpmyadmin/','/'].map(uri => line(time, { uri })), [aiLine('2026-09-07T01:00:00+08:00')]);
+  assert.equal(result.totals.requests, 8);
+  assert.equal(result.totals.entryRequests, 1);
+  assert.equal(result.totals.visitorEstimate, 1);
+  const classified = result.totals.automation;
+  assert.equal(classified.high, 7);
+  assert.equal(classified.unclassified, 1);
+  assert.equal(classified.entries.high, 1);
+  assert.equal(classified.aiUnclassified, 1);
+  assert.equal(classified.reasons.multi_probe, 7);
+  assert.deepEqual(result.hours[1].automation, classified);
+  assert.doesNotMatch(JSON.stringify(result), /203\.0\.113|Mozilla|wp-login|secret/);
+});
+
+test('窗口结束后的扫描不反向影响入口；24小时分类与小时分区一致', () => {
+  const records = [line('07/Sep/2026:23:59:00 +0800')];
+  for (const uri of ['/.env','/.git/config','/wp-login.php','/wp-admin/','/actuator/env','/phpmyadmin/']) records.push(line('08/Sep/2026:00:00:00 +0800', { uri }));
+  const result = summary(records);
+  assert.equal(result.totals.automation.unclassified, 1);
+  for (const category of ['verified','high','suspected','unclassified']) {
+    assert.equal(result.totals.automation[category], result.hours.reduce((sum,h) => sum + h.automation[category], 0));
+    assert.equal(result.totals.automation.entries[category], result.hours.reduce((sum,h) => sum + h.automation.entries[category], 0));
+  }
+});
+
+test('旧历史分类为未知，新历史白名单保留并拒绝分区漂移', () => {
+  const current = summary([line('06/Sep/2026:23:59:59 +0800'), line('07/Sep/2026:01:00:00 +0800')]);
+  const day = current.daily.find(d => d.day === '2026-09-07');
+  const old = structuredClone(day); delete old.automation;
+  assert.equal(mergeHistory({ schema: 2, days: [old] }, [], Date.parse(current.windowEnd)).days[0].automation, null);
+  day.automation.private = 'secret';
+  const history = mergeHistory({ schema: 2, days: [day] }, [], Date.parse(current.windowEnd));
+  assert.equal(history.days[0].automation.unclassified, 1);
+  assert.doesNotMatch(JSON.stringify(history), /secret/);
+  day.automation.high++;
+  assert.throws(() => mergeHistory({ schema: 2, days: [day] }, [], Date.parse(current.windowEnd)), /分类/);
+});
+
+test('任一HTTP来源无观测时保留完整历史，不拼造旧格式未细分的状态码', () => {
+  const traffic = [line('06/Sep/2026:23:59:59 +0800'), line('07/Sep/2026:01:00:00 +0800')];
+  const ai = [aiLine('2026-09-06T23:59:59+08:00'), aiLine('2026-09-07T01:00:00+08:00')];
+  const baseline = summary(traffic, ai), cutoff = Date.parse(baseline.windowEnd);
+  const day = baseline.daily.find(d => d.day === '2026-09-07');
+  const previous = { schema: 2, days: [day] };
+  const empty = mergeHistory(previous, summary([]).daily, cutoff);
+  assert.equal(empty.days.find(d => d.day === day.day).requests, 2);
+  assert.equal(empty.days.find(d => d.day === day.day).automation.unclassified, 2);
+  assert.equal(empty.days.length, 1, '无观测的零日不新建归档');
+  const aiMissing = mergeHistory(previous, summary(traffic).daily, cutoff).days.find(d => d.day === day.day);
+  assert.equal(aiMissing.ai.requests, 1);
+  assert.equal(aiMissing.requests, 2);
+  assert.equal(aiMissing.automation.aiUnclassified, 1);
+  const trafficMissing = mergeHistory(previous, summary([], [...ai, ai[1]]).daily, cutoff).days.find(d => d.day === day.day);
+  assert.equal(trafficMissing.entryRequests, 1);
+  assert.equal(trafficMissing.ai.requests, 1);
+  assert.equal(trafficMissing.requests, 2);
+  assert.equal(trafficMissing.automation.unclassified, 2);
+  assert.equal(trafficMissing.automation.aiUnclassified, 1);
+  assert.doesNotMatch(JSON.stringify(trafficMissing), /trafficObserved|aiObserved/);
+  const legacy = structuredClone(day); delete legacy.automation;
+  assert.equal(mergeHistory({ schema: 2, days: [legacy] }, summary([], ai).daily, cutoff).days[0].automation, null);
+  const observedEvent = rollingSummary([], { now, collectionStart: started, aiCollectionStart: started,
+    ...eventOptions, aiEventLines: [terminal()] });
+  const terminalOnly = mergeHistory(previous, observedEvent.daily, cutoff).days.find(d => d.day === day.day);
+  assert.equal(terminalOnly.requests, 2);
+  assert.equal(terminalOnly.ai.observation.requests, 1);
+  const around = rollingSummary([line('06/Sep/2026:23:59:59 +0800'), line('08/Sep/2026:01:00:00 +0800')], {
+    now: Date.parse('2026-09-09T00:03:00+08:00'), collectionStart: started, aiCollectionStart: started,
+    aiLines: [ai[0], aiLine('2026-09-08T01:00:00+08:00')], ...eventOptions,
+    aiEventLines: [terminal({ time: '2026-09-08T01:00:00.000Z' })] });
+  const dayGap = mergeHistory({ schema: 2, days: [terminalOnly] }, around.daily, Date.parse(around.windowEnd)).days.find(d => d.day === day.day);
+  assert.equal(dayGap.requests, 2, '其他日的观测不能把此日旧计数覆盖为零');
+  assert.equal(dayGap.ai.observation.requests, 1, '其他日的终态不能擦掉此日观测');
+  const noAiPrior = structuredClone(summary(traffic).daily.find(d => d.day === day.day));
+  delete noAiPrior.automation;
+  const recalculated = mergeHistory({ schema: 2, days: [noAiPrior] }, summary(traffic).daily, cutoff).days.find(d => d.day === day.day);
+  assert.equal(recalculated.automation.unclassified, 1, '原AI为零时不阻止正常分类回算');
+});
+
+test('超长原始查询串在观察前失败，不绕过保留字符串预算', () => {
+  assert.throws(() => summary([line('07/Sep/2026:01:00:00 +0800', { uri: '/?q=' + 'x'.repeat(17000) })]), /观察输入/);
+});
+
+test('总扫描行预算包含窗口外、空行、两遍读取和独立AI来源', () => {
+  const options = { now, collectionStart: started, aiCollectionStart: started, maxLogLines: 2 };
+  const row = line('07/Sep/2026:01:00:00 +0800');
+  assert.throws(() => rollingSummary(['', '', row], options), /扫描行预算/);
+  assert.throws(() => rollingSummary([line('08/Sep/2026:01:00:00 +0800'), row], { ...options, maxLogLines: 3 }), /扫描行预算/);
+  assert.throws(() => rollingSummary([row], { ...options, aiLines: [aiLine('2026-09-07T01:00:00+08:00')] }), /扫描行预算/);
+  assert.equal(rollingSummary([row], options).totals.requests, 1);
+});
+
 test('终态独立于 HTTP 计数并单独标记启用覆盖', () => {
   const result = rollingSummary([], { now, collectionStart: started, aiCollectionStart: started,
     ...eventOptions, aiEventLines: [terminal(), terminal({ outcome: 'client_aborted', firstTokenMs: null }),
@@ -285,9 +379,12 @@ test('CSV带UTF-8 BOM并精确包含汇总和24个小时；未采集不导出为
   assert.match(csv, /"未采集","","",""/);
   assert.match(csv, /2026-09-08 00:00:00\+08:00/);
   assert.ok(!/203\.0\.113|Mozilla|example\.org|secret/.test(csv));
-  const unavailableRow = csv.split('\r\n').find(row => row.includes('"未采集"'));
-  const unavailableCells = unavailableRow.match(/"(?:[^"]|"")*"/g);
-  assert.deepEqual(unavailableCells.slice(-8), Array(8).fill('""'));
+  const cells = csv.trimEnd().split('\r\n').map(row => row.match(/"(?:[^"]|"")*"/g));
+  const unavailableCells = cells.find(row => row[4] === '"未采集"');
+  assert.ok(unavailableCells, '应找到流量本身未采集的小时，不误选仅终态未采集的汇总');
+  for (const name of ['入口请求', 'AI请求', 'AI服务端完成', '自动分类版本', '高置信自动特征请求', '自动原因_规律导航']) {
+    assert.equal(unavailableCells[cells[0].indexOf('"' + name + '"')], '""', name);
+  }
 });
 
 test('页面脚本散列与CSP一致，下载和自动刷新仅使用本期汇总', () => {

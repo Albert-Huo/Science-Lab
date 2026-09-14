@@ -1,10 +1,11 @@
 (() => {
-  const labels = { entryRequests: '入口请求', visitorEstimate: '访客估算', requests: '全部请求',
+  const labels = { entryRequests: '原始入口', visitorEstimate: '入口组合估算', requests: '全部请求',
+    'automation.entries.unclassified': '未标记入口', 'automation.high': '高置信自动请求', 'automation.suspected': '疑似自动请求',
     'ai.requests': 'AI 请求', 'ai.httpSuccesses': 'AI HTTP 2xx' };
-  let metric = 'entryRequests', selected = null, checking = false;
+  let metric = 'automation.entries.unclassified', selected = null, checking = false;
   const format = value => new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(value));
-  const valueOf = (hour, key) => key.startsWith('ai.') ? hour.ai[key.slice(3)] : hour[key];
-  const coverageOf = (hour, key) => key.startsWith('ai.') ? hour.ai.coverage : hour.coverage;
+  const valueOf = (hour, key) => key.split('.').reduce((value, part) => value?.[part], hour) ?? 0;
+  const coverageOf = (hour, key) => key.startsWith('ai.') ? hour.ai.coverage : key.startsWith('automation.') && !hour.automation ? 'unavailable' : hour.coverage;
   const hours = [...document.querySelectorAll('[data-hour]')];
   function detail(index) {
     const hour = trafficData.hours[index], coverage = coverageOf(hour, metric);
@@ -22,7 +23,8 @@
     });
     document.querySelector('#metric-label').textContent = labels[metric];
     document.querySelector('#chart-scale').textContent = '最高 ' + Math.max(...values).toLocaleString('zh-CN');
-    document.querySelector('#metric-note').textContent = metric === 'visitorEstimate' ? '小时访客估算不可相加为全天人数' : metric.startsWith('ai.') ? 'AI 指标只包含内置模式' : '时间区间含开始、不含结束';
+    document.querySelector('#metric-note').textContent = metric === 'visitorEstimate' ? '小时组合估算不可相加为全天人数' : metric === 'automation.entries.unclassified' ? '未标记不等于真人访问' : metric.startsWith('automation.') ? '按同日组合观察标记，不等于恶意或入侵成功' : metric.startsWith('ai.') ? 'AI 指标只包含内置模式' : '时间区间含开始、不含结束';
+    document.querySelector('.trend-panel').dataset.mode = ['automation.high', 'automation.suspected'].includes(metric) ? 'automation' : 'traffic';
     if (selected !== null) detail(selected);
   }
   for (const button of document.querySelectorAll('[data-metric]')) button.addEventListener('click', () => {

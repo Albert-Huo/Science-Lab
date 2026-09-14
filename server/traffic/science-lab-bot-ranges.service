@@ -1,0 +1,28 @@
+[Unit]
+Description=Update official crawler IP ranges for private Science Lab analytics
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+ExecStart=/usr/bin/flock -n /var/lib/science-lab-traffic/bot-ranges.lock /opt/science-lab-runtime/node-v22.23.2-linux-x64/bin/node /opt/science-lab-traffic/traffic-bot-ranges.cjs --output /var/lib/science-lab-traffic/bot-ranges.json
+TimeoutStartSec=25
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/science-lab-traffic
+CapabilityBoundingSet=
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+MemoryMax=64M
+TasksMax=32
+Nice=10

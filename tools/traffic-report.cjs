@@ -39,13 +39,14 @@ function parseRecord(line) {
   const timestamp = m ? parseTime(m[2]) : NaN;
   if (!m || !Number.isFinite(timestamp) || !isIP(m[1])) throw new Error('无法解析访问日志');
   const [method, target] = m[3].split(' ');
-  const uri = (target || '').split('?')[0];
+  // Detach retained fields: a short slice must not keep a long query/Referer log line alive.
+  const uri = Buffer.from((target || '').split('?')[0], 'utf8').toString('utf8');
   const automated = AUTOMATION.test(m[7]);
   const tablet = /iPad|Tablet/i.test(m[7]) || (/Android/i.test(m[7]) && !/Mobile/i.test(m[7]));
   return {
-    timestamp, uri, status: +m[4], automated,
+    timestamp, uri, method, status: +m[4], automated,
     entry: !automated && /Mozilla\//.test(m[7]) && method === 'GET' && ['/', '/index.html'].includes(uri) && [200, 304].includes(+m[4]),
-    identity: m[1] + '\n' + m[7],
+    identity: Buffer.from(m[1] + '\n' + m[7], 'utf8').toString('utf8'),
     device: tablet ? 'tablet' : /Mobile|Android|iPhone/i.test(m[7]) ? 'mobile' : 'desktop',
     source: sourceGroup(m[6])
   };

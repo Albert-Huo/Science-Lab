@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily official crawler range refresh for Science Lab analytics
+
+[Timer]
+OnCalendar=*-*-* 05:40:00 Asia/Shanghai
+RandomizedDelaySec=5m
+Persistent=true
+Unit=science-lab-bot-ranges.service
+
+[Install]
+WantedBy=timers.target

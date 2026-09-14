@@ -9,6 +9,40 @@ const fixture = () => ({ ...rollingSummary([], {
 }), history: [] });
 const csvRows = csv => csv.trimEnd().split('\r\n').map(row => [...row.matchAll(/"((?:[^"]|"")*)"/g)].map(match => match[1].replace(/""/g, '"')));
 
+test('页面保留原始入口，展示互斥分类、原因与未标记入口，不宣称真人', () => {
+  const data = fixture(), html = renderDashboard(data);
+  assert.match(html, /浏览器特征入口/);
+  assert.match(html, /访问分类/);
+  assert.match(html, /高置信自动特征/);
+  assert.match(html, /疑似自动访问/);
+  assert.match(html, /未标记入口/);
+  assert.match(html, /不等于真人/);
+  assert.match(html, /查看判定原因/);
+  assert.match(html, /data-metric="automation.suspected"/);
+  assert.match(html, /data-metric="automation.entries.unclassified"/);
+  assert.match(html, /清单.*不可用/);
+  assert.doesNotMatch(html, /真实用户数|真实访客数|<strong>NaN/);
+});
+
+test('CSV分类与原指标同源，旧历史未知而非补零', () => {
+  const data = fixture();
+  data.history = [{ ...data.hours[0], day: '2026-09-09', partial: false }];
+  delete data.history[0].automation;
+  const [headers, total, ...hours] = csvRows(toCsv(data));
+  for (const key of ['已验证爬虫请求','高置信自动特征请求','疑似自动访问请求','未命中自动规则请求','未标记入口','匿名AI未判定请求','自动原因_成组敏感探测']) assert.ok(headers.includes(key), key);
+  assert.equal(total[headers.indexOf('自动分类版本')], '1');
+  assert.ok([total,...hours].every(row => row.length === headers.length));
+  const history = csvRows(toCsv(data, 'history'))[1];
+  assert.equal(history[headers.indexOf('自动分类状态')], '未知（旧数据）');
+  assert.equal(history[headers.indexOf('高置信自动特征请求')], '');
+  assert.match(renderDashboard(data), /旧历史.*未知/);
+});
+
+test('输出前拒绝分类漂移而不是发布错误图表', () => {
+  const data = fixture(); data.totals.automation.high++;
+  assert.throws(() => renderDashboard(data), /分类/);
+});
+
 test('CSV exports complete HTTP categories and independent AI coverage', () => {
   const data = fixture();
   Object.assign(data.totals.ai, { requests: 5, httpSuccesses: 1, invalidRequests: 1, rateLimited: 1, serverErrors: 1, otherStatuses: 1 });

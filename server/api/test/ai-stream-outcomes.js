@@ -16,6 +16,19 @@ const os = require('node:os');
 const http = require('node:http');
 const nativeFetch = global.fetch;
 
+function completeEvents(text) {
+  // append opens the file before its first write; only newline-complete records are observable.
+  const end = text.lastIndexOf('\n');
+  return end <= 0 ? [] : text.slice(0, end).split('\n').map(JSON.parse);
+}
+
+test('event polling waits for newline-complete records without hiding malformed JSON', () => {
+  assert.deepEqual(completeEvents(''), []);
+  assert.deepEqual(completeEvents('{'), []);
+  assert.deepEqual(completeEvents('{"outcome":"completed"}\n{'), [{ outcome: 'completed' }]);
+  assert.throws(() => completeEvents('{bad}\n'), SyntaxError);
+});
+
 test('HTTP requests each produce exactly one anonymous terminal outcome with local upstream', async t => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ai-stream-events-'));
   process.env.AI_EVENT_LOG_PATH = path.join(dir, 'ai-events.log');
@@ -64,7 +77,7 @@ test('HTTP requests each produce exactly one anonymous terminal outcome with loc
     const deadline = Date.now() + 2000;
     let events = [];
     while (Date.now() < deadline) {
-      try { events = (await fs.readFile(process.env.AI_EVENT_LOG_PATH, 'utf8')).trim().split('\n').map(JSON.parse); }
+      try { events = completeEvents(await fs.readFile(process.env.AI_EVENT_LOG_PATH, 'utf8')); }
       catch (error) { if (error.code !== 'ENOENT') throw error; }
       if (events.length >= count + 1) break;
       await new Promise(resolve => setTimeout(resolve, 10));
@@ -161,7 +174,7 @@ test('quota outage and unexpected middleware failure are recorded without error 
   }
   let events = [];
   for (let tries = 0; tries < 100 && events.length < 2; tries++) {
-    try { events = (await fs.readFile(process.env.AI_EVENT_LOG_PATH, 'utf8')).trim().split('\n').map(JSON.parse); }
+    try { events = completeEvents(await fs.readFile(process.env.AI_EVENT_LOG_PATH, 'utf8')); }
     catch (error) { if (error.code !== 'ENOENT') throw error; }
     if (events.length < 2) await new Promise(resolve => setTimeout(resolve, 10));
   }
