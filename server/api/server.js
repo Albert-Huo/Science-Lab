@@ -18,7 +18,9 @@ const { pipeline } = require('stream/promises');
 const { createAiPolicy } = require('./ai-policy');
 const { createQuota } = require('./ai-quota');
 const { createEventLogger, createSseObserver } = require('./ai-events');
+const { createProductAnalytics } = require('./product-analytics');
 const db = AI_ONLY ? null : require('./db');
+const AI_CONTEXT = require('./ai-context.json');
 
 const PORT = Number(process.env.PORT || 8970);
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -34,6 +36,8 @@ function positiveInt(value, fallback) {
 const AI_RATE_LIMIT_MINUTE_MAX = positiveInt(process.env.AI_RATE_LIMIT_MINUTE_MAX, 10);
 const AI_RATE_LIMIT_DAY_MAX = positiveInt(process.env.AI_RATE_LIMIT_DAY_MAX, 20);
 const AI_UPSTREAM_TIMEOUT_MS = positiveInt(process.env.AI_UPSTREAM_TIMEOUT_MS, 120000);
+const ANALYTICS_ORIGIN = String(process.env.ANALYTICS_ORIGIN || '').trim();
+const ANALYTICS_RATE_LIMIT_MINUTE_MAX = positiveInt(process.env.ANALYTICS_RATE_LIMIT_MINUTE_MAX, 600);
 const quota = createQuota({
   minuteMax: AI_RATE_LIMIT_MINUTE_MAX,
   ipDayMax: AI_RATE_LIMIT_DAY_MAX,
@@ -44,6 +48,10 @@ const quota = createQuota({
   secret: process.env.AI_SESSION_SECRET,
   redisUrl: process.env.AI_REDIS_URL,
   production: process.env.NODE_ENV === 'production',
+});
+const productAnalytics = createProductAnalytics({
+  redisUrl: process.env.ANALYTICS_REDIS_URL,
+  catalog: AI_CONTEXT,
 });
 
 if (!AI_ONLY && (!JWT_SECRET || JWT_SECRET.length < 16)) {
@@ -78,6 +86,38 @@ if (AI_ONLY) {
   // 在 CORS 预检和 JSON 解析前禁用，确保旧接口的所有方法统一返回 503。
   app.use(['/auth', '/progress'], (_req, res) => res.status(503).json({ error: 'sync_disabled' }));
 }
+const analyticsJson = express.json({ limit: '2kb', strict: true, type: 'application/json' });
+let analyticsWindowStart = Date.now();
+let analyticsWindowCount = 0;
+function analyticsGlobalLimit(_req, res, next) {
+  const now = Date.now();
+  if (now - analyticsWindowStart >= 60000) {
+    analyticsWindowStart = now;
+    analyticsWindowCount = 0;
+  }
+  analyticsWindowCount++;
+  if (analyticsWindowCount <= ANALYTICS_RATE_LIMIT_MINUTE_MAX) return next();
+  res.set('Retry-After', '60');
+  return res.status(429).json({ error: 'rate_limited' });
+}
+app.post('/analytics/events', (req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  if (req.originalUrl !== req.path) return res.status(400).json({ error: 'query_not_allowed' });
+  if (!ANALYTICS_ORIGIN || req.get('origin') !== ANALYTICS_ORIGIN || req.get('sec-fetch-site') !== 'same-origin') {
+    return res.status(403).json({ error: 'origin_not_allowed' });
+  }
+  if (!req.is('application/json')) return res.status(415).json({ error: 'unsupported_media_type' });
+  return analyticsGlobalLimit(req, res, () => analyticsJson(req, res, next));
+}, async (req, res, next) => {
+  try {
+    const result = await productAnalytics.record(req.body);
+    if (!result.ok) return res.status(503).json({ error: 'analytics_unavailable' });
+    return res.status(204).end();
+  } catch (error) {
+    if (error.code === 'invalid_event') return res.status(400).json({ error: 'invalid_event' });
+    return next(error);
+  }
+});
 app.use(express.json({ limit: '256kb' }));
 
 // CORS：仅允许白名单来源
@@ -96,7 +136,7 @@ const HISTORY_MAX = 100;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const configuredAiModel = String(process.env.DEEPSEEK_MODEL || '').trim();
 const DEFAULT_AI_MODEL = configuredAiModel || 'deepseek-v4-flash';
-const sanitizeAiBody = createAiPolicy(require('./ai-context.json'), DEFAULT_AI_MODEL);
+const sanitizeAiBody = createAiPolicy(AI_CONTEXT, DEFAULT_AI_MODEL);
 
 function sign(user) { return jwt.sign({ uid: user.id, email: user.email }, JWT_SECRET, { expiresIn: JWT_EXPIRES }); }
 
@@ -334,6 +374,7 @@ app.use((error, _req, res, _next) => {
 async function start() {
   if (!AI_ONLY) await db.init();
   await quota.connect();
+  await productAnalytics.connect();
   app.listen(PORT, '127.0.0.1', () => console.log('science-lab-api listening on 127.0.0.1:' + PORT));
 }
 if (require.main === module) start().catch(e => { console.error('启动失败：', e); process.exit(1); });

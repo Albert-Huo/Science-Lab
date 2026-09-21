@@ -492,8 +492,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 
 <script src="catalog-control.js"></script>
 <script src="content-source.js"></script>
-<script src="experiment-scroll.js?app=v0.8.12"></script>
-<script src="ai-chat.js?app=v0.8.12"></script>
+<script src="product-analytics.js?app=v0.8.13"></script>
+<script src="experiment-scroll.js?app=v0.8.13"></script>
+<script src="ai-chat.js?app=v0.8.13"></script>
 <script>
 /* 联系入口独立于实验清单初始化，空目录时也可使用。 */
 (()=>{
@@ -577,6 +578,8 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 const qs = new URLSearchParams(location.search);
 /* 内容源：生产固定线上站；与内容站同域时用相对路径；仅本地联调接受根相对 ?base= */
 const CONTENT_BASE=ContentSource.resolve({hostname:location.hostname,requestedBase:qs.get('base')});
+const productAnalytics=ScienceProductAnalytics.createClient();
+productAnalytics.pageView(ScienceProductAnalytics.classifySource(document.referrer,location.origin));
 const LS = { idx:'expfeed.idx', current:'expfeed.currentPath', hist:'expfeed.hist', hint:'expfeed.hint', ai:'expfeed.ai', chat:'expfeed.chat', install:'expfeed.install.dismissed', catalog:'expfeed.catalog.collapsed' };
 let storageWarningShown=false;
 function warnStorage(operation,error){
@@ -695,17 +698,18 @@ function render(){
   document.getElementById('btnNext').disabled = cur===MANIFEST.length-1;
   safeSet(LS.idx, cur);
   safeSet(LS.current, it.path);
+  productAnalytics.experimentOpen(MANIFEST[cur].path);
   markHistory(it);
   highlightCat();
   renderChatForCurrent();
   activateScroll();
 }
 function goTo(i){
-  if(i<0||i>=MANIFEST.length||i===cur) return;
-  cur=i; render();
+  if(i<0||i>=MANIFEST.length||i===cur) return false;
+  cur=i; render(); return true;
 }
-function next(){ goTo(cur+1); }
-function prev(){ goTo(cur-1); }
+function next(){ if(goTo(cur+1)) productAnalytics.keyAction('experiment_next'); }
+function prev(){ if(goTo(cur-1)) productAnalytics.keyAction('experiment_previous'); }
 
 /* ---------- history ---------- */
 function loadHist(){
@@ -822,9 +826,9 @@ function closePanels(){
 desktopCatalog.addEventListener('change',closePanels); // 归位移动抽屉，保留桌面目录偏好
 overlay.addEventListener('click',closePanels);
 document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',closePanels));
-catalogButton.addEventListener('click',()=>openPanel('catalog'));
+catalogButton.addEventListener('click',()=>{productAnalytics.keyAction('catalog_open');openPanel('catalog');});
 collapseCat.addEventListener('click',()=>setCatalogCollapsed(true));
-document.getElementById('btnUser').addEventListener('click',()=>openPanel('user'));
+document.getElementById('btnUser').addEventListener('click',()=>{productAnalytics.keyAction('profile_open');openPanel('user');});
 syncCatalogLayout();
 
 /* tabs */

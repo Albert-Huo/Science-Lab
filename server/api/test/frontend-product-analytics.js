@@ -78,3 +78,26 @@ test('浏览器模块不读取 Cookie 或任何持久存储', () => {
   vm.runInContext(source, context);
   assert.deepEqual(accesses, []);
 });
+
+test('首页只接入固定匿名事件且不推断实验完成', () => {
+  const html = fs.readFileSync(path.resolve(__dirname, '../../../index.html'), 'utf8');
+  assert.match(html, /<script src="product-analytics\.js\?app=v0\.8\.13"><\/script>/);
+  assert.ok(html.indexOf('product-analytics.js?app=v0.8.13') < html.indexOf('const qs = new URLSearchParams'));
+  assert.match(html, /ScienceProductAnalytics\.createClient\(\)/);
+  assert.match(html, /pageView\(ScienceProductAnalytics\.classifySource\(document\.referrer,location\.origin\)\)/);
+  assert.match(html, /experimentOpen\(MANIFEST\[cur\]\.path\)/);
+  for (const action of ['catalog_open', 'profile_open', 'experiment_previous', 'experiment_next']) {
+    assert.match(html, new RegExp("keyAction\\('" + action + "'\\)"));
+  }
+  assert.doesNotMatch(html, /experiment_complete|experimentComplete|content_end|dwell|停留.*上报/);
+  const mountBody = html.slice(html.indexOf('function mount(i)'), html.indexOf('function unmount(i)'));
+  assert.doesNotMatch(mountBody, /experimentOpen|keyAction|pageView/);
+});
+
+test('Service Worker 缓存匿名客户端且继续绕过 POST', () => {
+  const worker = fs.readFileSync(path.resolve(__dirname, '../../../sw.js'), 'utf8');
+  assert.match(worker, /const VERSION = 'v0\.8\.13'/);
+  assert.match(worker, /'\.\/product-analytics\.js\?app=' \+ VERSION/);
+  assert.match(worker, /if \(request\.method !== 'GET'\) return/);
+  assert.doesNotMatch(worker, /analytics\/events/);
+});
