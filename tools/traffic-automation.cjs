@@ -12,7 +12,7 @@ const REASONS = Object.freeze({
 });
 const TOOL = /(?:^|[\s;(])(?:curl|wget|python(?:-requests|-urllib|-httpx)?|httpclient|go-http-client|headlesschrome|headless|selenium|playwright|scrapy|nikto|nmap|ScienceLab-Log-Check)(?:[\/\s;)]|$)/i;
 const DECLARED = /(?:^|[\s;(])(?:googlebot(?:-image|-news|-video)?|bingbot|baiduspider|bytespider|petalbot|yandexbot|duckduckbot|applebot|ahrefsbot|semrushbot|mj12bot|dotbot|gptbot|claudebot|ccbot|oai-searchbot|chatgpt-user|perplexitybot|sogou(?: web spider)?|slurp|facebookexternalhit|twitterbot|telegrambot|slackbot|discordbot|uptimerobot|bot|spider|crawler|preview|monitor|uptime)(?:[\/\s;)]|$)/i;
-const MAX_PROFILES = 16000;
+const MAX_PROFILES = 8000;
 const counts = keys => Object.fromEntries(keys.map(key => [key, 0]));
 const integer = value => Number.isSafeInteger(value) && value >= 0;
 const day = time => Math.floor((time + 28800000) / 86400000);
@@ -34,19 +34,24 @@ function createDetector({ botRanges, maxProfiles = MAX_PROFILES, maxMinutes = 16
       if (sealed) throw new Error('自动访问观察已结束');
       if (record.identity.length > 2048 || record.uri.length > 4096) throw new Error('自动访问观察输入超出限制，保留上一份报告');
       const key = keyOf(record);
+      const probe = probePath(record.uri);
+      const page = record.method === 'GET' && (['/', '/index.html'].includes(record.uri) || /\.html$/i.test(record.uri));
+      // Tool/bot declarations are classified directly from the current UA. Static assets add no
+      // scan, burst or periodic-navigation evidence, so an asset-only identity needs no profile.
+      if (!profiles.has(key) && !probe && !page) return;
       if (!profiles.has(key)) {
         if (profiles.size >= maxProfiles) throw new Error('自动访问观察分组超出限制，保留上一份报告');
         charge(key.length);
         profiles.set(key, { probes: 0, paths: new Set(), minutes: new Map(), burst: false, pages: new Map() });
       }
-      const profile = profiles.get(key), probe = probePath(record.uri);
+      const profile = profiles.get(key);
       delete profile.decision;
       if (probe) {
         profile.probes++;
         if (profile.paths.size < 3 && !profile.paths.has(probe)) { charge(probe.length); profile.paths.add(probe); }
         return;
       }
-      if (record.method !== 'GET' || !(['/', '/index.html'].includes(record.uri) || /\.html$/i.test(record.uri))) return;
+      if (!page) return;
       const minute = Math.floor(record.timestamp / 60000);
       if (!profile.burst) {
         if (!profile.minutes.has(minute)) { charge(0, 1); profile.minutes.set(minute, { count: 0, paths: new Set() }); }

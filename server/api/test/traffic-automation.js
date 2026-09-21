@@ -142,13 +142,11 @@ test('观察样本有界且按时间确定，不因轮转文件读取顺序改�
   assert.throws(() => bounded.observe(record('/', 0, ua, '203.0.113.18')), /分组/);
 });
 
-test('默认分组预算覆盖日志保留期累计组合且仍在固定上限失败', () => {
-  const supported = createDetector();
-  for (let i = 0; i < 8001; i++) supported.observe({ ...record('/asset.js'), identity: `${i}\nua` });
-
-  const capped = createDetector();
-  for (let i = 0; i < 16000; i++) capped.observe({ ...record('/asset.js'), identity: `${i}\nua` });
-  assert.throws(() => capped.observe({ ...record('/asset.js'), identity: 'overflow\nua' }), /分组/);
+test('纯资源请求不占观察分组，页面或探测证据仍受固定上限保护', () => {
+  const detector = createDetector({ maxProfiles: 1 });
+  for (let i = 0; i < 9000; i++) detector.observe({ ...record('/asset.js'), identity: `${i}\nua` });
+  detector.observe(record('/', 0, ua, '203.0.113.18'));
+  assert.throws(() => detector.observe(record('/probe.html', 0, ua, '203.0.113.19')), /分组/);
 });
 
 test('全局分钟与样本预算受控，不让少数分组无限积累观察内存', () => {
