@@ -357,7 +357,7 @@ AI_COLLECTION_START=2026-09-09T12:00:00Z
 先备份当前静态release、API release、Nginx站点与 `http` include、systemd单元和私有统计状态。创建 `/var/lib/science-lab-analytics-redis`（redis:redis、0700）后，用不回显的随机密码生成以下两个私有文件：
 
 - `/etc/science-lab-analytics-redis.conf`：root:redis、0640，固定 `bind 127.0.0.1 ::1`、`port 16380`、`maxmemory 32mb`、`maxmemory-policy noeviction`、`appendonly yes`、`appendfsync everysec`、`save ""` 和独立 `requirepass`。
-- `/etc/science-lab-analytics.env`：root:root、0600，包含 `ANALYTICS_REDIS_URL`、`ANALYTICS_ORIGIN=https://lab.xingnian.net.cn`、真实 `ANALYTICS_COLLECTION_START` 与 `ANALYTICS_RATE_LIMIT_PER_MINUTE=600`。启用时间必须在精确入口真正开放前立即记录，不能回填。
+- `/etc/science-lab-analytics.env`：root:root、0600，包含 `ANALYTICS_REDIS_URL`、`ANALYTICS_ORIGIN=https://lab.xingnian.net.cn`、真实 `ANALYTICS_COLLECTION_START` 与 `ANALYTICS_RATE_LIMIT_PER_MINUTE=600`。启用时间必须在精确入口真正开放前立即记录，不能回填；格式必须是 `new Date().toISOString()` 产生的 UTC 毫秒格式（例如 `2026-09-21T08:21:26.000Z`），不能省略 `.000`。
 
 把 `server/traffic/science-lab-analytics-redis.service` 安装到systemd；把 `science-lab-api-analytics.conf` 安装为API service的 `analytics.conf` drop-in；安装产品快照service/timer。先运行：
 

@@ -521,7 +521,7 @@ git commit -m "docs: record product analytics verification"
 - 快照缺失时后台显示“无法读取新产品统计，当前状态未知”，产品数值为 `—`，未将故障误报为 0；测试浏览器会话及临时服务均按任务句柄关闭。
 - 首版已知边界：不采集 UV/会话，不生成跨页面或跨天轨迹；实验完成事件没有可靠语义，故明确不接入；独立统计 Redis 上限 32MB，systemd `MemoryMax=96M`。
 
-- [ ] **Step 6: 合并到主分支并推送**
+- [x] **Step 6: 合并到主分支并推送**
 
 确认原工作区只有既有两份未跟踪审查文件，随后快进合并：
 
@@ -537,21 +537,21 @@ Expected: `origin/main` 指向验证后的提交，两份无关文件仍未跟�
 
 **Production paths:** `/opt/science-lab-api-releases/<release>/`、`/var/www/science-lab-releases/<release>/`、`/opt/science-lab-traffic/`、`/etc/systemd/system/`、`/etc/nginx/conf.d/`、`/etc/science-lab-analytics.env`、`/etc/science-lab-analytics-redis.conf`、`/var/lib/science-lab-analytics-redis/`。
 
-- [ ] **Step 1: 部署前只读复核与备份**
+- [x] **Step 1: 部署前只读复核与备份**
 
 再次确认 16380 未监听、可用内存大于 1GB、磁盘大于 10GB、四个现有服务 active、当前 Git/静态/API release 指针和 Nginx 配置。创建 root:root 0700 的唯一备份目录，保存 API/静态指针、站点/Nginx http 配置、systemd 单元、统计运行文件、私有后台快照和历史；环境文件只备份到私有目录，不下载、不输出。
 
-- [ ] **Step 2: 准备独立 Redis 与密钥**
+- [x] **Step 2: 准备独立 Redis 与密钥**
 
 服务器生成 32 字节随机十六进制密码，不回显。建立 `redis:redis` 0700 数据目录；原子写入 root:redis 0640 配置，固定 16380、32MB、noeviction、AOF everysec。原子写入 root:root 0600 统计环境文件，包含回环 URL、`ANALYTICS_ORIGIN=https://lab.xingnian.net.cn` 和激活时填写的真实 UTC `ANALYTICS_COLLECTION_START`。
 
 安装 Redis unit，运行 `systemd-analyze verify`，启动后只用认证 PING 和临时命名空间验证；删除临时键，确认 6379、16379 的 PID、配置和数据未改变。
 
-- [ ] **Step 3: 上传并验证不活动版本**
+- [x] **Step 3: 上传并验证不活动版本**
 
 上传新 API release、静态 release、统计运行文件和 systemd/Nginx 源文件到不活动路径，逐文件 SHA-256 与 Git 对比。API 以生产环境和统计 Redis 在不公开的本机路径验证健康及合法/非法事件，静态文件进行脚本版本、JSON 和可读性检查；不得调用真实收费模型。
 
-- [ ] **Step 4: 按兼容顺序激活**
+- [x] **Step 4: 按兼容顺序激活**
 
 顺序固定：
 
@@ -563,19 +563,32 @@ Expected: `origin/main` 指向验证后的提交，两份无关文件仍未跟�
 6. 手动执行快照服务，确认 `analytics.json` 权限、schema 和无身份字段；
 7. 启用五分钟 timer，手动生成流量后台 HTML。
 
-- [ ] **Step 5: 生产验收**
+- [x] **Step 5: 生产验收**
 
 验证公开首页/隐私页/清单 200、API health 200、旧 `/api/` 503 口径不变；合法统计 204，query/跨源/超大请求分别 400/403/413；响应无 Set-Cookie；普通日志没有统计 location 请求，匿名统计日志没有 IP/UA/Referer/Cookie/query/body；私有后台未认证 HTML/JSON 401、敏感路径 404、认证后产品区和安全区正常；Redis 键只含固定 namespace 和内容哈希；AI 全站 500/并发 10 与额度 Redis 数据未改变。
 
 使用隔离无头浏览器打开一次首页、切换一个实验和目录，确认只增加预期匿名计数。验收结束关闭任务自有上下文，不清理共享浏览器状态。
 
-- [ ] **Step 6: 失败回滚**
+- [x] **Step 6: 回滚目标核验（未触发回滚）**
 
 任何关键验收失败：先禁用新 timer，恢复上一 API/静态指针和 Nginx/systemd 文件，执行 `nginx -t` 后 reload，恢复现有服务；保留独立统计 Redis 数据和匿名日志用于排查，不清库、不覆盖安全日志。若核心站点恢复后统计 Redis 单独异常，可停止新 Redis 而保持产品事件 503，公开实验与 AI 继续服务。
 
-- [ ] **Step 7: 记录部署证据**
+- [x] **Step 7: 记录部署证据**
 
 在本计划末尾追加生产 release、提交哈希、备份目录、启用时间、服务状态、HTTP 结果、回滚目标和未解决的网络日志合规专项；不得记录密码、密钥、完整 IP/UA 或用户数据。提交并推送最终记录。
+
+## 2026-09-21 生产部署记录
+
+- 生产代码提交：`10241a8`；API release：`/opt/science-lab-api-releases/20260921-10241a8`；静态 release：`/var/www/science-lab-releases/20260921-10241a8`。
+- 私有备份：`/var/backups/science-lab/analytics-20260921T081312Z`，root-only；回滚目标分别为 API `/opt/science-lab-api-releases/20260910-51f5c6c`、静态 `/var/www/science-lab-releases/20260910-51f5c6c`，并已保存 previous 链接。
+- 匿名产品统计启用时间：`2026-09-21T08:21:26.000Z`。独立 Redis 监听 `127.0.0.1:16380`，32MB、`noeviction`、AOF everysec；环境文件权限 root:root 0600，Redis 配置 root:redis 0640。密码未输出、未下载、未写入 Git 或本记录。
+- 部署前发现既有流量任务因保留期累计观察组超过 8,000 而失败。根因是纯静态资源请求也创建了无判定价值的空观察组；修复后保留原 8,000 上限，只为页面或探测证据建组。真实日志中组合由 9,186 降为 2,731；128MiB transient cgroup 影子任务 2.26 秒成功，正式任务随后 `Result=success`。
+- 生产 HTTP 验收：健康检查 200、旧 `/api/` 503、隐私页 200；匿名事件合法 204、query 400、跨源 403、非 JSON 415、超 2KB 413；无 `Set-Cookie`。普通安全日志对这些 POST 的增量为 0，专用日志只含时间、状态、耗时、请求长度和上游状态。
+- 私有后台未认证 HTML、`quota.json`、`analytics.json` 均 401，未授权敏感路径 404；页面结构包含“网站使用概览”“UV 未采集”“会话未采集”“实验完成事件未接入”和独立“安全流量”区。
+- 受控浏览器验收：无统计同意 Banner、Cookie 为空；首页、目录打开、下一实验和 390px 隐私页均正常，无横向溢出。刷新后产品快照为 PV 3、实验打开 2、关键操作 2；这些是上线验收产生的匿名聚合计数，不含身份或轨迹。
+- `science-lab-api`、独立统计 Redis、AI 额度 Redis、Nginx、五分钟产品快照 timer 和两小时流量 timer 均 active；AI 配额仍为全站 500、并发 10，额度 Redis PID 未变化。现有页面/安全统计任务已从部署前 failed 恢复为 success。
+- 服务器旧内核不支持 systemd BPF/cgroup `IPAddressDeny`，因此不能宣称进程级网络防火墙生效；Redis 自身只绑定回环地址，应用和快照程序仍拒绝非回环 Redis URL。该降级已记录，后续内核升级时应重新验证。
+- 网络安全日志的适用留存义务仍是独立合规专项：本次未改变现有 Nginx 安全日志用途和轮转策略，也不使用安全日志回算 UV、会话或用户轨迹。
 
 ## 自审结果
 

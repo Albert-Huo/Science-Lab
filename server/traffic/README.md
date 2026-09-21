@@ -51,11 +51,13 @@ requirepass <独立随机密码>
 ```ini
 ANALYTICS_REDIS_URL=redis://:<同一独立随机密码>@127.0.0.1:16380/0
 ANALYTICS_ORIGIN=https://lab.xingnian.net.cn
-ANALYTICS_COLLECTION_START=<首次成功开放入口前的真实UTC时间>
+ANALYTICS_COLLECTION_START=<首次成功开放入口前的真实UTC毫秒时间，如2026-09-21T08:21:26.000Z>
 ANALYTICS_RATE_LIMIT_PER_MINUTE=600
 ```
 
 安装 `science-lab-analytics-redis.service`、API的 `analytics.conf` drop-in、产品快照service/timer后，先执行 `systemd-analyze verify`，再daemon-reload。API仅 `Wants` 独立Redis：统计存储故障不得阻止API启动。快照每5分钟只读回环Redis并原子替换 `analytics.json`；读取失败保留上一份有效快照。部分旧内核不能执行systemd的IP过滤时，应用仍会拒绝非回环Redis URL，但必须记录该降级，不能宣称进程级网络隔离已生效。
+
+`ANALYTICS_COLLECTION_START` 必须直接使用 JavaScript `new Date().toISOString()` 的规范结果，包含三位毫秒和结尾 `Z`；秒级字符串会被快照服务判为 `invalid_config`，避免不同解析器对时间边界作出不同解释。
 
 Nginx的 `nginx-product-analytics.conf` 必须安装到 `http {}` 上下文；`nginx-locations.conf` 只放入HTTPS `server`。专用location关闭普通请求头透传、清空身份相关头并覆盖server级access log。日志 `/var/log/nginx/science-lab-product-analytics.log` 应为nginx:root、0640并沿用受控轮转；其字段只有时间、状态、耗时、请求长度和上游状态，不作为产品指标来源。上线前后均执行 `nginx -t`。
 
