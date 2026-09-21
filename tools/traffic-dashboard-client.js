@@ -105,10 +105,99 @@
       clearTimeout(timeout); quotaChecking = false; paintQuota();
     }
   }
+  let analyticsChecking = false, analyticsSnapshot = null, analyticsProblem = '', productMetric = 'pageViews';
+  const productLabels = { pageViews: '页面浏览 PV', experimentOpens: '实验打开次数', keyActions: '关键操作' };
+  const productSources = { direct: '直接访问', internal: '站内跳转', search: '搜索来源', external: '外部链接' };
+  const productActions = { catalog_open: '打开目录', profile_open: '打开“我的”', experiment_previous: '上一实验', experiment_next: '下一实验' };
+  function paintDefinitionList(target, labels, values) {
+    target.replaceChildren(...Object.entries(labels).map(([key, label]) => {
+      const row = document.createElement('div'), term = document.createElement('dt'), number = document.createElement('dd');
+      term.textContent = label; number.textContent = values[key].toLocaleString('zh-CN'); row.append(term, number); return row;
+    }));
+  }
+  function paintProductTrend(snapshot) {
+    const target = document.querySelector('#product-bars');
+    const max = Math.max(1, ...snapshot.hours.map(hour => hour[productMetric]));
+    target.replaceChildren(...snapshot.hours.map(hour => {
+      const bar = document.createElement('span');
+      bar.className = 'product-bar' + (hour.coverage === 'unavailable' ? ' unavailable' : '');
+      if (hour.coverage !== 'unavailable') bar.style.height = Math.max(2, hour[productMetric] / max * 100) + '%';
+      const period = format(hour.start) + ' — ' + format(hour.end).slice(-5);
+      const detail = hour.coverage === 'unavailable' ? '未采集' : productLabels[productMetric] + ' ' + hour[productMetric].toLocaleString('zh-CN') + (hour.coverage === 'partial' ? '，部分采集' : '');
+      bar.title = period + ' · ' + detail; bar.setAttribute('aria-label', bar.title); return bar;
+    }));
+    document.querySelector('#product-trend-note').textContent = productLabels[productMetric] + ' · 最高 ' +
+      Math.max(...snapshot.hours.map(hour => hour[productMetric])).toLocaleString('zh-CN') + ' · 无身份聚合，不按访客串联行为';
+  }
+  function paintExperiments(items) {
+    const target = document.querySelector('#product-experiments');
+    if (!items.length) {
+      const empty = document.createElement('li'); empty.className = 'product-empty'; empty.textContent = '当前窗口暂无实验打开记录';
+      target.replaceChildren(empty); return;
+    }
+    target.replaceChildren(...items.map((item, index) => {
+      const row = document.createElement('li'), name = document.createElement('span'), rank = document.createElement('i'), number = document.createElement('b');
+      rank.textContent = String(index + 1); name.append(rank, document.createTextNode(item.title)); number.textContent = item.count.toLocaleString('zh-CN');
+      row.append(name, number); return row;
+    }));
+  }
+  function paintAnalytics() {
+    const presentation = productAnalyticsPresentation(analyticsSnapshot);
+    const panel = document.querySelector('.product-panel'), status = document.querySelector('#analytics-status');
+    panel.dataset.state = analyticsProblem ? 'unavailable' : presentation.state;
+    status.dataset.state = panel.dataset.state;
+    status.textContent = analyticsProblem ? analyticsProblem + (analyticsSnapshot ? ' · 以下为上次快照' : '') : presentation.status;
+    for (const key of ['pageViews', 'experimentOpens', 'keyActions', 'uv', 'sessions', 'completion', 'sampled']) {
+      document.querySelector('#analytics-' + key).textContent = presentation[key];
+    }
+    const button = document.querySelector('#download-product');
+    button.disabled = !presentation.snapshot;
+    if (!presentation.snapshot) return;
+    paintProductTrend(presentation.snapshot);
+    paintDefinitionList(document.querySelector('#product-sources'), productSources, presentation.snapshot.totals.sources);
+    paintDefinitionList(document.querySelector('#product-actions'), productActions, presentation.snapshot.totals.actions);
+    paintExperiments(presentation.snapshot.totals.topExperiments);
+  }
+  async function checkAnalytics() {
+    paintAnalytics();
+    if (analyticsChecking || document.hidden || location.protocol !== 'https:') return;
+    analyticsChecking = true;
+    const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 10000);
+    try {
+      const response = await fetch(new URL('analytics.json', location.href), { cache: 'no-store', credentials: 'same-origin', signal: controller.signal });
+      if (!response.ok) throw new Error('analytics_unavailable');
+      const length = Number(response.headers.get('content-length'));
+      if (Number.isFinite(length) && length > 2 * 1024 * 1024) throw new Error('analytics_invalid');
+      const body = await response.text();
+      if (new TextEncoder().encode(body).byteLength > 2 * 1024 * 1024) throw new Error('analytics_invalid');
+      const snapshot = JSON.parse(body);
+      if (productAnalyticsPresentation(snapshot).state === 'invalid') throw new Error('analytics_invalid');
+      analyticsSnapshot = snapshot; analyticsProblem = '';
+    } catch {
+      analyticsProblem = '无法读取新产品统计，当前状态未知';
+    } finally {
+      clearTimeout(timeout); analyticsChecking = false; paintAnalytics();
+    }
+  }
+  for (const button of document.querySelectorAll('[data-product-metric]')) button.addEventListener('click', () => {
+    productMetric = button.dataset.productMetric;
+    document.querySelectorAll('[data-product-metric]').forEach(other => other.setAttribute('aria-pressed', String(other === button)));
+    if (analyticsSnapshot) paintProductTrend(analyticsSnapshot);
+  });
+  document.querySelector('#download-product').addEventListener('click', () => {
+    if (!analyticsSnapshot) return;
+    const url = URL.createObjectURL(new Blob([productAnalyticsToCsv(analyticsSnapshot)], { type: 'text/csv;charset=utf-8' }));
+    const anchor = document.createElement('a'); anchor.href = url;
+    anchor.download = 'science-lab-product-' + analyticsSnapshot.capturedAt.slice(0, 16).replace(/[:T]/g, '-') + '.csv';
+    document.body.append(anchor); anchor.click(); anchor.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
   document.querySelector('#check-update').addEventListener('click', checkQuota);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) { checkUpdate(); checkQuota(); } });
+  document.querySelector('#check-update').addEventListener('click', checkAnalytics);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { checkUpdate(); checkQuota(); checkAnalytics(); } });
   setInterval(checkUpdate, 60000);
   setInterval(checkQuota, 60000);
+  setInterval(checkAnalytics, 300000);
   checkQuota();
+  checkAnalytics();
   updateStatus();
 })();

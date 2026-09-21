@@ -3,6 +3,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { quotaPresentation } = require('./traffic-quota-view.cjs');
+const { validateProductAnalyticsSnapshot, productAnalyticsPresentation } = require('./product-analytics-view.cjs');
 const { CATEGORIES, REASONS, cleanAutomation } = require('./traffic-automation.cjs');
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const count = value => Number(value).toLocaleString('zh-CN');
@@ -57,6 +58,29 @@ function toCsv(data, scope = 'current') {
   return '\ufeff' + [headers, ...rows].map(values => values.map(cell).join(',')).join('\r\n') + '\r\n';
 }
 
+function productAnalyticsToCsv(value, scope = 'current') {
+  const data = validateProductAnalyticsSnapshot(value);
+  if (!data.available) throw new Error('Product analytics unavailable');
+  const cell = item => '"' + String(item ?? '').replace(/"/g, '""') + '"';
+  const coverage = item => item === 'recorded' ? '已采集' : item === 'partial' ? '部分采集' : '未采集';
+  const headers = ['记录类型', '时间', '采集状态', '页面浏览_PV', '实验打开次数', '关键操作次数', '分类', '名称', '次数'];
+  let rows;
+  if (scope === 'history') {
+    rows = data.days.map(day => ['每日汇总', day.day, coverage(day.coverage), day.pageViews, day.experimentOpens, day.keyActions, '', '', '']);
+  } else if (scope === 'current') {
+    rows = [
+      ['24小时汇总', data.capturedAt, '已采集', data.totals.pageViews, data.totals.experimentOpens, data.totals.keyActions, '', '', ''],
+      ...data.hours.map(hour => ['小时明细', hour.start, coverage(hour.coverage), hour.pageViews, hour.experimentOpens, hour.keyActions, '', '', '']),
+      ...Object.entries(data.totals.sources).map(([name, number]) => ['来源汇总', data.capturedAt, '已采集', '', '', '', '来源', name, number]),
+      ...Object.entries(data.totals.actions).map(([name, number]) => ['操作汇总', data.capturedAt, '已采集', '', '', '', '操作', name, number]),
+      ...data.totals.topExperiments.map(item => ['实验排行', data.capturedAt, '已采集', '', '', '', '实验', item.title, item.count]),
+    ];
+  } else {
+    throw new Error('Invalid product analytics CSV scope');
+  }
+  return '\ufeff' + [headers, ...rows].map(row => row.map(cell).join(',')).join('\r\n') + '\r\n';
+}
+
 function renderDashboard(data) {
   const validExperiment = item => item && typeof item.title === 'string' && item.title.length > 0 && item.title.length <= 300 &&
     Number.isSafeInteger(item.requests) && item.requests > 0;
@@ -71,11 +95,11 @@ function renderDashboard(data) {
     throw new Error('看板数据无效');
   }
   for (const item of [data.totals, ...data.hours, ...data.history]) cleanAutomation(item.automation, item.requests, item.entryRequests);
-  const css = ['traffic-dashboard.css', 'traffic-dashboard-ai.css', 'traffic-dashboard-automation.css']
+  const css = ['traffic-dashboard.css', 'traffic-dashboard-product.css', 'traffic-dashboard-ai.css', 'traffic-dashboard-automation.css']
     .map(file => fs.readFileSync(path.join(__dirname, file), 'utf8')).join('\n');
   const client = fs.readFileSync(path.join(__dirname, 'traffic-dashboard-client.js'), 'utf8');
   const json = JSON.stringify(data).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
-  const script = `'use strict';\nconst trafficData = ${json};\nconst toCsv = ${toCsv.toString()};\nconst quotaPresentation = ${quotaPresentation.toString()};\n${client}`;
+  const script = `'use strict';\nconst trafficData = ${json};\nconst toCsv = ${toCsv.toString()};\nconst validateProductAnalyticsSnapshot = ${validateProductAnalyticsSnapshot.toString()};\nconst productAnalyticsPresentation = ${productAnalyticsPresentation.toString()};\nconst productAnalyticsToCsv = ${productAnalyticsToCsv.toString()};\nconst quotaPresentation = ${quotaPresentation.toString()};\n${client}`;
   const hash = crypto.createHash('sha256').update(script).digest('base64');
   const csp = `default-src 'none'; script-src 'sha256-${hash}'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'`;
   const max = Math.max(1, ...data.hours.map(hour => hour.automation?.entries.unclassified ?? 0));
@@ -117,6 +141,12 @@ function renderDashboard(data) {
   const diagnosticRows = (labels, values, known) => `<dl class="diagnostic-list">${Object.entries(labels).map(([key, label]) => `<div><dt>${label}</dt><dd>${known ? count(values?.[key] ?? 0) : '—'}</dd></div>`).join('')}</dl>`;
   const resultDetails = `<details class="ai-diagnostics"><summary>查看完成结果与限流原因</summary><div class="ai-diagnostic-grid"><div><h3>服务端最终结果 <small>${observed ? observation.coverage === 'partial' ? '部分时段已采集' : '已采集' : '未采集'}</small></h3>${diagnosticRows(outcomeLabels, observation?.outcomes, observed)}<p>结果按结束时间统计；旧数据或未观察到的结果为未知，不从 HTTP 200 推断成功。${observed ? '本期观察到 ' + count(observation.requests) + ' 个结果。' : ''}</p></div><div><h3>HTTP 429 原因</h3>${diagnosticRows(reasonLabels, ai.limitReasons || { unknown: ai.rateLimited }, ai.coverage !== 'unavailable')}<p>Nginx 拒绝不会到达 Node，因此不会出现在服务端最终结果中。</p></div></div></details>`;
   const quotaPanel = `<section class="panel quota-panel" aria-labelledby="quota-title"><div class="panel-heading"><div><h2 id="quota-title">额度与服务状态</h2><p>独立分钟采样 · 不属于下方历史统计窗口</p></div><span id="quota-status" class="quota-status" role="status">等待读取额度快照</span></div><div class="quota-grid"><div><span>全站窗口剩余额度 / 上限</span><strong id="quota-remaining">—</strong></div><div><span>当前有效并发 / 上限</span><strong id="quota-active">—</strong></div><div><span>全站窗口到期 · 北京时间</span><strong id="quota-reset">—</strong></div></div><p class="panel-note">采样于 <span id="quota-sampled">—</span>。超过 3 分钟标记过期；全站日额度是首次请求起的 24 小时窗口，不是自然日，也不代表模型账单。</p></section>`;
+  const productPanel = `<section class="panel product-panel" aria-labelledby="product-title" data-state="loading"><div class="product-heading"><div><span class="product-eyebrow">PRODUCT / IDENTITY-FREE</span><h2 id="product-title">网站使用概览</h2><p>浏览器只发送固定事件，服务器直接累加匿名总数</p></div><div class="product-controls"><span id="analytics-status" class="product-status" role="status">正在读取产品统计</span><button id="download-product" class="secondary product-download" type="button" disabled>下载产品统计 <small>CSV</small></button></div></div>
+<div class="product-metrics"><article><span>页面浏览 PV</span><strong id="analytics-pageViews">—</strong><small>首页载入次数</small></article><article><span>实验打开次数</span><strong id="analytics-experimentOpens">—</strong><small>当前实验实际展示</small></article><article><span>关键操作</span><strong id="analytics-keyActions">—</strong><small>固定按钮点击总数</small></article><article class="not-collected"><span>UV</span><strong id="analytics-uv">未采集</strong><small>不生成访客标识</small></article></div>
+<div class="product-grid"><div class="product-trend"><div class="product-subheading"><h3>小时趋势</h3><div class="product-segmented" role="group" aria-label="产品统计趋势"><button type="button" data-product-metric="pageViews" aria-pressed="true">PV</button><button type="button" data-product-metric="experimentOpens" aria-pressed="false">实验打开</button><button type="button" data-product-metric="keyActions" aria-pressed="false">关键操作</button></div></div><div id="product-bars" class="product-bars" aria-label="产品统计小时趋势"><span class="product-empty">等待快照</span></div><p id="product-trend-note">无身份聚合，不按访客串联页面行为</p></div>
+<div class="product-breakdown"><h3>访问来源</h3><dl id="product-sources"><div><dt>直接访问</dt><dd>—</dd></div><div><dt>站内跳转</dt><dd>—</dd></div><div><dt>搜索来源</dt><dd>—</dd></div><div><dt>外部链接</dt><dd>—</dd></div></dl><h3>固定操作</h3><dl id="product-actions"><div><dt>打开目录</dt><dd>—</dd></div><div><dt>打开“我的”</dt><dd>—</dd></div><div><dt>上一实验</dt><dd>—</dd></div><div><dt>下一实验</dt><dd>—</dd></div></dl></div>
+<div class="product-ranking"><h3>热门实验 <small>前 10 · 按打开次数</small></h3><ol id="product-experiments"><li class="product-empty">等待快照</li></ol></div></div>
+<div class="privacy-state"><div><span>会话</span><strong id="analytics-sessions">未采集</strong></div><div><span>实验完成事件</span><strong id="analytics-completion">未接入</strong></div><p><b>无身份聚合</b> · 不设置统计 Cookie，不保存 IP、完整 UA、完整来源或查询参数，不使用指纹或派生标识，也不形成跨页面／跨天轨迹。安全运行日志与本区统计严格分离。</p><span>快照 <b id="analytics-sampled">—</b></span></div></section>`;
   const experimentRows = ai.experiments.length ? ai.experiments.map((item, index) => `<li><span><i>${index + 1}</i>${escape(item.title)}</span><b>${count(item.requests)}</b></li>`).join('') : '<li class="ai-empty">当前窗口暂无可排行的 HTTP 2xx 请求</li>';
   return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow,noarchive"><meta name="referrer" content="no-referrer"><meta name="report-generated-at" content="${escape(data.generatedAt)}"><meta http-equiv="Content-Security-Policy" content="${escape(csp)}"><title>访问观察台 · 星年实验馆</title><style>${css}</style></head><body>
 <div class="ambient" aria-hidden="true"></div><main>
@@ -125,6 +155,8 @@ function renderDashboard(data) {
 <div class="update-strip"><span>生成于 <b>${escape(time(data.generatedAt))}</b></span><span>下次更新 <b>${escape(time(data.nextUpdate))}</b></span><span>每次向前滚动 2 小时</span></div>
 <div id="update-warning" class="notice warning" role="status" hidden></div>
 ${data.partial ? `<div class="notice"><span class="notice-symbol">i</span><span>统计自 ${escape(time(data.collectionStart))} 开始，当前窗口尚未覆盖完整 24 小时。图中斜纹表示未采集时段，不计作零访问。</span></div>` : ''}
+${productPanel}
+<div class="section-heading"><span>SECURITY / OPERATIONS</span><h2>安全流量</h2><p>来自必要运行日志的请求量与自动化风险分类，不与产品统计合并，不用于反推 UV 或访问路径。</p></div>
 <section class="metrics" aria-label="24小时概览">${metric('浏览器特征入口', total.entryRequests, '原始入口口径 · 不等于真人访问', 'lead')}${metric('入口组合估算', total.visitorEstimate, '原始 IP + UA 去重 · 不代表真实人数')}${metric('全部请求', total.requests, '包含页面、资源、接口及自动请求')}</section>
 ${automationPanel}
 ${quotaPanel}
@@ -146,4 +178,4 @@ ${resultDetails}
 <footer><span>SCIENCE LAB <span class="footer-dot">·</span> 让每一次探索被看见</span><span>lab.xingnian.net.cn <span class="footer-dot">·</span> 仅维护者可见</span></footer>
 </main><script>${script}</script></body></html>`;
 }
-module.exports = { renderDashboard, toCsv };
+module.exports = { renderDashboard, toCsv, productAnalyticsToCsv };

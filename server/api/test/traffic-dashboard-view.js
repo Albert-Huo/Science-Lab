@@ -2,7 +2,7 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { rollingSummary } = require('../../../tools/traffic-dashboard.cjs');
-const { toCsv, renderDashboard } = require('../../../tools/traffic-dashboard-view.cjs');
+const { toCsv, productAnalyticsToCsv, renderDashboard } = require('../../../tools/traffic-dashboard-view.cjs');
 const fixture = () => ({ ...rollingSummary([], {
   now: Date.parse('2026-09-10T04:03:00Z'), collectionStart: '2026-09-01T00:00:00Z',
   aiCollectionStart: '2026-09-10T01:03:25Z',
@@ -101,4 +101,44 @@ test('quota presentation handles unavailable, stale, corrupt and future snapshot
   assert.equal(unavailable.state, 'unavailable');
   assert.equal(unavailable.remaining, '—');
   assert.equal(quotaPresentation(null, now).state, 'missing');
+});
+
+test('后台将无身份产品统计与安全流量分区并诚实标注未采集指标', () => {
+  const html = renderDashboard(fixture());
+  assert.match(html, /网站使用概览/);
+  assert.match(html, /页面浏览 PV/);
+  assert.match(html, /实验打开次数/);
+  assert.match(html, /关键操作/);
+  assert.match(html, /UV[\s\S]*未采集/);
+  assert.match(html, /会话[\s\S]*未采集/);
+  assert.match(html, /实验完成事件[\s\S]*未接入/);
+  assert.match(html, /无身份聚合/);
+  assert.match(html, /安全流量/);
+  assert.match(html, /analytics\.json/);
+  assert.match(html, /下载产品统计/);
+  assert.doesNotMatch(html, /真人 UV|高置信真人/);
+});
+
+test('产品统计 CSV 与安全流量 CSV 分离且不构造 UV 或会话', () => {
+  const capturedAt = '2026-09-10T04:00:00.000Z';
+  const privacy = { mode: 'identity_free', cookie: false, fingerprint: false, crossPage: false,
+    crossDay: false, uv: 'not_collected', sessions: 'not_collected', completion: 'not_connected' };
+  const hours = Array.from({ length: 24 }, (_, index) => ({
+    start: new Date(Date.parse(capturedAt) - (24 - index) * 3600000).toISOString(),
+    end: new Date(Date.parse(capturedAt) - (23 - index) * 3600000).toISOString(),
+    coverage: 'recorded', pageViews: index, experimentOpens: index + 1, keyActions: index + 2,
+  }));
+  const snapshot = { schema: 1, capturedAt, collectionStart: '2026-09-01T00:00:00.000Z', available: true,
+    reason: null, privacy, totals: { pageViews: 276, experimentOpens: 300, keyActions: 324,
+      sources: { direct: 100, internal: 80, search: 60, external: 36 },
+      actions: { catalog_open: 100, profile_open: 80, experiment_previous: 70, experiment_next: 74 },
+      topExperiments: [{ id: 'a'.repeat(64), title: '自由落体', count: 25 }] }, hours,
+    days: [{ day: '2026-09-09', coverage: 'recorded', pageViews: 200, experimentOpens: 150, keyActions: 50 }] };
+  const current = productAnalyticsToCsv(snapshot);
+  assert.match(current, /页面浏览_PV/);
+  assert.match(current, /自由落体/);
+  assert.doesNotMatch(current, /visitor|session|IP|UA|指纹|UV/iu);
+  const history = productAnalyticsToCsv(snapshot, 'history');
+  assert.match(history, /2026-09-09/);
+  assert.doesNotMatch(history, /自由落体/);
 });
