@@ -12,7 +12,7 @@ const REASONS = Object.freeze({
 });
 const TOOL = /(?:^|[\s;(])(?:curl|wget|python(?:-requests|-urllib|-httpx)?|httpclient|go-http-client|headlesschrome|headless|selenium|playwright|scrapy|nikto|nmap|ScienceLab-Log-Check)(?:[\/\s;)]|$)/i;
 const DECLARED = /(?:^|[\s;(])(?:googlebot(?:-image|-news|-video)?|bingbot|baiduspider|bytespider|petalbot|yandexbot|duckduckbot|applebot|ahrefsbot|semrushbot|mj12bot|dotbot|gptbot|claudebot|ccbot|oai-searchbot|chatgpt-user|perplexitybot|sogou(?: web spider)?|slurp|facebookexternalhit|twitterbot|telegrambot|slackbot|discordbot|uptimerobot|bot|spider|crawler|preview|monitor|uptime)(?:[\/\s;)]|$)/i;
-const MAX_PROFILES = 8000;
+const MAX_PROFILES = 16000;
 const counts = keys => Object.fromEntries(keys.map(key => [key, 0]));
 const integer = value => Number.isSafeInteger(value) && value >= 0;
 const day = time => Math.floor((time + 28800000) / 86400000);
