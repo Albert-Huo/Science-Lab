@@ -81,8 +81,8 @@ test('浏览器模块不读取 Cookie 或任何持久存储', () => {
 
 test('首页只接入固定匿名事件且不推断实验完成', () => {
   const html = fs.readFileSync(path.resolve(__dirname, '../../../index.html'), 'utf8');
-  assert.match(html, /<script src="product-analytics\.js\?app=v0\.8\.13"><\/script>/);
-  assert.ok(html.indexOf('product-analytics.js?app=v0.8.13') < html.indexOf('const qs = new URLSearchParams'));
+  assert.match(html, /<script src="product-analytics\.js\?app=v0\.8\.14"><\/script>/);
+  assert.ok(html.indexOf('product-analytics.js?app=v0.8.14') < html.indexOf('const qs = new URLSearchParams'));
   assert.match(html, /ScienceProductAnalytics\.createClient\(\)/);
   assert.match(html, /pageView\(ScienceProductAnalytics\.classifySource\(document\.referrer,location\.origin\)\)/);
   assert.match(html, /experimentOpen\(MANIFEST\[cur\]\.path\)/);
@@ -96,8 +96,19 @@ test('首页只接入固定匿名事件且不推断实验完成', () => {
 
 test('Service Worker 缓存匿名客户端且继续绕过 POST', () => {
   const worker = fs.readFileSync(path.resolve(__dirname, '../../../sw.js'), 'utf8');
-  assert.match(worker, /const VERSION = 'v0\.8\.13'/);
+  assert.match(worker, /const VERSION = 'v0\.8\.14'/);
   assert.match(worker, /'\.\/product-analytics\.js\?app=' \+ VERSION/);
+  assert.match(worker, /'\.\/privacy\.html'/);
   assert.match(worker, /if \(request\.method !== 'GET'\) return/);
   assert.doesNotMatch(worker, /analytics\/events/);
+});
+
+test('公开隐私说明落实采集即最小化、日志隔离与未成年人保护', () => {
+  const html = fs.readFileSync(path.resolve(__dirname, '../../../index.html'), 'utf8');
+  const privacy = fs.readFileSync(path.resolve(__dirname, '../../../privacy.html'), 'utf8');
+  assert.match(html, /href="privacy\.html"/);
+  for (const text of ['无身份聚合统计', '不设置统计 Cookie', '不创建访客唯一标识', '不进行浏览器指纹识别',
+    '不保存完整 IP', '不保存完整 UA', '不保存完整来源网址', '不保存 URL 查询参数', '安全与运行日志',
+    '不用于计算 UV', '第二层会话统计目前未启用', '不满 14 周岁', '监护人']) assert.match(privacy, new RegExp(text));
+  assert.doesNotMatch(html, /继续使用即同意|默认同意|同意匿名体验统计/);
 });

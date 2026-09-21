@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#0b0f17">
+  <title>隐私说明 · 星年实验馆</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0b0f17;--panel:#121a27;--line:#27334a;--text:#e8edf7;--muted:#9aa8c1;--green:#8be5c1;--blue:#75a8ff;--amber:#e8c58b}
+    *{box-sizing:border-box}html{background:var(--bg)}body{margin:0;color:var(--text);background:radial-gradient(circle at 85% 0,#25463745,transparent 34rem),var(--bg);font:15px/1.8 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
+    a{color:var(--green);text-underline-offset:3px}a:focus-visible{outline:2px solid var(--green);outline-offset:4px;border-radius:2px}
+    main{width:min(860px,calc(100% - 32px));margin:auto;padding:34px 0 70px}.back{display:inline-flex;align-items:center;gap:7px;color:var(--muted);font-size:13px;text-decoration:none}.back:hover{color:var(--text)}
+    header{padding:58px 0 34px;border-bottom:1px solid var(--line)}.eyebrow{color:var(--green);font-size:11px;letter-spacing:.18em}h1{font-size:clamp(32px,7vw,55px);line-height:1.15;margin:10px 0 16px;font-weight:650;letter-spacing:-.04em}header p{max-width:680px;margin:0;color:var(--muted);font-size:16px}.updated{display:block;margin-top:18px;color:#70809b;font-size:11px}
+    .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:28px 0}.summary article{border:1px solid var(--line);border-radius:14px;padding:18px;background:#121a27cc}.summary b{display:block;color:var(--green);font-size:14px}.summary span{display:block;margin-top:5px;color:var(--muted);font-size:12px;line-height:1.6}
+    section{padding:30px 0;border-bottom:1px solid var(--line)}h2{font-size:20px;margin:0 0 14px}h3{font-size:14px;margin:23px 0 7px;color:#dce7f7}p{margin:10px 0;color:#c7d0df}ul{margin:12px 0;padding-left:20px;color:#c7d0df}li{margin:7px 0}.note{margin:18px 0;padding:15px 17px;border:1px solid #355a4c;border-radius:12px;background:#10271f;color:#cce8dc}.warning{border-color:#655437;background:#292319;color:#ead7b5}.label{display:inline-block;margin-right:7px;padding:2px 7px;border-radius:99px;background:#25483b;color:var(--green);font-size:10px;vertical-align:1px}
+    table{width:100%;border-collapse:collapse;margin:15px 0;font-size:13px}th,td{padding:11px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{color:var(--muted);font-weight:500}td:first-child{width:26%;color:#e1e8f3}code{font:12px ui-monospace,SFMono-Regular,Menlo,monospace;color:#c8dcff}footer{padding-top:28px;color:var(--muted);font-size:12px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+    @media(max-width:640px){main{width:min(100% - 26px,860px);padding-top:22px}header{padding-top:39px}.summary{grid-template-columns:1fr}.summary article{padding:15px}table,tbody,tr,th,td{display:block}thead{display:none}tr{padding:10px 0;border-bottom:1px solid var(--line)}td{border:0;padding:3px 0}td:first-child{width:auto;font-weight:600}}
+  </style>
+</head>
+<body>
+<main>
+  <a class="back" href="./" aria-label="返回实验馆">← 返回实验馆</a>
+  <header>
+    <span class="eyebrow">PRIVACY · DATA BOUNDARIES</span>
+    <h1>隐私说明</h1>
+    <p>实验馆免费、免登录。我们用尽可能少的数据了解网站是否有人使用，同时把产品统计、安全日志和 AI 服务严格分开。</p>
+    <span class="updated">更新日期：2026 年 9 月 21 日</span>
+  </header>
+
+  <div class="summary" aria-label="隐私摘要">
+    <article><b>默认统计不识别人</b><span>只累计页面、实验和固定操作的总次数，不生成个人轨迹。</span></article>
+    <article><b>不弹统计同意框</b><span>默认层不依赖同意，是因为采集链路本身不创建可持续识别访客的数据。</span></article>
+    <article><b>会话分析保持关闭</b><span>需要关联同一浏览器行为的第二层会话统计目前未启用。</span></article>
+  </div>
+
+  <section id="anonymous-analytics">
+    <h2>一、默认开启的无身份聚合统计</h2>
+    <p><span class="label">产品统计</span>为了解“网站有没有人使用”，我们统计首页页面浏览、实验实际打开、目录／“我的”／上一实验／下一实验等固定按钮操作，以及直接访问、站内、搜索、外链四类来源。数据进入服务器后直接按小时和自然日累加，不保存原始事件记录。</p>
+    <table>
+      <thead><tr><th>统计内容</th><th>实际处理方式</th></tr></thead>
+      <tbody>
+        <tr><td>页面浏览</td><td>只记录固定页面 <code>home</code> 的计数。</td></tr>
+        <tr><td>实验打开</td><td>实验公开路径在浏览器中先转换为 SHA-256 内容 ID；请求不携带原始路径，后台只用受信目录把 ID 显示为公开实验标题。</td></tr>
+        <tr><td>关键操作</td><td>只接受四个固定操作名称，不接收按钮文字或自由文本。</td></tr>
+        <tr><td>访问来源</td><td>浏览器本地归类为直接、站内、搜索或外链；不上传完整来源网址。</td></tr>
+      </tbody>
+    </table>
+    <div class="note"><b>采集即最小化：</b>无身份聚合统计不设置统计 Cookie，不创建访客唯一标识，不进行浏览器指纹识别；产品统计库不保存完整 IP、不保存完整 UA、不保存完整来源网址、不保存 URL 查询参数，也不保存请求正文、Cookie、IP 哈希、IP + UA 派生标识或可关联到同一人的事件序列。</div>
+    <p>小时聚合最多保留约 48 小时；每日聚合及私有报表最多保留约 400 天。它们只能回答“发生了多少次”，不能回答“是哪一个人”或“同一个人先后做了什么”。因此后台会诚实显示“UV 未采集”“会话未采集”，不会用独立 IP 或派生标识冒充 UV。</p>
+  </section>
+
+  <section id="security-logs">
+    <h2>二、安全与运行日志</h2>
+    <p><span class="label">独立目的</span>浏览器与服务器通信时，服务器和网络设施不可避免会接触来源 IP、必要的浏览器信息、请求路径、响应状态与时间。这些必要日志用于防攻击、识别扫描、故障排查、保障服务稳定以及履行适用的网络安全义务。</p>
+    <p>安全日志与产品统计在权限、存储和处理链路上分开。安全日志不用于计算 UV，不用于建立用户画像或访问路径，也不会被回填到无身份产品统计中。日志仅限必要维护人员访问，并按适用法律法规、监管要求和实现安全目的所必要的期限保存，到期后按运维规则轮转或删除。</p>
+    <p class="warning note">安全流量后台中的“入口组合估算”“未标记入口”与自动化分类是安全观察指标，不代表真实人数；它们不会被改名或解释成真人 UV。</p>
+  </section>
+
+  <section id="local-data">
+    <h2>三、保存在当前设备的数据</h2>
+    <p>为了让免登录体验可以继续，浏览位置、浏览历史、目录偏好、安装提示状态、AI 对话记录及你主动填写的自定义 AI 配置可能保存在当前浏览器的 <code>localStorage</code>。这些本地记录不会作为产品统计上传；清除浏览器数据、更换浏览器或设备后无法恢复。</p>
+    <p>如果你选择“使用自己的 API Key”，Key 会保存在当前浏览器并由浏览器直接发送给你选择的服务商。共用设备请勿使用；关闭自定义模式并保存会移除已保存的 Key。</p>
+  </section>
+
+  <section id="ai">
+    <h2>四、AI 助手</h2>
+    <p>你主动使用内置 AI 助手时，当前实验信息、可读取的文字状态、问题及必要的近期对话会经本站服务发送给当前配置的模型供应商，用于生成回答。AI 产品统计不保存问题或回答正文；请不要在问题中提交姓名、联系方式、学校、住址、账号或其他敏感个人信息。</p>
+    <p>为了限制滥用，内置 AI 会使用 24 小时签名随机会话 Cookie，并在服务器 Redis 中暂存带过期时间的额度计数和不可逆密钥摘要。它属于提供 AI 功能所需的安全与额度控制，不属于上述无身份产品统计，也不用于广告、画像或跨站追踪。自定义模式由浏览器直接连接你填写的第三方，其处理受相应服务商规则约束。</p>
+  </section>
+
+  <section id="session-layer">
+    <h2>五、会话级体验统计目前关闭</h2>
+    <p>第二层会话统计目前未启用。网站不会为体验分析设置 24 小时访客 Cookie，不会把多次页面访问、点击、停留时间或实验路径关联到同一浏览器，也不会展示统计同意弹窗。</p>
+    <p>如果未来确有必要启用，我们会先更新本说明，采用明确、可撤回且低打扰的选择机制；拒绝不会影响基本功能，也不会出现默认勾选、“继续使用即同意”或拒绝后频繁弹出的设计。在未解决儿童监护人同意与相应规则之前，该功能保持关闭。</p>
+  </section>
+
+  <section id="minors">
+    <h2>六、未成年人</h2>
+    <p>实验馆可能面向未成年人。默认无身份聚合统计不识别年龄或身份；第二层会话统计保持关闭。若你不满 14 周岁，请在父母或其他监护人指导下使用，并不要在 AI 问答或反馈中提交个人信息。</p>
+    <p>如未来需要处理不满 14 周岁未成年人的个人信息，我们会制定专门规则，并在处理前依法取得父母或其他监护人的同意；在此之前不会启用需要持续识别浏览器的体验分析。</p>
+  </section>
+
+  <section id="rights">
+    <h2>七、你的选择与联系我们</h2>
+    <p>无身份聚合统计没有可定位到个人的记录，因此无法按个人导出或删除。你可以在浏览器设置中清除本地历史、AI 对话和必要 Cookie；停用自定义 AI 模式可移除本地保存的 Key。</p>
+    <p>如需询问数据处理方式、反馈安全问题，或请求处理你曾主动提交的个人信息，请通过微信 <b>xingniankepu</b> 联系。为保护他人，请不要在请求中附带无关个人信息。</p>
+    <p>本说明依据最小必要、目的明确、公开透明的原则编写。可参考中国人大网公布的<a href="https://www.npc.gov.cn/npc/c2/c30834/202108/t20210820_313088.html" rel="noopener">《个人信息保护法》</a>和国家网信办公布的<a href="https://www.cac.gov.cn/2024-09/30/c_1729384452307680.htm" rel="noopener">《网络数据安全管理条例》</a>。</p>
+  </section>
+
+  <footer><span>北京星年科技中心 · 星年实验馆</span><a href="./">返回实验馆</a></footer>
+</main>
+</body>
+</html>

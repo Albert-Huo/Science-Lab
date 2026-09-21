@@ -197,6 +197,8 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
   margin-bottom:10px;font-size:10.5px;color:var(--txt2);}
 .community-signoff span:first-child{display:flex;align-items:center;gap:6px;}
 .community-signoff span:first-child::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--acc2);}
+.privacy-link{color:var(--txt2);text-decoration:underline;text-underline-offset:3px;}
+.privacy-link:hover{color:var(--txt);}
 .community-actions{display:flex;gap:8px;}
 .community-actions button{display:flex;align-items:center;justify-content:center;gap:7px;flex:1;min-width:0;
   min-height:44px;padding:8px 6px;border:1px solid var(--line);border-radius:11px;
@@ -362,7 +364,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
   <div class="chips" id="catChips"></div>
   <div class="body" id="catList"></div>
   <footer class="community-footer" aria-label="联系与支持">
-    <div class="community-signoff"><span>免费开放 · 无需登录</span><span>星年科普</span></div>
+    <div class="community-signoff"><span>免费开放 · 无需登录</span><span>星年科普 · <a class="privacy-link" href="privacy.html" target="_blank" rel="noopener">隐私说明</a></span></div>
     <div class="community-actions">
       <button type="button" data-community-open="contact" aria-haspopup="dialog"><svg class="community-icon" aria-hidden="true"><use href="#icon-community-chat"/></svg>联系反馈</button>
       <button type="button" data-community-open="support" aria-haspopup="dialog"><svg class="community-icon" aria-hidden="true"><use href="#icon-community-heart"/></svg>支持实验馆</button>
@@ -387,7 +389,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
       <div class="stat"><b id="stSeen">0</b><span>已浏览</span></div>
       <div class="stat"><b id="stPct">0%</b><span>探索进度</span></div>
     </div>
-    <div class="local-note"><b>隐私说明</b><br>浏览历史与 AI 对话记录保存在当前浏览器。提问时会向模型服务发送实验信息、问题和必要的对话历史。清除浏览器数据或更换设备后，本地记录无法恢复。</div>
+    <div class="local-note"><b>隐私说明</b><br>浏览历史与 AI 对话记录保存在当前浏览器。提问时会向模型服务发送实验信息、问题和必要的对话历史。清除浏览器数据或更换设备后，本地记录无法恢复。<br><a class="privacy-link" href="privacy.html" target="_blank" rel="noopener">查看完整隐私说明</a></div>
     <section class="profile-community" aria-label="联系与支持">
       <p>一起，让科学更有趣</p>
       <button type="button" class="community-row" data-community-open="contact" aria-haspopup="dialog">
@@ -492,9 +494,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 
 <script src="catalog-control.js"></script>
 <script src="content-source.js"></script>
-<script src="product-analytics.js?app=v0.8.13"></script>
-<script src="experiment-scroll.js?app=v0.8.13"></script>
-<script src="ai-chat.js?app=v0.8.13"></script>
+<script src="product-analytics.js?app=v0.8.14"></script>
+<script src="experiment-scroll.js?app=v0.8.14"></script>
+<script src="ai-chat.js?app=v0.8.14"></script>
 <script>
 /* 联系入口独立于实验清单初始化，空目录时也可使用。 */
 (()=>{
