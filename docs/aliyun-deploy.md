@@ -350,6 +350,40 @@ AI_COLLECTION_START=2026-09-09T12:00:00Z
 
 报告目录、密码散列、每日归档与运行代码相互分离。只有报告目录的index.html可以通过认证访问，原始日志和状态文件均不对外映射。维护流程及具体文件见 `server/traffic/README.md`。App静态release和API未随本次统计功能重新部署。
 
+### 无身份产品统计
+
+本功能复用当前云服务器，不需要购买数据库、监控或第三方统计服务。它使用第三个独立本地Redis实例 `127.0.0.1:16380`；2026-09-21的只读检查显示端口未占用，但每次上线前仍须用 `ss -lntp` 即时复核。不得复用默认6379或AI额度16379，也不得把统计密码写入仓库、命令输出、部署记录或聊天。
+
+先备份当前静态release、API release、Nginx站点与 `http` include、systemd单元和私有统计状态。创建 `/var/lib/science-lab-analytics-redis`（redis:redis、0700）后，用不回显的随机密码生成以下两个私有文件：
+
+- `/etc/science-lab-analytics-redis.conf`：root:redis、0640，固定 `bind 127.0.0.1 ::1`、`port 16380`、`maxmemory 32mb`、`maxmemory-policy noeviction`、`appendonly yes`、`appendfsync everysec`、`save ""` 和独立 `requirepass`。
+- `/etc/science-lab-analytics.env`：root:root、0600，包含 `ANALYTICS_REDIS_URL`、`ANALYTICS_ORIGIN=https://lab.xingnian.net.cn`、真实 `ANALYTICS_COLLECTION_START` 与 `ANALYTICS_RATE_LIMIT_PER_MINUTE=600`。启用时间必须在精确入口真正开放前立即记录，不能回填。
+
+把 `server/traffic/science-lab-analytics-redis.service` 安装到systemd；把 `science-lab-api-analytics.conf` 安装为API service的 `analytics.conf` drop-in；安装产品快照service/timer。先运行：
+
+```bash
+sudo systemd-analyze verify \
+  /etc/systemd/system/science-lab-analytics-redis.service \
+  /etc/systemd/system/science-lab-product-analytics-snapshot.service \
+  /etc/systemd/system/science-lab-product-analytics-snapshot.timer
+sudo systemctl daemon-reload
+sudo systemctl enable --now science-lab-analytics-redis.service
+```
+
+独立Redis正常后再发布新API并重启。`/analytics/events` 在Node内部有2KB严格JSON、同源、固定schema和全局分钟保护；Redis不可用只返回503，不影响健康检查或AI。API连接后手动运行一次 `science-lab-product-analytics-snapshot.service`，确认 `/var/lib/science-lab-traffic/www/analytics.json` 为普通文件、0644、严格白名单且不含IP、UA、Cookie、visitor/session、原路径或自由文本，再启用五分钟timer。
+
+将 `server/traffic/nginx-product-analytics.conf` 安装到已由 `nginx -T` 核实的 `http {}` include目录；更新HTTPS站点内的精确location。该location只允许POST，限制2KB与短时突发，关闭通用请求头透传，清空Cookie、UA、Referer、X-Forwarded-For和X-Real-IP，并把access log覆盖为只含时间、状态、耗时、请求长度和上游状态的专用格式。它不会进入带IP的普通安全日志。后台allowlist只增加同一BasicAuth保护下的 `analytics.json`。
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+sudo systemctl enable --now science-lab-product-analytics-snapshot.timer
+```
+
+验收应使用固定 `page_view` 测试事件，不调用付费模型：合法同源POST返回204；跨源、query、非JSON和未知字段失败；响应不含 `Set-Cookie`。验证Redis只有 `science-lab:analytics:v1:*` 聚合Hash且TTL有界；专用Nginx日志没有请求URI或身份字段；普通安全日志没有该POST；未认证访问HTML、`quota.json`、`analytics.json`均为401，已认证快照为no-store；首页、隐私说明、健康检查和AI原功能正常。
+
+回滚顺序是：禁用产品快照timer → 恢复Nginx备份并测试/reload → 移除API analytics drop-in并恢复API release → 停用独立Redis。保留AOF与最后快照，不删除安全日志，不操作16379。前端事件发送是尽力而为，后端入口撤下后不会阻断实验馆使用。
+
 ## 5. 启用内置 AI
 
 写入真实 Key 前，先准备一个仅供本服务使用的低余额账户，把可用余额控制在可承受范围，并关闭不受控的自动充值；不要把 nginx 限流当作认证或全局费用上限。然后确认 `.env` 已设置 `DEEPSEEK_API_KEY`，执行 `pm2 restart science-lab-api --update-env`，再打开 App →「我的」→「AI 问答」直接提问。默认模式不需要在浏览器填写任何配置。

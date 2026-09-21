@@ -1,0 +1,11 @@
+[Unit]
+Description=Update Science Lab product analytics snapshot every five minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=10s
+Unit=science-lab-product-analytics-snapshot.service
+
+[Install]
+WantedBy=timers.target

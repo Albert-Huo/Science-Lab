@@ -1,0 +1,38 @@
+[Unit]
+Description=Science Lab isolated anonymous analytics Redis
+After=local-fs.target
+Before=science-lab-api.service science-lab-product-analytics-snapshot.service
+
+[Service]
+Type=simple
+User=redis
+Group=redis
+UMask=0077
+ExecStart=/usr/bin/redis-server /etc/science-lab-analytics-redis.conf --supervised no --daemonize no
+Restart=on-failure
+RestartSec=3s
+TimeoutStopSec=10s
+StateDirectory=science-lab-analytics-redis
+StateDirectoryMode=0700
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/science-lab-analytics-redis
+IPAddressDeny=any
+IPAddressAllow=localhost
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+MemoryMax=96M
+TasksMax=64
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

@@ -9,6 +9,7 @@
 | `/opt/science-lab-traffic/` | 统计运行文件及Nginx配置源文件，由root维护 |
 | `/var/lib/science-lab-traffic/www/index.html` | 私有历史报告，完整生成后原子替换 |
 | `/var/lib/science-lab-traffic/www/quota.json` | 独立分钟额度快照，与HTML使用相同BasicAuth，不含身份或凭据 |
+| `/var/lib/science-lab-traffic/www/analytics.json` | 无身份产品统计快照，与HTML使用相同BasicAuth，不含访客标识或原始事件 |
 | `/var/lib/science-lab-traffic/history.json` | 400天每日汇总，权限0600，不对外映射 |
 | `/var/lib/science-lab-traffic/update.lock` | 更新互斥锁，进程结束后自动释放 |
 | `/var/log/nginx/science-lab-ai-access.log` | 不含IP、浏览器、来源和正文的内置AI匿名JSON日志 |
@@ -18,15 +19,56 @@
 | `/etc/nginx/science-lab-traffic.htpasswd` | 密码散列，root:nginx、0640，不对外映射 |
 | `/etc/systemd/system/science-lab-traffic.service` | 受限的一次性更新任务，复用现有Node22运行时 |
 | `/etc/systemd/system/science-lab-traffic.timer` | 北京时间每个双数整点更新，开机补跑错过的执行 |
+| `/etc/science-lab-analytics.env` | 产品统计回环Redis连接、同源地址和真实启用时刻，root:root、0600 |
+| `/etc/science-lab-analytics-redis.conf` | 独立Redis配置及密码，root:redis、0640 |
+| `/var/lib/science-lab-analytics-redis/` | 独立AOF数据目录，redis:redis、0700 |
 
-准确的13个运行文件是 `traffic-report.cjs`、`traffic-ai-report.cjs`、`traffic-ai-outcomes.cjs`、`traffic-dashboard.cjs`、`traffic-dashboard-view.cjs`、`traffic-dashboard-client.js`、`traffic-dashboard.css`、`traffic-dashboard-ai.css`、`traffic-quota-view.cjs`、`ai-quota-snapshot.cjs`、`traffic-automation.cjs`、`traffic-bot-ranges.cjs`、`traffic-dashboard-automation.css`，不要把整个仓库部署到统计目录。`www`上级目录为root:nginx、0750，网页为0644；历史数据为0600。
+准确的16个运行文件是 `traffic-report.cjs`、`traffic-ai-report.cjs`、`traffic-ai-outcomes.cjs`、`traffic-dashboard.cjs`、`traffic-dashboard-view.cjs`、`traffic-dashboard-client.js`、`traffic-dashboard.css`、`traffic-dashboard-ai.css`、`traffic-dashboard-product.css`、`traffic-quota-view.cjs`、`ai-quota-snapshot.cjs`、`product-analytics-snapshot.cjs`、`product-analytics-view.cjs`、`traffic-automation.cjs`、`traffic-bot-ranges.cjs`、`traffic-dashboard-automation.css`，不要把整个仓库部署到统计目录。`www`上级目录为root:nginx、0750，网页为0644；历史数据为0600。
+
+## 无身份产品统计运行时
+
+安全日志与产品统计严格分离，是两套目的、存储和权限边界不同的链路。浏览器只发送固定白名单事件；Nginx的专用入口日志不含IP、UA、Referer、Cookie、URI、query或请求正文；Node直接向独立Redis的小时／每日Hash累加，不保存原始事件。普通安全日志仍用于防攻击与排障，但不得用于回算产品UV、会话或访问路径。后台因此固定显示“UV未采集”“会话未采集”和“实验完成事件未接入”。
+
+独立Redis使用 `127.0.0.1:16380`，与默认6379及AI额度16379均不复用。该端口已在2026-09-21只读检查为未占用；每次生产启用前仍必须即时复核监听进程，若已占用应停止部署并查明，不能擅自换端口后继续。私有配置至少包含：
+
+```conf
+bind 127.0.0.1 ::1
+protected-mode yes
+port 16380
+dir /var/lib/science-lab-analytics-redis
+appendonly yes
+appendfsync everysec
+save ""
+maxmemory 32mb
+maxmemory-policy noeviction
+requirepass <独立随机密码>
+```
+
+`/etc/science-lab-analytics-redis.conf` 必须为root:redis、0640；数据目录为redis:redis、0700。`noeviction` 是刻意选择：达到32mb上限时统计写入明确失败，公开网站与AI继续可用，不能静默逐出旧计数造成数字失真。AOF应纳入服务器私有备份，但不是用户行为原始记录。
+
+`/etc/science-lab-analytics.env` 必须为root:root、0600，不得提交Git或输出到终端／日志：
+
+```ini
+ANALYTICS_REDIS_URL=redis://:<同一独立随机密码>@127.0.0.1:16380/0
+ANALYTICS_ORIGIN=https://lab.xingnian.net.cn
+ANALYTICS_COLLECTION_START=<首次成功开放入口前的真实UTC时间>
+ANALYTICS_RATE_LIMIT_PER_MINUTE=600
+```
+
+安装 `science-lab-analytics-redis.service`、API的 `analytics.conf` drop-in、产品快照service/timer后，先执行 `systemd-analyze verify`，再daemon-reload。API仅 `Wants` 独立Redis：统计存储故障不得阻止API启动。快照每5分钟只读回环Redis并原子替换 `analytics.json`；读取失败保留上一份有效快照。部分旧内核不能执行systemd的IP过滤时，应用仍会拒绝非回环Redis URL，但必须记录该降级，不能宣称进程级网络隔离已生效。
+
+Nginx的 `nginx-product-analytics.conf` 必须安装到 `http {}` 上下文；`nginx-locations.conf` 只放入HTTPS `server`。专用location关闭普通请求头透传、清空身份相关头并覆盖server级access log。日志 `/var/log/nginx/science-lab-product-analytics.log` 应为nginx:root、0640并沿用受控轮转；其字段只有时间、状态、耗时、请求长度和上游状态，不作为产品指标来源。上线前后均执行 `nginx -t`。
+
+推荐启用顺序：创建并核验私有配置和数据目录 → 启动独立Redis并用不回显密码的方式执行 `PING` → 安装API drop-in并重启API → 手动运行快照 → 安装Nginx http配置与精确location并reload → 发送一个固定测试事件 → 验证Redis仅有 `science-lab:analytics:v1:*` 聚合键、私有快照可读且普通安全日志未记录该POST → 启用五分钟timer。不要使用真实AI调用验收本功能。
+
+回滚时先禁用产品快照timer，再恢复Nginx备份并经 `nginx -t` reload，使浏览器事件变为尽力失败；随后移除API drop-in并重启API，最后停用独立Redis。保留AOF和最后一份私有快照供审计，不删除现有安全日志，不触碰AI额度Redis。若只发生统计故障，优先保留入口并排障；公开站点本身无需回滚。
 
 ## 更新与检查
 
 通过现有SSH连接在服务器运行：
 
 ```bash
-systemctl status science-lab-traffic.timer --no-pager
+systemctl status science-lab-traffic.timer science-lab-product-analytics-snapshot.timer --no-pager
 systemctl show science-lab-traffic.timer -p NextElapseUSecRealtime
 systemctl start science-lab-traffic.service
 systemctl show science-lab-traffic.service -p Result -p ExecMainStatus
