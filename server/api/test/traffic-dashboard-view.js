@@ -115,6 +115,7 @@ test('后台将无身份产品统计与安全流量分区并诚实标注未采�
   assert.match(html, /无身份聚合/);
   assert.match(html, /安全流量/);
   assert.match(html, /analytics\.json/);
+  assert.match(html, /\['127\.0\.0\.1','localhost'\]\.includes\(location\.hostname\)/);
   assert.match(html, /下载产品统计/);
   assert.doesNotMatch(html, /真人 UV|高置信真人/);
 });

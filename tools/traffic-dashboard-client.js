@@ -3,6 +3,7 @@
     'automation.entries.unclassified': '未标记入口', 'automation.high': '高置信自动请求', 'automation.suspected': '疑似自动请求',
     'ai.requests': 'AI 请求', 'ai.httpSuccesses': 'AI HTTP 2xx' };
   let metric = 'automation.entries.unclassified', selected = null, checking = false;
+  const canRefresh = location.protocol === 'https:' || ['127.0.0.1','localhost'].includes(location.hostname);
   const format = value => new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(value));
   const valueOf = (hour, key) => key.split('.').reduce((value, part) => value?.[part], hour) ?? 0;
   const coverageOf = (hour, key) => key.startsWith('ai.') ? hour.ai.coverage : key.startsWith('automation.') && !hour.automation ? 'unavailable' : hour.coverage;
@@ -57,7 +58,7 @@
   }
   async function checkUpdate() {
     updateStatus();
-    if (checking || document.hidden || location.protocol !== 'https:') return;
+    if (checking || document.hidden || !canRefresh) return;
     checking = true;
     const button = document.querySelector('#check-update'); button.disabled = true;
     const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 10000);
@@ -87,7 +88,7 @@
   }
   async function checkQuota() {
     paintQuota();
-    if (quotaChecking || document.hidden || location.protocol !== 'https:') return;
+    if (quotaChecking || document.hidden || !canRefresh) return;
     quotaChecking = true;
     const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 10000);
     try {
@@ -160,7 +161,7 @@
   }
   async function checkAnalytics() {
     paintAnalytics();
-    if (analyticsChecking || document.hidden || location.protocol !== 'https:') return;
+    if (analyticsChecking || document.hidden || !canRefresh) return;
     analyticsChecking = true;
     const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 10000);
     try {
