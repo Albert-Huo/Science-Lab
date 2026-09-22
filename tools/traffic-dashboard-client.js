@@ -50,6 +50,11 @@
   const warning = document.querySelector('#update-warning'), freshness = document.querySelector('#freshness');
   let networkProblem = '';
   function updateStatus() {
+    const risk = riskPresentation(trafficData);
+    document.querySelector('#risk-panel').dataset.state = networkProblem ? 'unknown' : risk.state;
+    document.querySelector('#risk-title').textContent = networkProblem ? '连接异常 · 当前状态未知' : risk.title;
+    document.querySelector('#risk-reason').textContent = networkProblem || risk.reason;
+    document.querySelector('#risk-advice').textContent = networkProblem ? '检查连接或稍后刷新；以下保留的是上次统计。' : risk.advice;
     const late = Date.now() > Date.parse(trafficData.nextUpdate) + 5 * 60000;
     warning.hidden = !late && !networkProblem;
     warning.textContent = late ? '更新延迟：正在显示上一份可用数据，请以页面统计区间为准。' : networkProblem;
@@ -83,6 +88,17 @@
     const status = document.querySelector('#quota-status');
     status.textContent = quotaProblem ? quotaProblem + (quotaSnapshot ? ' · 以下为上次采样' : '') : presentation.status;
     status.dataset.state = quotaProblem ? 'unavailable' : presentation.state;
+    if (!quotaProblem && presentation.state === 'ready') {
+      if (quotaSnapshot.globalRemaining === 0) {
+        status.textContent = 'AI 额度已用完 · 等待额度重置'; status.dataset.state = 'warning';
+      } else if (quotaSnapshot.activeRequests >= quotaSnapshot.concurrentLimit) {
+        status.textContent = 'AI 当前繁忙 · 新请求可能被限流，请稍后重试'; status.dataset.state = 'warning';
+      } else if (quotaSnapshot.globalRemaining / quotaSnapshot.globalLimit <= 0.2) {
+        status.textContent = 'AI 剩余额度不超过 20% · 建议关注用量'; status.dataset.state = 'warning';
+      } else {
+        status.textContent = 'AI 额度充足 · 并发未满（不代表模型服务可用）';
+      }
+    }
     document.querySelector('.quota-panel').dataset.stale = String(!!quotaProblem || presentation.state === 'stale');
     for (const key of ['remaining', 'active', 'reset', 'sampled']) document.querySelector('#quota-' + key).textContent = presentation[key];
   }

@@ -3,6 +3,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { quotaPresentation } = require('./traffic-quota-view.cjs');
+const { riskPresentation } = require('./traffic-risk-view.cjs');
 const { validateProductAnalyticsSnapshot, productAnalyticsPresentation } = require('./product-analytics-view.cjs');
 const { CATEGORIES, REASONS, cleanAutomation } = require('./traffic-automation.cjs');
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -95,11 +96,11 @@ function renderDashboard(data) {
     throw new Error('看板数据无效');
   }
   for (const item of [data.totals, ...data.hours, ...data.history]) cleanAutomation(item.automation, item.requests, item.entryRequests);
-  const css = ['traffic-dashboard.css', 'traffic-dashboard-product.css', 'traffic-dashboard-ai.css', 'traffic-dashboard-automation.css']
+  const css = ['traffic-dashboard.css', 'traffic-dashboard-product.css', 'traffic-dashboard-ai.css', 'traffic-dashboard-automation.css', 'traffic-dashboard-risk.css']
     .map(file => fs.readFileSync(path.join(__dirname, file), 'utf8')).join('\n');
   const client = fs.readFileSync(path.join(__dirname, 'traffic-dashboard-client.js'), 'utf8');
   const json = JSON.stringify(data).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
-  const script = `'use strict';\nconst trafficData = ${json};\nconst toCsv = ${toCsv.toString()};\nconst validateProductAnalyticsSnapshot = ${validateProductAnalyticsSnapshot.toString()};\nconst productAnalyticsPresentation = ${productAnalyticsPresentation.toString()};\nconst productAnalyticsToCsv = ${productAnalyticsToCsv.toString()};\nconst quotaPresentation = ${quotaPresentation.toString()};\n${client}`;
+  const script = `'use strict';\nconst trafficData = ${json};\nconst riskPresentation = ${riskPresentation.toString()};\nconst toCsv = ${toCsv.toString()};\nconst validateProductAnalyticsSnapshot = ${validateProductAnalyticsSnapshot.toString()};\nconst productAnalyticsPresentation = ${productAnalyticsPresentation.toString()};\nconst productAnalyticsToCsv = ${productAnalyticsToCsv.toString()};\nconst quotaPresentation = ${quotaPresentation.toString()};\n${client}`;
   const hash = crypto.createHash('sha256').update(script).digest('base64');
   const csp = `default-src 'none'; script-src 'sha256-${hash}'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'`;
   const max = Math.max(1, ...data.hours.map(hour => hour.automation?.entries.unclassified ?? 0));
@@ -112,6 +113,8 @@ function renderDashboard(data) {
   const metric = (label, value, hint, className = '') => `<article class="metric ${className}"><span class="metric-label">${label}</span><strong>${count(value)}</strong><p>${hint}</p></article>`;
   const distribution = (label, value, total, symbol) => `<div class="distribution"><div class="distribution-line"><span><i aria-hidden="true">${symbol}</i>${label}</span><span><b>${count(value)}</b><small>${total ? Math.round(value / total * 100) + '%' : '—'}</small></span></div><div class="track"><span style="width:${total ? value / total * 100 : 0}%"></span></div></div>`;
   const total = data.totals;
+  const risk = riskPresentation(data);
+  const riskPanel = `<section id="risk-panel" class="panel risk-panel" data-state="${risk.state}" aria-labelledby="risk-title"><span class="risk-label">最近 24 小时 · 日志观察</span><h2 id="risk-title">${escape(risk.title)}</h2><p id="risk-reason">${escape(risk.reason)}</p><p class="risk-advice"><b>建议</b><span id="risk-advice">${escape(risk.advice)}</span></p><p class="risk-note">统计截至 ${escape(time(data.windowEnd))}，每 2 小时更新。未接入实时可用性与服务器负载监测。</p><details class="risk-rules"><summary>什么情况下需要关注？</summary><p>绿色：已记录请求，未达到异常阈值。黄色：24 小时非预期服务错误或 AI 回答失败至少 5 次；或 AI 限流至少 20 次且占 AI 请求 20%。红色：非预期服务错误至少 20 次且占全部请求 5%，同时相邻两个小时各至少 5 次且占该小时请求 5%。灰色：数据过期、不完整或没有请求，暂时无法判断。</p><p>预期停用接口的 503 不算故障。爬虫、扫描特征、单个 404 不单独升级风险；这些规则是排查提示，不是入侵判定。</p></details></section>`;
   const ai = total.ai;
   const automation = total.automation;
   const classificationLabels = { verified: '已验证爬虫', high: '高置信自动特征', suspected: '疑似自动访问', unclassified: '未命中规则' };
@@ -156,10 +159,12 @@ function renderDashboard(data) {
 <div id="update-warning" class="notice warning" role="status" hidden></div>
 ${data.partial ? `<div class="notice"><span class="notice-symbol">i</span><span>统计自 ${escape(time(data.collectionStart))} 开始，当前窗口尚未覆盖完整 24 小时。图中斜纹表示未采集时段，不计作零访问。</span></div>` : ''}
 ${productPanel}
-<div class="section-heading"><span>SECURITY / OPERATIONS</span><h2>安全流量</h2><p>来自必要运行日志的请求量与自动化风险分类，不与产品统计合并，不用于反推 UV 或访问路径。</p></div>
+<div class="section-heading"><span>SECURITY / OPERATIONS</span><h2>网站运行与风险</h2><p>先看是否需要处理；安全流量与产品统计分开，不用于反推 UV 或访问路径。</p></div>
+${riskPanel}
+${quotaPanel}
+<details class="technical-details"><summary>技术详情 <span>请求量、爬虫分类、错误与历史趋势</span></summary>
 <section class="metrics" aria-label="24小时概览">${metric('浏览器特征入口', total.entryRequests, '原始入口口径 · 不等于真人访问', 'lead')}${metric('入口组合估算', total.visitorEstimate, '原始 IP + UA 去重 · 不代表真实人数')}${metric('全部请求', total.requests, '包含页面、资源、接口及自动请求')}</section>
 ${automationPanel}
-${quotaPanel}
 <p class="traffic-health">HTTP 5xx 原始总数 <b>${count(total.serverErrors)}</b><span>预期停用接口 503 <b>${total.expectedUnavailable == null ? '未知（旧数据）' : count(total.expectedUnavailable)}</b></span><span>其他服务端 5xx <b>${total.serviceErrors == null ? '未知（旧数据）' : count(total.serviceErrors)}</b></span></p>
 <section class="panel ai-panel" aria-labelledby="ai-title"><div class="ai-heading"><div><span class="ai-eyebrow">AI / BUILT-IN</span><h2 id="ai-title">AI 交互 <small>仅内置模式</small></h2><p>匿名请求元数据 · BYOK 不在统计范围</p></div><span class="ai-coverage">${ai.coverage === 'recorded' ? '24 小时已采集' : ai.coverage === 'partial' ? '部分时段已采集' : '尚未开始采集'}</span></div>
 <div class="ai-metrics">${aiMetric('AI 请求', ai.coverage === 'unavailable' ? '—' : count(ai.requests), 'HTTP 日志 · 含入口拒绝')}${aiMetric('服务端完成', observed ? count(observation.outcomes.completed) : '—', observed ? '已观察到有效 [DONE]' : '旧数据完成结果未知')}${aiMetric('限流 429', ai.coverage === 'unavailable' ? '—' : count(ai.rateLimited), 'Nginx 与 Node 合计')}${aiMetric('首内容平均耗时', observed ? duration(average(observation.firstTokenMsTotal, observation.firstTokenSamples)) : '—', '首个非空正文片段 · 非响应头')}</div>
@@ -174,7 +179,8 @@ ${resultDetails}
 <div class="breakdowns"><section class="panel"><div class="panel-heading"><h2>访问设备</h2><span class="caption">按入口请求</span></div>${distribution('电脑', total.devices.desktop, total.entryRequests, '▱')}${distribution('手机', total.devices.mobile, total.entryRequests, '▯')}${distribution('平板', total.devices.tablet, total.entryRequests, '▭')}<p class="panel-note">根据浏览器信息粗略识别，可能存在误判。</p></section><section class="panel"><div class="panel-heading"><h2>来源概览</h2><span class="caption">按入口请求</span></div>${distribution('站内跳转', total.sources.internal, total.entryRequests, '↻')}${distribution('外部链接', total.sources.external, total.entryRequests, '↗')}${distribution('无来源信息', total.sources.unknown, total.entryRequests, '–')}<p class="panel-note">无来源信息不一定是直接访问，也可能由隐私设置造成。</p></section></div>
 <section class="archive"><div><span class="archive-label">留一份观察记录</span><h2>历史每日汇总</h2><p>已归档 ${count(data.history.length)} 天 · 最多保留 400 天 · 每天结束后归档</p></div><button id="download-history" class="secondary" type="button" ${data.history.length ? '' : 'disabled'}>${data.history.length ? '下载历史 CSV' : '等待首日归档'} <span aria-hidden="true">↓</span></button></section>
 <details class="methodology"><summary>统计口径与数据说明</summary><div><p>浏览器特征入口沿用原入口请求口径：GET 首页、状态 200 / 304，且未命中旧 UA 自动特征规则，不是身份认证。未标记入口是其中未命中新版自动规则的子集，仍不等于真人。预取可能多计，缓存或离线访问可能漏计。</p><p>入口组合估算沿用原访客估算，在内存中按 IP 与浏览器标识去重，包含可能被新版标记的入口。共享网络与设备变化会影响估算；小时或每日组合数不能相加作为更长期间人数。设备和来源仍按原始入口统计，未静默过滤。</p><p>原 UA 规则命中 ${count(total.automated)} 条请求，仅作历史兼容指标，不等于已验证机器人。新分类单独展示并保留原因；${count(total.clientErrors)} 条 4xx、${count(total.serverErrors)} 条 5xx 响应。统计页自身请求不计入访问日志。</p><p>AI 统计只包含本站内置模式，BYOK 不在统计范围。HTTP 2xx 表示流式接口已建立，不保证浏览器最终收到 [DONE]；请求耗时包含响应传输，响应字节不是 token 数。</p><p>AI 专用日志不含 IP、浏览器、来源或请求正文；实验只以定长哈希记录并在当前 24 小时内映射。每日历史不保存实验排行，也不保存问题或回答正文。</p><p>时间区间含开始、不含结束。页面展示最近一个双数整点之前的 24 小时，每 2 小时生成；更新失败时继续展示旧快照并提示延迟。无日志记录无法区分无人访问、离线缓存或服务器中断。</p><p>CSV 与当前屏幕来自同一份快照，仅含汇总数字，使用 UTF-8 编码，可用 Excel 打开。原始 IP、浏览器标识及完整来源网址不进入网页或下载文件。历史 CSV 中首个采集日会标记为部分采集；旧历史无分类证据时显示未知，不补零。</p><p>原始日志沿用每日轮转、保留 10 份历史文件。每日汇总保留 400 天；保留日志内的完整日可按本版规则回算，未来规则版本变化应单独比较。服务器长时间停机、超过原始日志保留期的缺失数据无法补算。本版不包含地区或停留时间。</p></div></details>
-<noscript><div class="notice">浏览器禁用了脚本，请手动刷新查看新一期报告；下载功能需要启用 JavaScript。</div></noscript>
+</details>
+<noscript><div class="notice">浏览器禁用了脚本，以上结论仅代表报告生成时；请手动刷新查看新一期报告，额度与下载功能需要启用 JavaScript。</div></noscript>
 <footer><span>SCIENCE LAB <span class="footer-dot">·</span> 让每一次探索被看见</span><span>lab.xingnian.net.cn <span class="footer-dot">·</span> 仅维护者可见</span></footer>
 </main><script>${script}</script></body></html>`;
 }

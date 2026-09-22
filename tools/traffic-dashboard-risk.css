@@ -1,0 +1,15 @@
+.risk-panel { border-left: 4px solid #82979a; }
+.risk-panel[data-state="normal"] { border-left-color: #b4e9b9; }
+.risk-panel[data-state="warning"] { border-left-color: #e7c779; }
+.risk-panel[data-state="danger"] { border-left-color: #ee9a87; }
+.risk-panel h2 { font-size: clamp(23px, 3vw, 32px); margin: 12px 0 18px; }
+.risk-panel p { line-height: 1.8; }
+.risk-label, .risk-note { color: var(--muted, #9bb0b1); font-size: 13px; }
+.risk-advice { display: flex; gap: 16px; padding: 16px 0; border-top: 1px solid #2a4144; }
+.risk-advice b { flex-shrink: 0; }
+.risk-rules { color: #a7bbbc; margin-top: 16px; font-size: 13px; }
+.risk-rules summary, .technical-details > summary { cursor: pointer; }
+.technical-details > summary { padding: 22px 0; font-size: 18px; color: #d9e7e6; }
+.technical-details > summary span { color: #9bb0b1; font-size: 13px; margin-left: 12px; }
+.technical-details[open] > summary { margin-bottom: 16px; }
+@media (max-width: 600px) { .technical-details > summary span { display: block; margin: 8px 0 0 20px; } }

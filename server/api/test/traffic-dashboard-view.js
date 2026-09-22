@@ -9,6 +9,44 @@ const fixture = () => ({ ...rollingSummary([], {
 }), history: [] });
 const csvRows = csv => csv.trimEnd().split('\r\n').map(row => [...row.matchAll(/"((?:[^"]|"")*)"/g)].map(match => match[1].replace(/""/g, '"')));
 
+test('风险提示保守处理自动化、预期503、持续故障、限流和采集缺失', () => {
+  const { riskPresentation } = require('../../../tools/traffic-risk-view.cjs');
+  const data = fixture(), now = Date.parse(data.generatedAt);
+  data.partial = false;
+  data.hours.forEach(hour => { hour.coverage = 'recorded'; });
+  Object.assign(data.totals, { requests: 100, serviceErrors: 0, serverErrors: 49, expectedUnavailable: 49 });
+  data.totals.automation.high = 90;
+  const state = () => riskPresentation(data, now).state;
+  assert.equal(state(), 'normal');
+  data.totals.serviceErrors = 1; assert.equal(state(), 'normal');
+  data.totals.serviceErrors = 5; assert.equal(state(), 'warning');
+  data.totals.serviceErrors = 20; assert.equal(state(), 'warning');
+  Object.assign(data.hours[1], { requests: 50, serviceErrors: 10 });
+  Object.assign(data.hours[2], { requests: 50, serviceErrors: 10 });
+  assert.equal(state(), 'danger');
+  data.totals.requests = 10000; assert.equal(state(), 'warning');
+  data.totals.serviceErrors = 0;
+  Object.assign(data.totals.ai, { coverage: 'recorded', requests: 100, rateLimited: 20 });
+  assert.equal(state(), 'warning');
+  data.totals.ai.rateLimited = 19; assert.equal(state(), 'normal');
+  data.totals.ai.observation = { coverage: 'recorded', outcomes: { upstream_timeout: 5 } };
+  assert.equal(state(), 'warning');
+  assert.equal(riskPresentation(data, Date.parse(data.nextUpdate) + 300001).state, 'unknown');
+  data.partial = true; assert.equal(state(), 'unknown');
+  data.partial = false; data.hours[0].coverage = 'unavailable'; assert.equal(state(), 'unknown');
+  data.hours[0].coverage = 'recorded'; delete data.totals.serviceErrors; assert.equal(state(), 'unknown');
+  data.totals.serviceErrors = 0; data.totals.requests = 0; assert.equal(state(), 'unknown');
+});
+
+test('主视图保留结论与额度，技术详情默认折叠', () => {
+  const html = renderDashboard(fixture());
+  assert.match(html, /网站运行与风险/);
+  assert.match(html, /未接入实时可用性与服务器负载监测/);
+  assert.match(html, /<details class="technical-details"><summary>技术详情/);
+  assert.ok(html.indexOf('id="risk-panel"') < html.indexOf('<details class="technical-details">'));
+  assert.ok(html.indexOf('id="quota-status"') < html.indexOf('<details class="technical-details">'));
+});
+
 test('页面保留原始入口，展示互斥分类、原因与未标记入口，不宣称真人', () => {
   const data = fixture(), html = renderDashboard(data);
   assert.match(html, /浏览器特征入口/);

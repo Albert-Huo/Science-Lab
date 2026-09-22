@@ -23,7 +23,9 @@
 | `/etc/science-lab-analytics-redis.conf` | 独立Redis配置及密码，root:redis、0640 |
 | `/var/lib/science-lab-analytics-redis/` | 独立AOF数据目录，redis:redis、0700 |
 
-准确的16个运行文件是 `traffic-report.cjs`、`traffic-ai-report.cjs`、`traffic-ai-outcomes.cjs`、`traffic-dashboard.cjs`、`traffic-dashboard-view.cjs`、`traffic-dashboard-client.js`、`traffic-dashboard.css`、`traffic-dashboard-ai.css`、`traffic-dashboard-product.css`、`traffic-quota-view.cjs`、`ai-quota-snapshot.cjs`、`product-analytics-snapshot.cjs`、`product-analytics-view.cjs`、`traffic-automation.cjs`、`traffic-bot-ranges.cjs`、`traffic-dashboard-automation.css`，不要把整个仓库部署到统计目录。`www`上级目录为root:nginx、0750，网页为0644；历史数据为0600。
+准确的18个运行文件是 `traffic-report.cjs`、`traffic-ai-report.cjs`、`traffic-ai-outcomes.cjs`、`traffic-dashboard.cjs`、`traffic-dashboard-view.cjs`、`traffic-dashboard-client.js`、`traffic-dashboard.css`、`traffic-dashboard-ai.css`、`traffic-dashboard-product.css`、`traffic-quota-view.cjs`、`ai-quota-snapshot.cjs`、`product-analytics-snapshot.cjs`、`product-analytics-view.cjs`、`traffic-automation.cjs`、`traffic-bot-ranges.cjs`、`traffic-dashboard-automation.css`、`traffic-risk-view.cjs`、`traffic-dashboard-risk.css`，不要把整个仓库部署到统计目录。`www`上级目录为root:nginx、0750，网页为0644；历史数据为0600。
+
+运行与风险主视图依据现有24小时日志给出排查提示，每2小时更新，不是实时健康检查。规则详见页面“什么情况下需要关注”；爬虫占比不单独报警，预期停用503不算故障，过期、部分采集、零请求显示未知。技术分类默认折叠，原始CSV口径不变；额度提示来自独立分钟快照，不代表模型服务健康。
 
 ## 无身份产品统计运行时
 
