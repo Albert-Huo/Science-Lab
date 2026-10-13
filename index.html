@@ -510,9 +510,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 
 <script src="catalog-control.js"></script>
 <script src="content-source.js"></script>
-<script src="product-analytics.js?app=v0.8.16"></script>
-<script src="experiment-scroll.js?app=v0.8.16"></script>
-<script src="ai-chat.js?app=v0.8.16"></script>
+<script src="product-analytics.js?app=v0.8.17"></script>
+<script src="experiment-scroll.js?app=v0.8.17"></script>
+<script src="ai-chat.js?app=v0.8.17"></script>
 <script>
 /* 联系入口独立于实验清单初始化，空目录时也可使用。 */
 (()=>{
@@ -695,6 +695,25 @@ const pages = MANIFEST.map((it,i)=>{
 });
 function esc(s){return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
+/* ---------- experiment activity ---------- */
+let experimentActivitySequence = 0;
+function notifyExperimentActivity(frame,active){
+  if(!frame?.contentWindow) return;
+  frame.contentWindow.postMessage({
+    channel:'xingnian-experiment-activity',
+    active:Boolean(active),
+    sequence:++experimentActivitySequence
+  },new URL(frame.src,window.location.href).origin);
+}
+function syncExperimentActivity(){
+  pages.forEach((page,i)=>notifyExperimentActivity(page.querySelector('iframe'),i===cur&&!document.hidden));
+}
+document.addEventListener('visibilitychange',syncExperimentActivity);
+window.addEventListener('pageshow',syncExperimentActivity);
+window.addEventListener('pagehide',()=>{
+  pages.forEach(page=>notifyExperimentActivity(page.querySelector('iframe'),false));
+});
+
 function mount(i){
   if(i<0||i>=pages.length) return;
   const p=pages[i];
@@ -706,6 +725,7 @@ function mount(i){
     f.addEventListener('load',()=>{
       f.dataset.scrollLoaded='1';
       const ph=p.querySelector('.ph'); if(ph) ph.remove();
+      notifyExperimentActivity(f,i===cur&&!document.hidden);
       if(i===cur) activateScroll();
     });
     p.appendChild(f);
@@ -714,7 +734,7 @@ function mount(i){
 function unmount(i){
   if(i<0||i>=pages.length) return;
   const p=pages[i], f=p.querySelector('iframe');
-  if(f){ f.remove();
+  if(f){ notifyExperimentActivity(f,false); f.remove();
     if(!p.querySelector('.ph')){
       const ph=document.createElement('div'); ph.className='ph';
       ph.innerHTML='<div class="dot"></div><div>'+esc(MANIFEST[i].title)+'</div>';
@@ -727,6 +747,7 @@ function render(){
   for(let i=0;i<pages.length;i++){
     if(Math.abs(i-cur)<=1) mount(i); else unmount(i);
   }
+  syncExperimentActivity();
   const it=MANIFEST[cur];
   document.title=it.title+' · 星年实验馆';
   try{
