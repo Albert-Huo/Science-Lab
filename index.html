@@ -411,6 +411,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
       <button id="installAction">立即添加</button>
       <button id="installClose" aria-label="永久关闭安装引导">✕</button>
     </div>
+    <button type="button" class="community-row" id="operationHelp" style="width:calc(100% - 32px);margin:0 16px 16px" aria-haspopup="dialog" aria-controls="hint"><span class="community-symbol" aria-hidden="true">💡</span><span class="community-label"><b>操作帮助</b><small>查看实验任务与导航说明</small></span></button>
     <section class="profile-community" aria-label="联系与支持">
       <p>一起，让科学更有趣</p>
       <button type="button" class="community-row" data-community-open="contact" aria-haspopup="dialog">
@@ -495,22 +496,23 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
   </div>
 </dialog>
 
-<div id="hint" class="hide"><div class="card">
-  <b>↕ 查看当前实验</b>　按住右侧短手柄，上滑查看下方，下滑返回（已适配实验）<br>
-  <b>↑ ↓ 切换实验</b>　点击右下角箭头<br>
-  <b>☰ 目录</b>　点击顶部目录按钮选择实验<br>
-  <b>我的 / AI</b>　点击左上角头像按钮<br>
-  桌面端可用 滚轮 / 方向键 翻页
-  <button class="ok" id="hintOk">开始探索</button>
+<div id="hint" class="hide" role="dialog" aria-modal="true" aria-labelledby="hintTitle"><div class="card">
+  <b id="hintTitle">先完成实验上方的当前任务</b><br>
+  按任务提示操作器材，再点击确认或记录。<br>
+  需要提示时点击实验台的 💡；这份说明可在“我的 → 操作帮助”再次查看。
+  <details style="margin-top:12px"><summary>查看导航说明</summary>
+    <p>点击顶部“目录”选择实验，右下角箭头切换实验。按住右侧短手柄，上滑查看当前实验下方、下滑返回（已适配实验）。桌面端可用滚轮或方向键切换实验。</p>
+  </details>
+  <button class="ok" id="hintOk">开始实验</button>
 </div></div>
 
 <div id="toast"></div>
 
 <script src="catalog-control.js"></script>
 <script src="content-source.js"></script>
-<script src="product-analytics.js?app=v0.8.15"></script>
-<script src="experiment-scroll.js?app=v0.8.15"></script>
-<script src="ai-chat.js?app=v0.8.15"></script>
+<script src="product-analytics.js?app=v0.8.16"></script>
+<script src="experiment-scroll.js?app=v0.8.16"></script>
+<script src="ai-chat.js?app=v0.8.16"></script>
 <script>
 /* 联系入口独立于实验清单初始化，空目录时也可使用。 */
 (()=>{
@@ -1246,13 +1248,13 @@ document.getElementById('btnNext').addEventListener('click',next);
 /* desktop: wheel + keys */
 let wheelLock=0;
 window.addEventListener('wheel',e=>{
-  if(document.querySelector('.panel.show,dialog[open]')) return;
+  if(document.querySelector('.panel.show,dialog[open],#hint:not(.hide)')) return;
   const now=Date.now(); if(now-wheelLock<550) return;
   if(e.deltaY>30){ wheelLock=now; next(); }
   else if(e.deltaY<-30){ wheelLock=now; prev(); }
 },{passive:true});
 window.addEventListener('keydown',e=>{
-  if(document.querySelector('dialog[open]')) return;
+  if(document.querySelector('dialog[open],#hint:not(.hide)')) return;
   if(['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) return;
   if(e.key==='ArrowDown'||e.key==='PageDown') next();
   else if(e.key==='ArrowUp'||e.key==='PageUp') prev();
@@ -1292,10 +1294,28 @@ document.getElementById('btnShare').addEventListener('click',()=>{
 document.getElementById('shareClose').addEventListener('click',()=>document.getElementById('shareDialog').close());
 document.getElementById('shareDialog').addEventListener('close',()=>document.getElementById('btnShare').focus({preventScroll:true}));
 const hint=document.getElementById('hint');
-if(!safeGet(LS.hint)) hint.classList.remove('hide');
-document.getElementById('hintOk').addEventListener('click',()=>{
+const hintOk=document.getElementById('hintOk');
+if(!safeGet(LS.hint)){ hint.classList.remove('hide'); hintOk.focus({preventScroll:true}); }
+function closeWelcome(){
   hint.classList.add('hide'); safeSet(LS.hint,'1');
+  document.getElementById('btnUser').focus({preventScroll:true});
   updateScrollBand();
+}
+hintOk.addEventListener('click',closeWelcome);
+document.getElementById('operationHelp').addEventListener('click',()=>{
+  closePanels();
+  hint.querySelector('details').open=false;
+  hint.classList.remove('hide');
+  hintOk.focus({preventScroll:true});
+});
+hint.addEventListener('keydown',event=>{
+  if(event.key==='Escape'){ event.preventDefault(); closeWelcome(); }
+  if(event.key==='Tab'){
+    const controls=[...hint.querySelectorAll('button,summary')].filter(element=>element.getBoundingClientRect().height>0);
+    const first=controls[0],last=controls[controls.length-1];
+    if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
+    else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+  }
 });
 
 /* ---------- init ---------- */
