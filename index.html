@@ -56,6 +56,15 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 .hud-btn{position:relative;z-index:2;width:34px;height:34px;border-radius:10px;border:1px solid var(--line);
   background:#121826cc;color:var(--txt);font-size:16px;display:flex;align-items:center;justify-content:center;
   cursor:pointer;backdrop-filter:blur(6px);flex:none;}
+.hud-btn.share-btn{width:auto;min-width:44px;padding:0 8px;font-size:12px;}
+.share-dialog{width:min(520px,calc(100vw - 24px));margin:auto;padding:20px;border:1px solid var(--line);border-radius:16px;background:var(--panel);color:var(--txt);}
+.share-dialog::backdrop{background:#0009;}
+.share-dialog header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;}
+.share-dialog h2{font-size:16px;overflow-wrap:anywhere;}
+.share-dialog button{min-width:40px;min-height:40px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);color:var(--txt);font:inherit;cursor:pointer;}
+.share-dialog p{font-size:13px;line-height:1.6;color:var(--txt2);margin-bottom:12px;}
+.share-dialog input{width:100%;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--txt);font:inherit;font-size:13px;}
+.share-dialog input:focus-visible,.share-dialog button:focus-visible{outline:2px solid var(--acc);outline-offset:2px;}
 #hudStrip{position:relative;z-index:2;flex:1;min-width:0;height:28px;border-radius:14px;
   background:var(--strip);padding:2px;display:flex;}
 #hudInner{flex:1;min-width:0;border-radius:12px;background:#0b0f17d9;display:flex;align-items:center;
@@ -288,8 +297,8 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
   background:var(--strip);color:#0b0f17;font-weight:700;font-size:14px;cursor:pointer;}
 #hint.hide{display:none;}
 /* install guide */
-#installGuide{position:fixed;left:12px;right:62px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:45;
-  max-width:520px;margin:auto;display:flex;align-items:center;gap:10px;padding:10px 11px 10px 12px;
+#installGuide{position:static;
+  max-width:none;margin:12px;display:flex;align-items:center;gap:10px;padding:10px 11px 10px 12px;
   border:1px solid #4f8cff66;border-radius:14px;background:#121826f2;box-shadow:0 10px 28px #0008;
   backdrop-filter:blur(10px);}
 #installGuide.hide{display:none;}
@@ -320,7 +329,6 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
   .page{background:#05070c;}
   .page iframe{max-width:1280px;margin:0 auto;}
   .catalog-collapsed .page iframe{max-width:none;}
-  #installGuide{left:calc(var(--dock-offset) + 12px);}
 }
 /* toast */
 #toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:90;background:#121826ee;
@@ -344,6 +352,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
   <div id="hudStrip"><div id="hudInner">
     <span id="hudTag">物理 · 初中</span><span id="hudTitle"></span><span id="hudIdx">1/1</span>
   </div></div>
+  <button class="hud-btn share-btn" id="btnShare" type="button" aria-label="分享当前实验" title="复制当前实验链接" disabled>分享</button>
   <button class="hud-btn" id="btnCat" title="目录" aria-label="目录" aria-controls="panelCat" aria-expanded="false"><span aria-hidden="true">☰</span><span class="catalog-open-label">展开目录</span></button>
 </div>
 
@@ -357,6 +366,12 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 </div>
 
 <div id="overlay"></div>
+
+<dialog class="share-dialog" id="shareDialog" aria-labelledby="shareTitle">
+  <header><h2 id="shareTitle">分享实验</h2><button id="shareClose" type="button" aria-label="关闭分享">✕</button></header>
+  <p>自动复制未成功。请长按或选中下方链接，使用系统复制；接收者无需登录即可打开。</p>
+  <input id="shareLink" type="url" readonly aria-label="当前实验分享链接">
+</dialog>
 
 <aside class="panel" id="panelCat">
   <header><h2>实验目录</h2><button type="button" class="catalog-collapse" id="collapseCat" title="收起目录" aria-label="收起目录" aria-controls="panelCat"><svg class="community-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v16m14-14-6 6 6 6"/></svg>收起</button><button class="close" data-close aria-label="关闭目录">✕</button></header>
@@ -390,6 +405,12 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
       <div class="stat"><b id="stPct">0%</b><span>探索进度</span></div>
     </div>
     <div class="local-note"><b>隐私说明</b><br>浏览历史与 AI 对话记录保存在当前浏览器。提问时会向模型服务发送实验信息、问题和必要的对话历史。清除浏览器数据或更换设备后，本地记录无法恢复。<br><a class="privacy-link" href="privacy.html" target="_blank" rel="noopener">查看完整隐私说明</a></div>
+    <div id="installGuide" class="hide" role="status">
+      <div class="install-icon">＋</div>
+      <div class="install-copy"><b id="installTitle">添加到主屏幕</b><span id="installText"></span></div>
+      <button id="installAction">立即添加</button>
+      <button id="installClose" aria-label="永久关闭安装引导">✕</button>
+    </div>
     <section class="profile-community" aria-label="联系与支持">
       <p>一起，让科学更有趣</p>
       <button type="button" class="community-row" data-community-open="contact" aria-haspopup="dialog">
@@ -483,20 +504,13 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
   <button class="ok" id="hintOk">开始探索</button>
 </div></div>
 
-<div id="installGuide" class="hide" role="status">
-  <div class="install-icon">＋</div>
-  <div class="install-copy"><b id="installTitle">添加到主屏幕</b><span id="installText"></span></div>
-  <button id="installAction">立即添加</button>
-  <button id="installClose" aria-label="永久关闭安装引导">✕</button>
-</div>
-
 <div id="toast"></div>
 
 <script src="catalog-control.js"></script>
 <script src="content-source.js"></script>
-<script src="product-analytics.js?app=v0.8.14"></script>
-<script src="experiment-scroll.js?app=v0.8.14"></script>
-<script src="ai-chat.js?app=v0.8.14"></script>
+<script src="product-analytics.js?app=v0.8.15"></script>
+<script src="experiment-scroll.js?app=v0.8.15"></script>
+<script src="ai-chat.js?app=v0.8.15"></script>
 <script>
 /* 联系入口独立于实验清单初始化，空目录时也可使用。 */
 (()=>{
@@ -611,6 +625,24 @@ function fetchJson(url,options){
     return response.json();
   });
 }
+function sharedExperimentIndex(experiments,search){
+  const path=new URLSearchParams(search).get('experiment');
+  return path?experiments.findIndex(item=>item.path===path):-1;
+}
+function initialExperimentIndex(sourceManifest,experiments,savedPath,savedIndex,search){
+  const requested=sharedExperimentIndex(experiments,search);
+  return requested>=0?requested:CatalogControl.initialIndex(sourceManifest,experiments,savedPath,savedIndex);
+}
+function experimentShareUrl(pageHref,path){
+  const page=new URL(pageHref);
+  const url=new URL(page.pathname,page.origin);
+  if(['localhost','127.0.0.1'].includes(page.hostname)){
+    const base=ContentSource.resolve({hostname:page.hostname,requestedBase:page.searchParams.get('base')});
+    if(base.startsWith('/')) url.searchParams.set('base',base);
+  }
+  url.searchParams.set('experiment',path);
+  return url.href;
+}
 document.documentElement.classList.toggle('catalog-collapsed',safeGet(LS.catalog)==='1');
 Promise.all([
   fetchJson('manifest.json'),
@@ -623,7 +655,7 @@ Promise.all([
   const catalog=CatalogControl.apply(sourceManifest,control);
   const savedPath=safeGet(LS.current,'');
   const savedIndex=parseInt(safeGet(LS.idx,'0'),10)||0;
-  const initialIndex=CatalogControl.initialIndex(sourceManifest,catalog.experiments,savedPath,savedIndex);
+  const initialIndex=initialExperimentIndex(sourceManifest,catalog.experiments,savedPath,savedIndex,location.search);
   boot(catalog.experiments,catalog.states,initialIndex);
 }).catch(e=>{
   document.body.insertAdjacentHTML('beforeend','<div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#93a1bd;font-size:14px;z-index:99;background:#0b0f17">实验清单加载失败：'+e+'</div>');
@@ -646,6 +678,7 @@ if(!MANIFEST.length){
   return;
 }
 let cur = initialIndex>=0&&initialIndex<MANIFEST.length?initialIndex:0;
+document.getElementById('btnShare').disabled=false;
 let order = MANIFEST.map((_,i)=>i);   // current play order (filterable later)
 let animating = false;
 
@@ -693,6 +726,12 @@ function render(){
     if(Math.abs(i-cur)<=1) mount(i); else unmount(i);
   }
   const it=MANIFEST[cur];
+  document.title=it.title+' · 星年实验馆';
+  try{
+    const url=new URL(location.href);
+    url.searchParams.set('experiment',it.path);
+    history.replaceState(null,'',url.href);
+  }catch(error){ console.warn('实验地址更新失败：'+error.message); }
   document.getElementById('hudTag').textContent = it.subject+' · '+it.level;
   document.getElementById('hudTitle').textContent = it.title;
   document.getElementById('hudIdx').textContent = (cur+1)+'/'+MANIFEST.length;
@@ -1225,6 +1264,33 @@ function toast(t){
   const el=document.getElementById('toast'); el.textContent=t; el.classList.add('show');
   clearTimeout(toast._t); toast._t=setTimeout(()=>el.classList.remove('show'),2200);
 }
+async function copyExperimentLink(url,title){
+  const button=document.getElementById('btnShare');
+  button.disabled=true;
+  try{
+    if(!navigator.clipboard||!navigator.clipboard.writeText) throw new Error('clipboard_unavailable');
+    await navigator.clipboard.writeText(url);
+    toast('已复制：'+title);
+    return true;
+  }catch(error){
+    console.warn('实验链接自动复制未完成：'+error.message);
+    document.getElementById('shareTitle').textContent=title;
+    const input=document.getElementById('shareLink');
+    input.value=url;
+    const dialog=document.getElementById('shareDialog');
+    if(!dialog.open) dialog.showModal();
+    input.focus(); input.select(); input.setSelectionRange(0,input.value.length);
+    return false;
+  }finally{
+    button.disabled=false;
+  }
+}
+document.getElementById('btnShare').addEventListener('click',()=>{
+  const item=MANIFEST[cur];
+  copyExperimentLink(experimentShareUrl(location.href,item.path),item.title);
+});
+document.getElementById('shareClose').addEventListener('click',()=>document.getElementById('shareDialog').close());
+document.getElementById('shareDialog').addEventListener('close',()=>document.getElementById('btnShare').focus({preventScroll:true}));
 const hint=document.getElementById('hint');
 if(!safeGet(LS.hint)) hint.classList.remove('hide');
 document.getElementById('hintOk').addEventListener('click',()=>{
@@ -1234,7 +1300,9 @@ document.getElementById('hintOk').addEventListener('click',()=>{
 
 /* ---------- init ---------- */
 renderChips(); renderCat(); renderStats(); renderHist(); render();
-if(cur>0) toast('已回到上次浏览位置');
+if(qs.has('experiment')){
+  if(sharedExperimentIndex(MANIFEST,qs.toString())<0) toast('分享的实验暂不可用，已打开可用实验');
+}else if(cur>0) toast('已回到上次浏览位置');
 }
 
 /* ---------- install guide ---------- */

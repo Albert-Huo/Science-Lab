@@ -7,7 +7,7 @@
  },
  {
   "path": "physics-middle/初中物理实验2.html",
-  "title": "初中物理实验2｜探究晶体熔化和凝固的过程及特点（三模式优化版）",
+  "title": "初中物理实验2｜探究晶体熔化和凝固的过程及特点",
   "subject": "物理",
   "level": "初中"
  },
@@ -445,13 +445,13 @@
  },
  {
   "path": "physics-high/平抛与自由落体 1.html",
-  "title": "平抛与自由落体演示（优化版）",
+  "title": "平抛与自由落体演示",
   "subject": "物理",
   "level": "高中"
  },
  {
   "path": "physics-high/平抛与自由落体 2-加电梯.html",
-  "title": "自由落体电梯演示（最终修正版）",
+  "title": "自由落体电梯演示",
   "subject": "物理",
   "level": "高中"
  },
@@ -559,7 +559,7 @@
  },
  {
   "path": "physics-popular-science/为什么冰刀在冰上那么滑交互版.html",
-  "title": "冰刀为何在冰上那么滑 · 互动演示（放大镜与命中修复）",
+  "title": "冰刀为何在冰上那么滑 · 互动演示",
   "subject": "物理",
   "level": "科普演示"
  },
@@ -667,7 +667,7 @@
  },
  {
   "path": "physics-popular-science/小狗听到的声交互版.html",
-  "title": "小狗听到的声｜交互闯关（模板同款+自动判定｜最终版）",
+  "title": "小狗听到的声 · 互动实验",
   "subject": "物理",
   "level": "科普演示"
  },

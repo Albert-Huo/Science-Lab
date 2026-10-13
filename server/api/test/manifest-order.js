@@ -81,3 +81,33 @@ test('发布过滤保留顺序，按路径保存的浏览位置在重排后仍�
     assert.equal(visible[index].path, savedPath);
   }
 });
+
+test('已核对的开发备注仅改变展示名称，保留路径和教学描述', () => {
+  const displayRoot = path.join(fixtureRoot, 'display-content');
+  const titles = [
+    ['physics-middle/初中物理实验2.html', '初中物理实验2｜探究晶体熔化和凝固的过程及特点（三模式优化版）', '初中物理实验2｜探究晶体熔化和凝固的过程及特点'],
+    ['physics-high/平抛与自由落体 1.html', '平抛与自由落体演示（优化版）', '平抛与自由落体演示'],
+    ['physics-high/平抛与自由落体 2-加电梯.html', '自由落体电梯演示（最终修正版）', '自由落体电梯演示'],
+    ['physics-popular-science/为什么冰刀在冰上那么滑交互版.html', '冰刀为何在冰上那么滑 · 互动演示（放大镜与命中修复）', '冰刀为何在冰上那么滑 · 互动演示'],
+    ['physics-popular-science/小狗听到的声交互版.html', '小狗听到的声｜交互闯关（模板同款+自动判定｜最终版）', '小狗听到的声 · 互动实验'],
+    ['physics-middle/其他实验.html', '温度测量（学生必做）', '温度测量（学生必做）'],
+    ['physics-high/未知演示.html', '自由落体（对比版）', '自由落体（对比版）'],
+  ];
+  for (const [relative, title] of titles) {
+    const file = path.join(displayRoot, relative);
+    fs.mkdirSync(path.dirname(file), { recursive:true });
+    fs.writeFileSync(file, `<title>${title}</title>`);
+  }
+  execFileSync('python3', [generator, displayRoot], { encoding:'utf8' });
+  const items = JSON.parse(fs.readFileSync(path.join(fixtureRoot, 'manifest.json'), 'utf8'));
+  assert.equal(items.length, titles.length);
+  for (const [relative, , expected] of titles) {
+    const item = items.find(entry => entry.path === relative);
+    assert.ok(item, `路径仍有效：${relative}`);
+    assert.equal(item.title, expected);
+  }
+  fs.writeFileSync(path.join(displayRoot, titles[0][0]), '<title>新教学名称（对照观察）</title>');
+  execFileSync('python3', [generator, displayRoot], { encoding:'utf8' });
+  const updated = JSON.parse(fs.readFileSync(path.join(fixtureRoot, 'manifest.json'), 'utf8'));
+  assert.equal(updated.find(item => item.path === titles[0][0]).title, '新教学名称（对照观察）', '来源教学名称变化时不可被旧映射覆盖');
+});

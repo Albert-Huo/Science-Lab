@@ -22,6 +22,28 @@ DIRS = {
 
 TITLE_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.S | re.I)
 
+# 只替换已核对的开发备注；来源标题变化时保留新标题。
+DISPLAY_TITLES = {
+    "physics-middle/初中物理实验2.html": (
+        "初中物理实验2｜探究晶体熔化和凝固的过程及特点（三模式优化版）",
+        "初中物理实验2｜探究晶体熔化和凝固的过程及特点",
+    ),
+    "physics-high/平抛与自由落体 1.html": (
+        "平抛与自由落体演示（优化版）", "平抛与自由落体演示",
+    ),
+    "physics-high/平抛与自由落体 2-加电梯.html": (
+        "自由落体电梯演示（最终修正版）", "自由落体电梯演示",
+    ),
+    "physics-popular-science/为什么冰刀在冰上那么滑交互版.html": (
+        "冰刀为何在冰上那么滑 · 互动演示（放大镜与命中修复）",
+        "冰刀为何在冰上那么滑 · 互动演示",
+    ),
+    "physics-popular-science/小狗听到的声交互版.html": (
+        "小狗听到的声｜交互闯关（模板同款+自动判定｜最终版）",
+        "小狗听到的声 · 互动实验",
+    ),
+}
+
 
 def natural_sort_key(filename: str) -> tuple:
     # 去掉扩展名，确保主实验 49 排在子实验 49-1 前。
@@ -60,9 +82,13 @@ def main() -> None:
             if not fname.endswith(".html"):
                 continue
             rel = f"{d}/{fname}"
+            title = extract_title(os.path.join(full, fname), fname[:-5])
+            override = DISPLAY_TITLES.get(rel)
+            if override and title == override[0]:
+                title = override[1]
             items.append({
                 "path": rel,
-                "title": extract_title(os.path.join(full, fname), fname[:-5]),
+                "title": title,
                 "subject": subject,
                 "level": level,
             })

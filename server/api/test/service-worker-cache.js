@@ -14,6 +14,7 @@ const handlers = {};
 const deleted = [];
 const added = [];
 const writes = [];
+const matched = [];
 let fetchResponse;
 let cachedResponse;
 const cache = {
@@ -34,7 +35,7 @@ const context = vm.createContext({
     open: async () => cache,
     keys: async () => [staleCache, 'other-app-cache', currentCache],
     delete: async (key) => { deleted.push(key); return true; },
-    match: async () => cachedResponse,
+    match: async (request) => { matched.push(typeof request === 'string' ? request : request.url); return cachedResponse; },
   },
   fetch: async () => fetchResponse,
 });
@@ -80,5 +81,27 @@ async function waitEvent(name, event) {
       respondWith: () => { intercepted = true; } });
   }
   assert.strictEqual(intercepted, false, '私有统计页不得进入公开 App 缓存');
+  cachedResponse = new Response('<html>cached shell</html>', { headers:{ 'Content-Type':'text/html' } });
+  context.fetch = async () => { throw new Error('offline'); };
+  for (const pathname of ['/', '/index.html']) {
+    for (const experiment of ['physics-middle/初中物理实验1.html', '../invalid.html']) {
+      let navigationResponse;
+      handlers.fetch({
+        request:{ method:'GET', mode:'navigate', url:'https://lab.xingnian.net.cn' + pathname + '?experiment=' + encodeURIComponent(experiment) },
+        respondWith:promise=>{ navigationResponse=promise; },
+      });
+      assert.ok(navigationResponse, '带分享参数的首页导航必须使用壳缓存');
+      assert.equal(await (await navigationResponse).clone().text(), '<html>cached shell</html>');
+      assert.equal(matched.at(-1), 'https://lab.xingnian.net.cn' + pathname);
+    }
+  }
+  for (const pathname of ['/api/health', '/admin/traffic/', '/physics-middle/初中物理实验1.html']) {
+    let interceptedNavigation = false;
+    handlers.fetch({
+      request:{ method:'GET', mode:'navigate', url:'https://lab.xingnian.net.cn' + pathname + '?experiment=test' },
+      respondWith:()=>{ interceptedNavigation=true; },
+    });
+    assert.equal(interceptedNavigation, false, '仅归一化壳首页，不缓存 API、管理页或实验内容');
+  }
   console.log('✓ Service Worker 缓存所有权、JSON 回退与 API 绕过检查通过');
 })().catch((error) => { console.error(error); process.exit(1); });

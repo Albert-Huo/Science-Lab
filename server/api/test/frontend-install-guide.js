@@ -6,6 +6,11 @@ const path = require('path');
 const vm = require('vm');
 
 const html = fs.readFileSync(path.resolve(__dirname, '../../../index.html'), 'utf8');
+const profileStart = html.indexOf('<div class="tabpane on" data-pane="profile">');
+const historyStart = html.indexOf('<div class="tabpane" data-pane="history">');
+const guideStart = html.indexOf('<div id="installGuide"');
+assert.ok(guideStart > profileStart && guideStart < historyStart, '安装说明应在用户主动打开的信息面板内');
+assert.match(html, /#installGuide\{position:static;/, '安装说明不得固定覆盖实验区');
 const functionStart = html.indexOf('function installGuideCopy(');
 const functionEnd = html.indexOf('function initInstallGuide()', functionStart);
 

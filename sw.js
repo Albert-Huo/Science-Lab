@@ -3,7 +3,7 @@
  * - 清单与目录控制网络优先，只缓存有效 JSON
  * - 跨域实验内容与 API 请求不拦截
  */
-const VERSION = 'v0.8.14';
+const VERSION = 'v0.8.15';
 const CACHE_PREFIX = 'sl-shell-';
 const SHELL_CACHE = CACHE_PREFIX + VERSION;
 const SCROLL_ASSET = './experiment-scroll.js?app=' + VERSION;
@@ -28,6 +28,7 @@ const SHELL = [
 const JSON_SHELL = ['./catalog-control.json', './manifest.json'];
 const STATIC_SHELL = SHELL.filter((path) => !JSON_SHELL.includes(path));
 const SHELL_URLS = new Set(SHELL.map((path) => new URL(path, self.location.href).href));
+const NAVIGATION_URLS = new Set(['./', './index.html'].map((path) => new URL(path, self.location.href).href));
 
 function isJson(response) {
   return !!(response && response.ok && (response.headers.get('content-type') || '').includes('application/json'));
@@ -84,14 +85,18 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (!SHELL_URLS.has(url.href)) return;
+  const navigationUrl = new URL(url.href);
+  navigationUrl.search = '';
+  const cacheKey = request.mode === 'navigate' && NAVIGATION_URLS.has(navigationUrl.href)
+    ? navigationUrl.href : url.href;
+  if (!SHELL_URLS.has(cacheKey)) return;
   event.respondWith(
-    caches.match(request).then((cached) => {
+    caches.match(cacheKey).then((cached) => {
       const refresh = fetch(request)
         .then(async (response) => {
           if (response && response.ok) {
             const cache = await caches.open(SHELL_CACHE);
-            await cache.put(request, response.clone());
+            await cache.put(cacheKey, response.clone());
           }
           return response;
         })
