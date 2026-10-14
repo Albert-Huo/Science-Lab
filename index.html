@@ -31,7 +31,7 @@ if (location.hostname === 'albert-huo.github.io' && location.pathname.startsWith
   --bg:#0b0f17; --panel:#121826; --panel2:#1a2234; --line:#26314a;
   --txt:#e8edf7; --txt2:#93a1bd; --acc:#4f8cff; --acc2:#22d3a5;
   --strip:linear-gradient(90deg,#4f8cff,#22d3a5,#a78bfa);
-  --hud-h:44px;
+  --hud-h:56px;
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
@@ -50,13 +50,14 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 .empty-feed b{color:var(--txt);font-size:18px;}
 @keyframes spin{to{transform:rotate(360deg)}}
 /* ---------- HUD ---------- */
-#hud{position:fixed;top:0;left:0;right:0;height:var(--hud-h);z-index:40;display:flex;
+#hud{position:fixed;top:0;left:0;right:0;height:calc(var(--hud-h) + env(safe-area-inset-top));z-index:40;display:flex;
   align-items:center;gap:8px;padding:0 8px;padding-top:env(safe-area-inset-top);}
 #hud::before{content:"";position:absolute;inset:0;background:var(--bg);pointer-events:none;}
-.hud-btn{position:relative;z-index:2;width:34px;height:34px;border-radius:10px;border:1px solid var(--line);
+.hud-btn{position:relative;z-index:2;width:44px;height:44px;border-radius:10px;border:1px solid var(--line);
   background:#121826cc;color:var(--txt);font-size:16px;display:flex;align-items:center;justify-content:center;
   cursor:pointer;backdrop-filter:blur(6px);flex:none;}
 .hud-btn.share-btn{width:auto;min-width:44px;padding:0 8px;font-size:12px;}
+#btnPresentation{display:none;width:auto;padding:0 12px;font-size:13px;}
 .share-dialog{width:min(520px,calc(100vw - 24px));margin:auto;padding:20px;border:1px solid var(--line);border-radius:16px;background:var(--panel);color:var(--txt);}
 .share-dialog::backdrop{background:#0009;}
 .share-dialog header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;}
@@ -65,10 +66,10 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 .share-dialog p{font-size:13px;line-height:1.6;color:var(--txt2);margin-bottom:12px;}
 .share-dialog input{width:100%;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--txt);font:inherit;font-size:13px;}
 .share-dialog input:focus-visible,.share-dialog button:focus-visible{outline:2px solid var(--acc);outline-offset:2px;}
-#hudStrip{position:relative;z-index:2;flex:1;min-width:0;height:28px;border-radius:14px;
+#hudStrip{position:relative;z-index:2;flex:1;min-width:0;height:34px;border-radius:14px;
   background:var(--strip);padding:2px;display:flex;}
 #hudInner{flex:1;min-width:0;border-radius:12px;background:#0b0f17d9;display:flex;align-items:center;
-  gap:8px;padding:0 10px;font-size:12px;}
+  gap:8px;padding:0 10px;font-size:14px;}
 #hudTag{color:var(--acc2);white-space:nowrap;flex:none;}
 #hudTitle{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--txt);}
 #hudIdx{color:var(--txt2);white-space:nowrap;flex:none;font-variant-numeric:tabular-nums;}
@@ -93,11 +94,10 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
     background:#172033eb;color:#fff;border-color:#ffffffa0;transform:scaleX(1.06);}
   #scrollHandle:focus-visible{outline:1px solid var(--txt2);outline-offset:-2px;border-radius:10px;}
 }
-/* ---------- nav arrows ---------- */
-#navBtns{position:fixed;right:10px;bottom:calc(24px + env(safe-area-inset-bottom));z-index:30;
-  display:flex;flex-direction:column;gap:10px;}
-#navBtns button{width:40px;height:40px;border-radius:50%;border:1px solid rgba(147,161,189,.22);
-  background:rgba(18,24,38,.14);color:rgba(232,237,247,.68);font-size:16px;cursor:pointer;
+/* ---------- experiment navigation ---------- */
+#navBtns{display:flex;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);flex:none;}
+#navBtns button{flex:1;min-width:0;min-height:44px;border-radius:8px;border:1px solid var(--line);
+  background:var(--panel2);color:var(--txt);font-size:13px;cursor:pointer;
   transition:background .15s,color .15s,border-color .15s;}
 #navBtns button:active,#navBtns button:focus-visible{
   border-color:rgba(147,161,189,.5);background:rgba(18,24,38,.34);color:rgba(232,237,247,.95);}
@@ -114,7 +114,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 #panelCat.show,#panelUser.show{transform:translateX(0);}
 .panel header{padding:14px 16px 10px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;}
 .panel header h2{font-size:15px;font-weight:600;flex:1;}
-.panel header .close{width:28px;height:28px;border:none;border-radius:8px;background:var(--panel2);
+.panel header .close{width:44px;height:44px;border:none;border-radius:8px;background:var(--panel2);
   color:var(--txt2);cursor:pointer;font-size:14px;}
 .catalog-collapse,.catalog-open-label{display:none;}
 .catalog-collapse:focus-visible,#btnCat:focus-visible{outline:2px solid var(--acc2);outline-offset:2px;}
@@ -320,7 +320,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
   #panelCat{left:0;right:auto;width:var(--dock-w);transform:none;box-shadow:none;
     border-right:1px solid var(--line);z-index:20;}
   #panelCat header .close{display:none;}
-  .catalog-collapse{display:flex;align-items:center;gap:4px;min-height:32px;padding:5px 8px;
+  .catalog-collapse{display:flex;align-items:center;gap:4px;min-height:44px;padding:5px 8px;
     border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--txt2);font:inherit;font-size:12px;cursor:pointer;}
   .catalog-collapse:hover{background:var(--panel2);color:var(--txt);}
   .catalog-collapse svg{width:16px;height:16px;}
@@ -333,7 +333,14 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
   .page{background:#05070c;}
   .page iframe{max-width:1280px;margin:0 auto;}
   .catalog-collapsed .page iframe{max-width:none;}
+  #btnPresentation{display:flex;}
 }
+@media (max-width:600px){#hudTag{display:none;}}
+.presentation-mode #panelCat,.presentation-mode #btnUser,.presentation-mode #btnShare,
+.presentation-mode #btnCat,.presentation-mode #hudTag,.presentation-mode #hudIdx,
+.presentation-mode #installGuide{display:none;}
+.presentation-mode #hudTitle{font-size:18px;font-weight:600;}
+.presentation-mode #hudStrip{height:40px;}
 /* toast */
 #toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:90;background:#121826ee;
   border:1px solid var(--line);color:var(--txt);font-size:12.5px;padding:8px 16px;border-radius:999px;
@@ -357,16 +364,12 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
     <span id="hudTag">物理 · 初中</span><span id="hudTitle"></span><span id="hudIdx">1/1</span>
   </div></div>
   <button class="hud-btn share-btn" id="btnShare" type="button" aria-label="分享当前实验" title="复制当前实验链接" disabled>分享</button>
+  <button class="hud-btn" id="btnPresentation" type="button" aria-pressed="false" title="收起目录，专注展示当前实验" disabled>专注展示</button>
   <button class="hud-btn" id="btnCat" title="目录" aria-label="目录" aria-controls="panelCat" aria-expanded="false"><span aria-hidden="true">☰</span><span class="catalog-open-label">展开目录</span></button>
 </div>
 
 <div id="scrollHandle" aria-hidden="true" tabindex="-1" aria-orientation="vertical">
   <div class="scroll-grip" aria-hidden="true"><span>↕</span></div>
-</div>
-
-<div id="navBtns">
-  <button id="btnPrev" title="上一个实验" aria-label="上一个实验">↑</button>
-  <button id="btnNext" title="下一个实验" aria-label="下一个实验">↓</button>
 </div>
 
 <div id="overlay"></div>
@@ -379,6 +382,10 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 
 <aside class="panel" id="panelCat">
   <header><h2>实验目录</h2><button type="button" class="catalog-collapse" id="collapseCat" title="收起目录" aria-label="收起目录" aria-controls="panelCat"><svg class="community-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v16m14-14-6 6 6 6"/></svg>收起</button><button class="close" data-close aria-label="关闭目录">✕</button></header>
+  <nav id="navBtns" aria-label="切换实验">
+    <button id="btnPrev" type="button" title="上一个实验" aria-label="上一个实验">↑ 上一实验</button>
+    <button id="btnNext" type="button" title="下一个实验" aria-label="下一个实验">↓ 下一实验</button>
+  </nav>
   <div id="catSearch"><input id="catInput" type="search" aria-label="搜索实验名称、编号或知识点" placeholder="搜索名称、编号或知识点…"></div>
   <div class="chips" id="catChips"></div>
   <div class="body" id="catList"></div>
@@ -505,18 +512,18 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
   按任务提示操作器材，再点击确认或记录。<br>
   需要提示时点击实验台的 💡；这份说明可在“我的 → 操作帮助”再次查看。
   <details style="margin-top:12px"><summary>查看导航说明</summary>
-    <p>点击顶部“目录”选择实验，右下角箭头切换实验。按住右侧短手柄，上滑查看当前实验下方、下滑返回（已适配实验）。桌面端可用滚轮或方向键切换实验。</p>
+    <p>在“目录”中选择实验或切换上、下一实验。按住右侧短手柄，上滑查看当前实验下方、下滑返回。电脑端可点“专注展示”收起目录，再点“退出展示”恢复。</p>
   </details>
   <button class="ok" id="hintOk">开始实验</button>
 </div></div>
 
 <div id="toast"></div>
 
-<script src="catalog-control.js?app=v0.8.20"></script>
+<script src="catalog-control.js?app=v0.8.21"></script>
 <script src="content-source.js"></script>
-<script src="product-analytics.js?app=v0.8.20"></script>
-<script src="experiment-scroll.js?app=v0.8.20"></script>
-<script src="ai-chat.js?app=v0.8.20"></script>
+<script src="product-analytics.js?app=v0.8.21"></script>
+<script src="experiment-scroll.js?app=v0.8.21"></script>
+<script src="ai-chat.js?app=v0.8.21"></script>
 <script>
 /* 联系入口独立于实验清单初始化，空目录时也可使用。 */
 (()=>{
@@ -685,6 +692,7 @@ if(!MANIFEST.length){
 }
 let cur = initialIndex>=0&&initialIndex<MANIFEST.length?initialIndex:0;
 document.getElementById('btnShare').disabled=false;
+document.getElementById('btnPresentation').disabled=false;
 let order = MANIFEST.map((_,i)=>i);   // current play order (filterable later)
 let animating = false;
 
@@ -868,12 +876,14 @@ const catalogPanel=document.getElementById('panelCat');
 const catalogButton=document.getElementById('btnCat');
 const collapseCat=document.getElementById('collapseCat');
 let catalogCollapsed=document.documentElement.classList.contains('catalog-collapsed');
+let presentationMode=false;
+const presentationButton=document.getElementById('btnPresentation');
 function syncCatalogLayout(){
-  document.documentElement.classList.toggle('catalog-collapsed',catalogCollapsed);
+  document.documentElement.classList.toggle('catalog-collapsed',catalogCollapsed||presentationMode);
   const label=desktopCatalog.matches?'展开目录':'目录';
   catalogButton.title=label;
   catalogButton.setAttribute('aria-label',label);
-  catalogButton.setAttribute('aria-expanded',String(desktopCatalog.matches?!catalogCollapsed:catalogPanel.classList.contains('show')));
+  catalogButton.setAttribute('aria-expanded',String(desktopCatalog.matches?!(catalogCollapsed||presentationMode):catalogPanel.classList.contains('show')));
   if(desktopCatalog.matches&&catalogCollapsed&&catalogPanel.contains(document.activeElement)) catalogButton.focus({preventScroll:true});
 }
 function setCatalogCollapsed(collapsed){
@@ -896,7 +906,20 @@ function closePanels(){
   syncCatalogLayout();
   updateScrollBand();
 }
-desktopCatalog.addEventListener('change',closePanels); // 归位移动抽屉，保留桌面目录偏好
+function setPresentationMode(on){
+  presentationMode=!!on;
+  document.documentElement.classList.toggle('presentation-mode',presentationMode);
+  presentationButton.textContent=presentationMode?'退出展示':'专注展示';
+  presentationButton.title=presentationMode?'退出展示，恢复目录布局':'收起目录，专注展示当前实验';
+  presentationButton.setAttribute('aria-pressed',String(presentationMode));
+  closePanels();
+  if(desktopCatalog.matches) presentationButton.focus({preventScroll:true});
+}
+presentationButton.addEventListener('click',()=>setPresentationMode(!presentationMode));
+desktopCatalog.addEventListener('change',()=>{
+  if(presentationMode&&!desktopCatalog.matches) setPresentationMode(false);
+  else closePanels();
+}); // 归位移动抽屉，保留桌面目录偏好
 overlay.addEventListener('click',closePanels);
 document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',closePanels));
 catalogButton.addEventListener('click',()=>{productAnalytics.keyAction('catalog_open');openPanel('catalog');});
@@ -1279,6 +1302,7 @@ document.getElementById('btnNext').addEventListener('click',next);
 let wheelLock=0;
 window.addEventListener('wheel',e=>{
   if(document.querySelector('.panel.show,dialog[open],#hint:not(.hide)')) return;
+  if(document.querySelector('.presentation-mode')) return;
   const now=Date.now(); if(now-wheelLock<550) return;
   if(e.deltaY>30){ wheelLock=now; next(); }
   else if(e.deltaY<-30){ wheelLock=now; prev(); }
@@ -1286,6 +1310,10 @@ window.addEventListener('wheel',e=>{
 window.addEventListener('keydown',e=>{
   if(document.querySelector('dialog[open],#hint:not(.hide)')) return;
   if(['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) return;
+  if(document.querySelector('.presentation-mode')){
+    if(e.key==='Escape') setPresentationMode(false);
+    return;
+  }
   if(e.key==='ArrowDown'||e.key==='PageDown') next();
   else if(e.key==='ArrowUp'||e.key==='PageUp') prev();
   else if(e.key==='Escape') closePanels();

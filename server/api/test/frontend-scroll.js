@@ -17,7 +17,7 @@ test('host version-pins the scroll module and exposes opt-in local diagnostics',
   const version = serviceWorker.match(/const VERSION = '(v\d+\.\d+\.\d+)';/)?.[1];
   const scrollVersion = hostHtml.match(/<script src="experiment-scroll\.js\?app=(v\d+\.\d+\.\d+)"><\/script>/)?.[1];
   const moduleVersion = scrollModule.match(/const VERSION='(v\d+\.\d+\.\d+)'/)?.[1];
-  assert.equal(version, 'v0.8.20');
+  assert.equal(version, 'v0.8.21');
   assert.equal(scrollVersion, version);
   assert.equal(moduleVersion, version);
   assert.ok(hostHtml.includes("qs.get('scroll-debug')==='1'"));
@@ -381,13 +381,13 @@ test('short viewports reduce handle height and disable targets smaller than 44px
   assert.ok(html.includes('scrollEdge.clientHeight>=44'));
 });
 
-test('navigation arrows use layered transparency without shrinking touch targets', () => {
+test('experiment navigation stays inside the catalogue with full touch targets', () => {
   const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
   const baseRule = html.match(/#navBtns button\{([^}]+)\}/)?.[1] || '';
-  assert.ok(baseRule.includes('width:40px;height:40px'));
-  assert.ok(baseRule.includes('background:rgba(18,24,38,.14)'));
-  assert.ok(baseRule.includes('border:1px solid rgba(147,161,189,.22)'));
-  assert.ok(baseRule.includes('color:rgba(232,237,247,.68)'));
+  assert.ok(baseRule.includes('min-height:44px'));
+  const catalogue = html.slice(html.indexOf('<aside class="panel" id="panelCat">'), html.indexOf('<aside class="panel" id="panelUser">'));
+  assert.ok(catalogue.includes('id="navBtns"'), 'navigation must not overlay the experiment iframe');
+  assert.ok(baseRule.includes('color:var(--txt)'));
   assert.ok(!baseRule.includes('backdrop-filter'));
   assert.match(html, /#navBtns button:active,#navBtns button:focus-visible\{/);
 });
