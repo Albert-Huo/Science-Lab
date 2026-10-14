@@ -17,6 +17,8 @@ const toolsRoot = path.join(fixtureRoot, 'tools');
 fs.mkdirSync(toolsRoot);
 const generator = path.join(toolsRoot, 'build-manifest.py');
 fs.copyFileSync(path.join(repoRoot, 'tools/build-manifest.py'), generator);
+const metadata = path.join(repoRoot, 'tools/experiment-metadata.json');
+if (fs.existsSync(metadata)) fs.copyFileSync(metadata, path.join(toolsRoot, 'experiment-metadata.json'));
 
 const expectedNumbers = ['1', '2', '9', '10', '12-1', '12-2', '12-10', '49', '49-1', '49-2', '49-10', '68', '100'];
 const expectedNames = expectedNumbers.map(number => `初中物理实验${number}.html`);
@@ -49,7 +51,8 @@ test('生成清单按主编号、子编号排序，主实验排在子实验前',
 test('生成清单保留标题、路径和分类，并忽略非 HTML 文件', () => {
   const byPath = items => Object.fromEntries(items.map(item => [item.path, item]));
   assert.equal(generated.length, expectedItems.length);
-  assert.deepEqual(byPath(generated), byPath(expectedItems));
+  const originalFields = generated.map(({ path, title, subject, level }) => ({ path, title, subject, level }));
+  assert.deepEqual(byPath(originalFields), byPath(expectedItems));
 });
 
 test('其他目录保留原有文件名排序和分类顺序', () => {
@@ -85,11 +88,11 @@ test('发布过滤保留顺序，按路径保存的浏览位置在重排后仍�
 test('已核对的开发备注仅改变展示名称，保留路径和教学描述', () => {
   const displayRoot = path.join(fixtureRoot, 'display-content');
   const titles = [
-    ['physics-middle/初中物理实验2.html', '初中物理实验2｜探究晶体熔化和凝固的过程及特点（三模式优化版）', '初中物理实验2｜探究晶体熔化和凝固的过程及特点'],
-    ['physics-high/平抛与自由落体 1.html', '平抛与自由落体演示（优化版）', '平抛与自由落体演示'],
-    ['physics-high/平抛与自由落体 2-加电梯.html', '自由落体电梯演示（最终修正版）', '自由落体电梯演示'],
-    ['physics-popular-science/为什么冰刀在冰上那么滑交互版.html', '冰刀为何在冰上那么滑 · 互动演示（放大镜与命中修复）', '冰刀为何在冰上那么滑 · 互动演示'],
-    ['physics-popular-science/小狗听到的声交互版.html', '小狗听到的声｜交互闯关（模板同款+自动判定｜最终版）', '小狗听到的声 · 互动实验'],
+    ['physics-middle/初中物理实验2.html', '初中物理实验2｜探究晶体熔化和凝固的过程及特点（三模式优化版）', '探究晶体熔化和凝固的过程及特点'],
+    ['physics-high/平抛与自由落体 1.html', '平抛与自由落体演示（优化版）', '平抛与自由落体｜同时落地对比'],
+    ['physics-high/平抛与自由落体 2-加电梯.html', '自由落体电梯演示（最终修正版）', '自由落体电梯｜内外视角对比'],
+    ['physics-popular-science/为什么冰刀在冰上那么滑交互版.html', '冰刀为何在冰上那么滑 · 互动演示（放大镜与命中修复）', '冰刀为何在冰上那么滑'],
+    ['physics-popular-science/小狗听到的声交互版.html', '小狗听到的声｜交互闯关（模板同款+自动判定｜最终版）', '小狗听到的声音｜人犬听域示意'],
     ['physics-middle/其他实验.html', '温度测量（学生必做）', '温度测量（学生必做）'],
     ['physics-high/未知演示.html', '自由落体（对比版）', '自由落体（对比版）'],
   ];
@@ -110,4 +113,36 @@ test('已核对的开发备注仅改变展示名称，保留路径和教学描�
   execFileSync('python3', [generator, displayRoot], { encoding:'utf8' });
   const updated = JSON.parse(fs.readFileSync(path.join(fixtureRoot, 'manifest.json'), 'utf8'));
   assert.equal(updated.find(item => item.path === titles[0][0]).title, '新教学名称（对照观察）', '来源教学名称变化时不可被旧映射覆盖');
+  assert.equal(updated.find(item => item.path === titles[0][0]).topic, undefined, '来源变化时也不能绑定旧教学分类');
+});
+
+test('生成器提供已核对知识分类、原编号及跨主题关键词', () => {
+  const content = path.join(fixtureRoot, 'topic-content');
+  const file = path.join(content, 'physics-middle/初中物理实验20.html');
+  fs.mkdirSync(path.dirname(file), { recursive:true });
+  fs.writeFileSync(file, '<title>初中物理实验20｜观察磁体对小铁球的作用（交互版）</title>');
+  execFileSync('python3', [generator, content], { encoding:'utf8' });
+  const [actual] = JSON.parse(fs.readFileSync(path.join(fixtureRoot, 'manifest.json'), 'utf8'));
+  assert.equal(actual.path, 'physics-middle/初中物理实验20.html');
+  assert.equal(actual.topic, '运动与力');
+  assert.equal(actual.number, '20');
+  assert.ok(actual.keywords.some(word => word.includes('磁')));
+});
+
+test('教学代表来源变化时不能归并原来同内容的入口', () => {
+  const content = path.join(fixtureRoot, 'alias-content');
+  const names = ['太阳忽然消失后的地球交互版.html', '太阳消失后的地球交互版.html'];
+  for (const name of names) {
+    const file = path.join(content, 'physics-popular-science', name);
+    fs.mkdirSync(path.dirname(file), { recursive:true });
+    fs.writeFileSync(file, '<title>太阳忽然消失后的地球 · 交互演示</title>');
+  }
+  execFileSync('python3', [generator, content], { encoding:'utf8' });
+  let items = JSON.parse(fs.readFileSync(path.join(fixtureRoot, 'manifest.json'), 'utf8'));
+  assert.equal(items[1].catalogAliasOf, items[0].path);
+  fs.writeFileSync(path.join(content, 'physics-popular-science', names[0]), '<title>新的独立教学活动</title>');
+  execFileSync('python3', [generator, content], { encoding:'utf8' });
+  items = JSON.parse(fs.readFileSync(path.join(fixtureRoot, 'manifest.json'), 'utf8'));
+  assert.equal(items[1].catalogAliasOf, undefined);
+  assert.deepEqual(CatalogControl.catalogIndexes(items), [0, 1]);
 });

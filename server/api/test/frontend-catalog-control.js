@@ -209,7 +209,7 @@ function assertActiveRateZonePlacement(nginxBlock) {
 
 {
   const html = fs.readFileSync(path.resolve(__dirname, '../../../index.html'), 'utf8');
-  assert.ok(html.includes('<script src="catalog-control.js"></script>'), '首页应加载目录发布控制模块');
+  assert.ok(html.includes('<script src="catalog-control.js?app=v0.8.18"></script>'), '首页应加载当前版本目录模块，避免旧模块缓存');
   assert.ok(
     /fetchJson\('catalog-control\.json',\{cache:'no-store'\}\)/.test(html),
     '控制文件请求应绕过 HTTP 缓存'
@@ -264,7 +264,7 @@ function assertActiveRateZonePlacement(nginxBlock) {
     serviceWorker.includes('const SHELL_CACHE = CACHE_PREFIX + VERSION;'),
     'App 壳缓存名应从当前版本派生'
   );
-  assert.ok(serviceWorker.includes("'./catalog-control.js'"), '发布控制模块应进入离线 App 壳');
+  assert.ok(serviceWorker.includes("'./catalog-control.js?app=' + VERSION"), '当前版本目录模块应进入离线 App 壳');
   assert.ok(serviceWorker.includes("'./content-source.js'"), '内容源解析模块应进入离线 App 壳');
   assert.ok(serviceWorker.includes("const SCROLL_ASSET = './experiment-scroll.js?app=' + VERSION;"), '内容滚动模块地址应随 App 版本更新');
   assert.ok(serviceWorker.includes('  SCROLL_ASSET,'), '版本化内容滚动模块应进入离线 App 壳');

@@ -22,27 +22,40 @@ DIRS = {
 
 TITLE_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.S | re.I)
 
-# 只替换已核对的开发备注；来源标题变化时保留新标题。
-DISPLAY_TITLES = {
-    "physics-middle/初中物理实验2.html": (
-        "初中物理实验2｜探究晶体熔化和凝固的过程及特点（三模式优化版）",
-        "初中物理实验2｜探究晶体熔化和凝固的过程及特点",
-    ),
-    "physics-high/平抛与自由落体 1.html": (
-        "平抛与自由落体演示（优化版）", "平抛与自由落体演示",
-    ),
-    "physics-high/平抛与自由落体 2-加电梯.html": (
-        "自由落体电梯演示（最终修正版）", "自由落体电梯演示",
-    ),
-    "physics-popular-science/为什么冰刀在冰上那么滑交互版.html": (
-        "冰刀为何在冰上那么滑 · 互动演示（放大镜与命中修复）",
-        "冰刀为何在冰上那么滑 · 互动演示",
-    ),
-    "physics-popular-science/小狗听到的声交互版.html": (
-        "小狗听到的声｜交互闯关（模板同款+自动判定｜最终版）",
-        "小狗听到的声 · 互动实验",
-    ),
-}
+NUMBER_RE = re.compile(r"^(?:初中|高中)物理实验(\d+(?:-\d+)?)")
+
+
+def load_metadata() -> tuple:
+    """Load curated names/topics bound to exact source titles, not broad regexes."""
+    metadata_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "experiment-metadata.json")
+    with open(metadata_path, encoding="utf-8") as source:
+        metadata = json.load(source)
+    if metadata.get("version") != 1 or not isinstance(metadata.get("experiments"), dict):
+        raise ValueError("展示元数据必须为 version=1 且包含 experiments 对象")
+    topics = metadata.get("middleTopics")
+    if not isinstance(topics, list) or not topics or any(not isinstance(topic, str) or not topic for topic in topics) or len(set(topics)) != len(topics):
+        raise ValueError("知识分类必须为非空、不重复的名称列表")
+    experiments = metadata["experiments"]
+    for path, item in experiments.items():
+        parts = path.split("/")
+        if len(parts) != 2 or parts[0] not in DIRS or parts[1] in {"", ".", ".."} or not parts[1].endswith(".html") or "\\" in path:
+            raise ValueError("展示元数据存在无效实验路径：" + path)
+        if not isinstance(item, dict) or not isinstance(item.get("title"), str) or not item["title"].strip():
+            raise ValueError("展示元数据缺少教学名称：" + path)
+        sources = item.get("sourceTitles")
+        if not isinstance(sources, list) or not sources or any(not isinstance(title, str) or not title.strip() for title in sources):
+            raise ValueError("展示元数据缺少已核对来源标题：" + path)
+        if "topic" in item and item["topic"] not in topics:
+            raise ValueError("未知知识分类：" + path)
+        if not isinstance(item.get("keywords", []), list) or any(not isinstance(word, str) for word in item.get("keywords", [])):
+            raise ValueError("搜索关键词必须为文本列表：" + path)
+        if "description" in item and not isinstance(item["description"], str):
+            raise ValueError("教学说明必须为文本：" + path)
+    for path, item in experiments.items():
+        alias = item.get("catalogAliasOf")
+        if alias and (alias not in experiments or alias == path or experiments[alias].get("catalogAliasOf") or alias.split("/")[0] != path.split("/")[0]):
+            raise ValueError("目录代表必须存在、同类别且不能形成别名链：" + path)
+    return experiments, {topic: index for index, topic in enumerate(topics)}
 
 
 def natural_sort_key(filename: str) -> tuple:
@@ -70,6 +83,7 @@ def main() -> None:
     content_repo = os.path.abspath(content_repo)
     if not os.path.isdir(content_repo):
         sys.exit(f"内容仓库不存在: {content_repo}")
+    metadata, topic_orders = load_metadata()
 
     items = []
     for d, (subject, level) in DIRS.items():
@@ -83,15 +97,33 @@ def main() -> None:
                 continue
             rel = f"{d}/{fname}"
             title = extract_title(os.path.join(full, fname), fname[:-5])
-            override = DISPLAY_TITLES.get(rel)
-            if override and title == override[0]:
-                title = override[1]
-            items.append({
+            item = {
                 "path": rel,
                 "title": title,
                 "subject": subject,
                 "level": level,
-            })
+            }
+            number = NUMBER_RE.match(fname)
+            if number:
+                item["number"] = number.group(1)
+            items.append(item)
+
+    matched = {item["path"]: metadata[item["path"]] for item in items
+               if item["path"] in metadata and item["title"] in metadata[item["path"]]["sourceTitles"]}
+    for item in items:
+        display = matched.get(item["path"])
+        if not display:
+            continue
+        item["title"] = display["title"]
+        if "topic" in display:
+            item["topic"] = display["topic"]
+            item["topicOrder"] = topic_orders[display["topic"]]
+        item["keywords"] = display.get("keywords", [])
+        if display.get("description"):
+            item["description"] = display["description"]
+        # Source changes may create a different lesson: never silently fold it into an old one.
+        if display.get("catalogAliasOf") in matched:
+            item["catalogAliasOf"] = display["catalogAliasOf"]
 
     out = os.path.join(repo_root, "manifest.json")
     with open(out, "w", encoding="utf-8") as f:

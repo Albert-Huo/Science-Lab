@@ -48,6 +48,44 @@ async function waitEvent(name, event) {
 }
 
 (async () => {
+  const offlineHandlers = {};
+  const assetCache = new Map();
+  let offline = false;
+  const base = 'https://lab.xingnian.net.cn/sw.js';
+  const cacheKey = request => new URL(typeof request === 'string' ? request : request.url, base).href;
+  const readAsset = async request => {
+    if (offline) throw new Error('offline');
+    const url = new URL(cacheKey(request));
+    const relative = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
+    const body = fs.readFileSync(path.resolve(__dirname, '../../..', relative));
+    return new Response(body, { headers:{ 'Content-Type':relative.endsWith('.json') ? 'application/json' : 'text/plain' } });
+  };
+  const offlineCache = {
+    addAll: async assets => {
+      for (const asset of assets) assetCache.set(cacheKey(asset), await readAsset(asset));
+    },
+    put: async (request,response) => { assetCache.set(cacheKey(request),response); },
+  };
+  const offlineContext = vm.createContext({ URL, fetch:readAsset,
+    self:{ location:{ origin:'https://lab.xingnian.net.cn', href:base }, addEventListener:(name,handler)=>{ offlineHandlers[name]=handler; }, skipWaiting:async()=>{}, clients:{ claim:async()=>{} } },
+    caches:{ open:async()=>offlineCache, match:async request=>assetCache.get(cacheKey(request))?.clone() },
+  });
+  vm.runInContext(serviceWorkerSource, offlineContext);
+  let installPromise;
+  offlineHandlers.install({ waitUntil:promise=>{ installPromise=promise; } });
+  await installPromise;
+  const catalogUrl = 'https://lab.xingnian.net.cn/catalog-control.js?app='+versionMatch[1];
+  assert.ok(assetCache.has(catalogUrl), '安装时必须预缓存首页实际请求的版本化目录模块');
+  offline = true;
+  let offlineModule;
+  offlineHandlers.fetch({ request:{ method:'GET', url:catalogUrl }, respondWith:promise=>{ offlineModule=promise; } });
+  assert.ok(offlineModule, '断网刷新必须由SW接管实际版本化目录模块请求');
+  const cachedModule = await (await offlineModule).text();
+  assert.equal(cachedModule, fs.readFileSync(path.resolve(__dirname, '../../../catalog-control.js'), 'utf8'));
+  const moduleContext = vm.createContext({});
+  vm.runInContext(cachedModule, moduleContext);
+  assert.equal(typeof moduleContext.CatalogControl.catalogIndexes, 'function', '离线命中的应是具有新目录能力的当前模块');
+
   await waitEvent('activate', {});
   assert.deepStrictEqual(deleted, [staleCache]);
 

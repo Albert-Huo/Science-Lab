@@ -127,13 +127,17 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 .chip{font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);
   background:var(--panel2);color:var(--txt2);cursor:pointer;}
 .chip.on{background:var(--acc);border-color:var(--acc);color:#fff;}
+.chip:focus-visible,.cat-item:focus-visible{outline:2px solid var(--acc2);outline-offset:-2px;}
 .cat-group{padding:4px 0;}
 .cat-group h3{font-size:12px;color:var(--acc2);padding:10px 16px 6px;position:sticky;top:0;
   background:var(--panel);z-index:1;}
-.cat-item{padding:9px 16px;font-size:13px;color:var(--txt);cursor:pointer;display:flex;gap:8px;
-  border-left:3px solid transparent;}
-.cat-item .no{color:var(--txt2);flex:none;font-variant-numeric:tabular-nums;width:30px;}
-.cat-item span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cat-group h4{font-size:12px;font-weight:600;color:var(--txt2);padding:12px 16px 4px;}
+.cat-item{padding:9px 16px;font-size:13px;font-family:inherit;color:var(--txt);cursor:pointer;display:flex;gap:8px;
+  width:100%;text-align:left;background:none;border:0;border-left:3px solid transparent;}
+.cat-item .no{color:var(--txt2);flex:none;font-variant-numeric:tabular-nums;min-width:30px;width:max-content;white-space:nowrap;}
+.cat-item .cat-text{min-width:0;flex:1;}
+.cat-name{display:block;line-height:1.5;overflow-wrap:anywhere;}
+.cat-detail{display:block;margin-top:3px;font-size:11px;line-height:1.5;color:var(--txt2);overflow-wrap:anywhere;}
 .cat-item:hover{background:var(--panel2);}
 .cat-item.cur{border-left-color:var(--acc);background:var(--panel2);color:var(--acc);}
 /* user panel */
@@ -375,7 +379,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 
 <aside class="panel" id="panelCat">
   <header><h2>实验目录</h2><button type="button" class="catalog-collapse" id="collapseCat" title="收起目录" aria-label="收起目录" aria-controls="panelCat"><svg class="community-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v16m14-14-6 6 6 6"/></svg>收起</button><button class="close" data-close aria-label="关闭目录">✕</button></header>
-  <div id="catSearch"><input id="catInput" type="search" placeholder="搜索实验…"></div>
+  <div id="catSearch"><input id="catInput" type="search" aria-label="搜索实验名称、编号或知识点" placeholder="搜索名称、编号或知识点…"></div>
   <div class="chips" id="catChips"></div>
   <div class="body" id="catList"></div>
   <footer class="community-footer" aria-label="联系与支持">
@@ -508,11 +512,11 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 
 <div id="toast"></div>
 
-<script src="catalog-control.js"></script>
+<script src="catalog-control.js?app=v0.8.18"></script>
 <script src="content-source.js"></script>
-<script src="product-analytics.js?app=v0.8.17"></script>
-<script src="experiment-scroll.js?app=v0.8.17"></script>
-<script src="ai-chat.js?app=v0.8.17"></script>
+<script src="product-analytics.js?app=v0.8.18"></script>
+<script src="experiment-scroll.js?app=v0.8.18"></script>
+<script src="ai-chat.js?app=v0.8.18"></script>
 <script>
 /* 联系入口独立于实验清单初始化，空目录时也可使用。 */
 (()=>{
@@ -658,12 +662,12 @@ Promise.all([
   const savedPath=safeGet(LS.current,'');
   const savedIndex=parseInt(safeGet(LS.idx,'0'),10)||0;
   const initialIndex=initialExperimentIndex(sourceManifest,catalog.experiments,savedPath,savedIndex,location.search);
-  boot(catalog.experiments,catalog.states,initialIndex);
+  boot(catalog.experiments,catalog.states,initialIndex,sourceManifest);
 }).catch(e=>{
   document.body.insertAdjacentHTML('beforeend','<div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#93a1bd;font-size:14px;z-index:99;background:#0b0f17">实验清单加载失败：'+e+'</div>');
 });
 
-function boot(MANIFEST,PUBLISHING_STATES,initialIndex){
+function boot(MANIFEST,PUBLISHING_STATES,initialIndex,SOURCE_MANIFEST=MANIFEST){
 
 const track = document.getElementById('track');
 if(!MANIFEST.length){
@@ -806,7 +810,7 @@ function renderHist(){
     const unavailable=i>=0?'':state==='disabled'?'暂不可用':state==='hidden'?'已从目录隐藏':'已从目录移除';
     const t=new Date(x.ts);
     const time=(t.getMonth()+1)+'月'+t.getDate()+'日 '+String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0');
-    return '<div class="hist-item" data-i="'+i+'" data-state="'+state+'"><span>'+esc(x.title)+'</span><small>'+time+(unavailable?' · '+unavailable:'')+'</small></div>';
+    return '<div class="hist-item" data-i="'+i+'" data-state="'+state+'"><span>'+esc(CatalogControl.historyTitle(x,SOURCE_MANIFEST))+'</span><small>'+time+(unavailable?' · '+unavailable:'')+'</small></div>';
   }).join('');
 }
 document.getElementById('histList').addEventListener('click',e=>{
@@ -820,32 +824,37 @@ document.getElementById('histList').addEventListener('click',e=>{
 });
 
 /* ---------- catalog ---------- */
+const catalogIndexes=CatalogControl.catalogIndexes(MANIFEST);
 const groups={};
-MANIFEST.forEach((it,i)=>{ const k=it.subject+' · '+it.level; (groups[k]=groups[k]||[]).push(i); });
+MANIFEST.forEach((it,i)=>{ if(catalogIndexes[i]!==i) return; const k=it.subject+' · '+it.level; (groups[k]=groups[k]||[]).push(i); });
 let chipFilter=null, searchText='';
 function renderChips(){
   const el=document.getElementById('catChips');
-  el.innerHTML='<span class="chip'+(chipFilter===null?' on':'')+'" data-k="">全部</span>'+
-    Object.keys(groups).map(k=>'<span class="chip'+(chipFilter===k?' on':'')+'" data-k="'+k+'">'+k+' ('+groups[k].length+')</span>').join('');
+  el.innerHTML='<button type="button" class="chip'+(chipFilter===null?' on':'')+'" data-k="" aria-pressed="'+(chipFilter===null)+'">全部</button>'+
+    Object.keys(groups).map(k=>'<button type="button" class="chip'+(chipFilter===k?' on':'')+'" data-k="'+esc(k)+'" aria-pressed="'+(chipFilter===k)+'">'+esc(k)+' ('+groups[k].length+')</button>').join('');
 }
 document.getElementById('catChips').addEventListener('click',e=>{
   const c=e.target.closest('.chip'); if(!c) return;
   chipFilter=c.dataset.k||null; renderChips(); renderCat();
+  [...document.querySelectorAll('#catChips .chip')].find(button=>button.dataset.k===(chipFilter||''))?.focus({preventScroll:true});
 });
 document.getElementById('catInput').addEventListener('input',e=>{ searchText=e.target.value.trim(); renderCat(); });
 function renderCat(){
   const el=document.getElementById('catList'); let html='';
   for(const k of Object.keys(groups)){
     if(chipFilter && k!==chipFilter) continue;
-    const items=groups[k].filter(i=>!searchText||MANIFEST[i].title.includes(searchText));
+    const items=groups[k].filter(i=>CatalogControl.matchesSearch(MANIFEST[i],searchText));
     if(!items.length) continue;
-    html+='<div class="cat-group"><h3>'+k+'</h3>'+items.map((i,n)=>
-      '<div class="cat-item'+(i===cur?' cur':'')+'" data-i="'+i+'"><span class="no">'+(n+1)+'</span><span>'+esc(MANIFEST[i].title)+'</span></div>').join('')+'</div>';
+    html+='<div class="cat-group"><h3>'+esc(k)+'</h3>'+CatalogControl.topicSections(MANIFEST,items).map(section=>
+      (section.title?'<h4>'+esc(section.title)+'</h4>':'')+section.indexes.map(i=>{
+        const item=MANIFEST[i],number=item.number||String(groups[k].indexOf(i)+1);
+        return '<button type="button" class="cat-item'+(i===catalogIndexes[cur]?' cur':'')+'" data-i="'+i+'"><span class="no">'+esc(number)+'</span><span class="cat-text"><span class="cat-name">'+esc(item.title)+'</span>'+(item.description?'<small class="cat-detail">'+esc(item.description)+'</small>':'')+'</span></button>';
+      }).join('')).join('')+'</div>';
   }
   el.innerHTML=html||'<div class="empty">没有匹配的实验</div>';
 }
 function highlightCat(){
-  document.querySelectorAll('.cat-item').forEach(d=>d.classList.toggle('cur', +d.dataset.i===cur));
+  document.querySelectorAll('.cat-item').forEach(d=>d.classList.toggle('cur', +d.dataset.i===catalogIndexes[cur]));
 }
 document.getElementById('catList').addEventListener('click',e=>{
   const it=e.target.closest('.cat-item'); if(!it) return;

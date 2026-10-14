@@ -68,5 +68,45 @@
     return 0;
   }
 
-  return {apply,stats,initialIndex};
+  /** Map each original navigation index to its catalog representative; keep all routes. */
+  function catalogIndexes(experiments){
+    const source=Array.isArray(experiments)?experiments:[];
+    const byPath=new Map(source.map((item,index)=>[item.path,index]));
+    return source.map((item,index)=>{
+      const representative=byPath.get(item.catalogAliasOf);
+      if(representative===undefined||representative===index) return index;
+      const primary=source[representative];
+      if(primary.catalogAliasOf||primary.subject!==item.subject||primary.level!==item.level||primary.topic!==item.topic) return index;
+      return representative;
+    });
+  }
+
+  /** Group catalog indexes by ordered knowledge topic without reordering navigation. */
+  function topicSections(experiments,indexes){
+    const groups=new Map();
+    for(const index of indexes){
+      const item=experiments[index];
+      if(!item) continue;
+      const title=typeof item.topic==='string'?item.topic:'';
+      if(!groups.has(title)) groups.set(title,{title,indexes:[],order:Number.isInteger(item.topicOrder)&&item.topicOrder>=0?item.topicOrder:Number.MAX_SAFE_INTEGER});
+      groups.get(title).indexes.push(index);
+    }
+    return [...groups.values()].sort((a,b)=>a.order-b.order).map(({title,indexes})=>({title,indexes}));
+  }
+
+  /** Match every search word against names, original numbers and curated topic keywords. */
+  function matchesSearch(item,query){
+    const words=String(query||'').trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+    const keywords=Array.isArray(item.keywords)?item.keywords.filter(value=>typeof value==='string'):[];
+    const text=[item.title,item.topic,item.number,item.description,...keywords].filter(value=>typeof value==='string').join(' ').toLocaleLowerCase();
+    return words.every(word=>text.includes(word));
+  }
+
+  /** Resolve current names for history while retaining unavailable old entries. */
+  function historyTitle(item,sourceManifest){
+    const current=(Array.isArray(sourceManifest)?sourceManifest:[]).find(entry=>entry.path===item.path);
+    return current?current.title:item.title;
+  }
+
+  return {apply,stats,initialIndex,catalogIndexes,topicSections,matchesSearch,historyTitle};
 });
