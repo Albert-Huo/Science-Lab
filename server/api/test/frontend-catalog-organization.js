@@ -83,6 +83,20 @@ test('搜索支持分类、原编号、关键词、多个词及大小写', () =>
   assert.equal(CatalogControl.matchesSearch(lesson, 'RGB 热学'), false);
 });
 
+test('目录编号只作隐藏信息，70个原编号仍可检索且不改变原入口', () => {
+  for (const lesson of manifest.filter(entry => entry.level === '初中')) {
+    assert.equal(CatalogControl.matchesSearch(lesson, lesson.number), true, lesson.path);
+    assert.equal(CatalogControl.initialIndex(manifest, manifest, lesson.path, 0), manifest.indexOf(lesson));
+  }
+  for (const number of ['12-1', '12-2', '49-1']) {
+    const matches = manifest.filter(entry => CatalogControl.matchesSearch(entry, number));
+    assert.deepEqual(matches.map(entry => entry.path), [`physics-middle/初中物理实验${number}.html`]);
+  }
+  const fixture = item('测量液体密度', { number:'12-1', keywords:['密度'] });
+  assert.equal(CatalogControl.matchesSearch(fixture, '12-1 密度'), true);
+  assert.equal(CatalogControl.matchesSearch(fixture, '12-2'), false);
+});
+
 test('货船故事检索实际低频声主题，不误归到浮力或淡水', () => {
   const lesson = manifest.find(entry => entry.path === 'physics-popular-science/货船神秘失踪交互版.html');
   assert.equal(CatalogControl.matchesSearch(lesson, '次声波'), true);

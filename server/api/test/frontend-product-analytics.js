@@ -81,8 +81,8 @@ test('浏览器模块不读取 Cookie 或任何持久存储', () => {
 
 test('首页只接入固定匿名事件且不推断实验完成', () => {
   const html = fs.readFileSync(path.resolve(__dirname, '../../../index.html'), 'utf8');
-  assert.match(html, /<script src="product-analytics\.js\?app=v0\.8\.18"><\/script>/);
-  assert.ok(html.indexOf('product-analytics.js?app=v0.8.18') < html.indexOf('const qs = new URLSearchParams'));
+  assert.match(html, /<script src="product-analytics\.js\?app=v0\.8\.19"><\/script>/);
+  assert.ok(html.indexOf('product-analytics.js?app=v0.8.19') < html.indexOf('const qs = new URLSearchParams'));
   assert.match(html, /ScienceProductAnalytics\.createClient\(\)/);
   assert.match(html, /pageView\(ScienceProductAnalytics\.classifySource\(document\.referrer,location\.origin\)\)/);
   assert.match(html, /experimentOpen\(MANIFEST\[cur\]\.path\)/);
@@ -96,7 +96,7 @@ test('首页只接入固定匿名事件且不推断实验完成', () => {
 
 test('Service Worker 缓存匿名客户端且继续绕过 POST', () => {
   const worker = fs.readFileSync(path.resolve(__dirname, '../../../sw.js'), 'utf8');
-  assert.match(worker, /const VERSION = 'v0\.8\.18'/);
+  assert.match(worker, /const VERSION = 'v0\.8\.19'/);
   assert.match(worker, /'\.\/product-analytics\.js\?app=' \+ VERSION/);
   assert.match(worker, /'\.\/privacy\.html'/);
   assert.match(worker, /if \(request\.method !== 'GET'\) return/);
