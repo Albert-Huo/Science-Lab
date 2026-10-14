@@ -105,7 +105,8 @@ def main() -> None:
             }
             number = NUMBER_RE.match(fname)
             if number:
-                item["number"] = number.group(1)
+                major, separator, minor = number.group(1).partition("-")
+                item["number"] = major.zfill(2) + separator + minor
             items.append(item)
 
     matched = {item["path"]: metadata[item["path"]] for item in items

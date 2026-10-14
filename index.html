@@ -512,11 +512,11 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 
 <div id="toast"></div>
 
-<script src="catalog-control.js?app=v0.8.19"></script>
+<script src="catalog-control.js?app=v0.8.20"></script>
 <script src="content-source.js"></script>
-<script src="product-analytics.js?app=v0.8.19"></script>
-<script src="experiment-scroll.js?app=v0.8.19"></script>
-<script src="ai-chat.js?app=v0.8.19"></script>
+<script src="product-analytics.js?app=v0.8.20"></script>
+<script src="experiment-scroll.js?app=v0.8.20"></script>
+<script src="ai-chat.js?app=v0.8.20"></script>
 <script>
 /* 联系入口独立于实验清单初始化，空目录时也可使用。 */
 (()=>{
@@ -847,7 +847,7 @@ function renderCat(){
     if(!items.length) continue;
     html+='<div class="cat-group"><h3>'+esc(k)+'</h3>'+CatalogControl.topicSections(MANIFEST,items).map(section=>
       (section.title?'<h4>'+esc(section.title)+'</h4>':'')+section.indexes.map(i=>{
-        const item=MANIFEST[i],number=item.number||String(groups[k].indexOf(i)+1);
+        const item=MANIFEST[i],number=item.number||String(groups[k].indexOf(i)+1).padStart(2,'0');
         return '<button type="button" class="cat-item'+(i===catalogIndexes[cur]?' cur':'')+'" data-i="'+i+'"><span class="no">'+esc(number)+'</span><span class="cat-text"><span class="cat-name">'+esc(item.title)+'</span>'+(item.description?'<small class="cat-detail">'+esc(item.description)+'</small>':'')+'</span></button>';
       }).join('')).join('')+'</div>';
   }

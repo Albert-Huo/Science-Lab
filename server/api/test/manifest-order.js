@@ -20,7 +20,7 @@ fs.copyFileSync(path.join(repoRoot, 'tools/build-manifest.py'), generator);
 const metadata = path.join(repoRoot, 'tools/experiment-metadata.json');
 if (fs.existsSync(metadata)) fs.copyFileSync(metadata, path.join(toolsRoot, 'experiment-metadata.json'));
 
-const expectedNumbers = ['1', '2', '9', '10', '12-1', '12-2', '12-10', '49', '49-1', '49-2', '49-10', '68', '100'];
+const expectedNumbers = ['1', '2', '3-1', '9', '10', '12-1', '12-2', '12-10', '49', '49-1', '49-2', '49-10', '68', '100'];
 const expectedNames = expectedNumbers.map(number => `初中物理实验${number}.html`);
 const fixtures = [
   ['physics-middle', '物理', '初中', [...expectedNames].reverse().concat('说明.html')],
@@ -46,6 +46,14 @@ const middlePaths = items => items.filter(item => item.path.startsWith('physics-
 
 test('生成清单按主编号、子编号排序，主实验排在子实验前', () => {
   assert.deepEqual(middlePaths(generated), [...expectedNames, '说明.html'].map(name => `physics-middle/${name}`));
+});
+
+test('生成器将个位主编号补零，保留子编号、大编号和原文件路径', () => {
+  const expected = { '1':'01', '2':'02', '3-1':'03-1', '9':'09', '10':'10', '12-1':'12-1', '100':'100' };
+  for (const [original, formatted] of Object.entries(expected)) {
+    const item = generated.find(entry => entry.path === `physics-middle/初中物理实验${original}.html`);
+    assert.equal(item.number, formatted);
+  }
 });
 
 test('生成清单保留标题、路径和分类，并忽略非 HTML 文件', () => {

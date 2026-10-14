@@ -4,7 +4,7 @@
   "title": "用常见温度计测量温度",
   "subject": "物理",
   "level": "初中",
-  "number": "1",
+  "number": "01",
   "topic": "测量与实验基本操作",
   "topicOrder": 0,
   "keywords": [
@@ -25,7 +25,7 @@
   "title": "探究晶体熔化和凝固的过程及特点",
   "subject": "物理",
   "level": "初中",
-  "number": "2",
+  "number": "02",
   "topic": "物态变化与热学",
   "topicOrder": 4,
   "keywords": [
@@ -47,7 +47,7 @@
   "title": "观察升华与凝华现象",
   "subject": "物理",
   "level": "初中",
-  "number": "3",
+  "number": "03",
   "topic": "物态变化与热学",
   "topicOrder": 4,
   "keywords": [
@@ -69,7 +69,7 @@
   "title": "探究水沸腾时温度变化规律",
   "subject": "物理",
   "level": "初中",
-  "number": "4",
+  "number": "04",
   "topic": "物态变化与热学",
   "topicOrder": 4,
   "keywords": [
@@ -90,7 +90,7 @@
   "title": "探究蒸发快慢的影响因素",
   "subject": "物理",
   "level": "初中",
-  "number": "5",
+  "number": "05",
   "topic": "物态变化与热学",
   "topicOrder": 4,
   "keywords": [
@@ -111,7 +111,7 @@
   "title": "体验不同物质的弹性",
   "subject": "物理",
   "level": "初中",
-  "number": "6",
+  "number": "06",
   "topic": "运动与力",
   "topicOrder": 1,
   "keywords": [
@@ -132,7 +132,7 @@
   "title": "观察磁现象",
   "subject": "物理",
   "level": "初中",
-  "number": "7",
+  "number": "07",
   "topic": "磁学与电磁现象",
   "topicOrder": 8,
   "keywords": [
@@ -154,7 +154,7 @@
   "title": "比较物质的导电性",
   "subject": "物理",
   "level": "初中",
-  "number": "8",
+  "number": "08",
   "topic": "电学",
   "topicOrder": 7,
   "keywords": [
@@ -176,7 +176,7 @@
   "title": "比较不同材料的导热性",
   "subject": "物理",
   "level": "初中",
-  "number": "9",
+  "number": "09",
   "topic": "物态变化与热学",
   "topicOrder": 4,
   "keywords": [
@@ -1644,7 +1644,7 @@
   "title": "测量瞬时速度（五点法）",
   "subject": "物理",
   "level": "高中",
-  "number": "1",
+  "number": "01",
   "keywords": [
    "高中物理实验1｜测量瞬时速度（五点法）",
    "高中物理实验1",
@@ -1656,7 +1656,7 @@
   "title": "探究匀变速直线运动的特点",
   "subject": "物理",
   "level": "高中",
-  "number": "2",
+  "number": "02",
   "keywords": [
    "高中物理实验2｜探究匀变速直线运动的特点",
    "高中物理实验2",
@@ -1668,7 +1668,7 @@
   "title": "测量匀变速直线运动物体的加速度（拟合直线法）｜工具栏下置布局",
   "subject": "物理",
   "level": "高中",
-  "number": "3",
+  "number": "03",
   "keywords": [
    "匀变速直线运动",
    "加速度",
@@ -1686,7 +1686,7 @@
   "title": "测量匀变速直线运动物体的加速度（拟合直线法）｜工具栏上置布局",
   "subject": "物理",
   "level": "高中",
-  "number": "3",
+  "number": "03",
   "keywords": [
    "匀变速直线运动",
    "加速度",
@@ -1704,7 +1704,7 @@
   "title": "研究自由落体运动（打点计时器）",
   "subject": "物理",
   "level": "高中",
-  "number": "4",
+  "number": "04",
   "keywords": [
    "高中物理实验4｜研究自由落体运动（打点计时器）",
    "高中物理实验4",
@@ -1716,7 +1716,7 @@
   "title": "测量自由落体加速度（频闪照相）",
   "subject": "物理",
   "level": "高中",
-  "number": "5",
+  "number": "05",
   "keywords": [
    "高中物理实验5｜测量自由落体加速度（频闪照相）",
    "高中物理实验5",
@@ -1728,7 +1728,7 @@
   "title": "探究弹簧弹力与形变量的关系（胡克定律）",
   "subject": "物理",
   "level": "高中",
-  "number": "6",
+  "number": "06",
   "keywords": [
    "高中物理实验6｜探究弹簧弹力与形变量的关系（胡克定律）",
    "高中物理实验6",
@@ -1740,7 +1740,7 @@
   "title": "探究两个互成角度的力的合成规律",
   "subject": "物理",
   "level": "高中",
-  "number": "7",
+  "number": "07",
   "keywords": [
    "高中物理实验7｜探究两个互成角度的力的合成规律",
    "高中物理实验7",
@@ -1752,7 +1752,7 @@
   "title": "伽利略理想斜面实验",
   "subject": "物理",
   "level": "高中",
-  "number": "8",
+  "number": "08",
   "keywords": [
    "伽利略",
    "理想斜面",

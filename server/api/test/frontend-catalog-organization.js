@@ -24,7 +24,8 @@ test('初中70个实验均有知识分类和原编号，开发备注不作为展
   for (const entry of middle) {
     assert.ok(topics.includes(entry.topic), entry.path + ' 缺少已审查的知识分类');
     assert.equal(entry.topicOrder, topics.indexOf(entry.topic));
-    assert.equal(entry.number, entry.path.match(/实验(\d+(?:-\d+)?)\.html$/)[1]);
+    const [major, ...suffix] = entry.path.match(/实验(\d+(?:-\d+)?)\.html$/)[1].split('-');
+    assert.equal(entry.number, [major.padStart(2, '0'), ...suffix].join('-'));
     assert.ok(Array.isArray(entry.keywords) && entry.keywords.length > 0);
   }
   for (const entry of manifest) {
@@ -95,6 +96,24 @@ test('目录编号只作隐藏信息，70个原编号仍可检索且不改变原
   const fixture = item('测量液体密度', { number:'12-1', keywords:['密度'] });
   assert.equal(CatalogControl.matchesSearch(fixture, '12-1 密度'), true);
   assert.equal(CatalogControl.matchesSearch(fixture, '12-2'), false);
+});
+
+test('个位编号统一为01至09，新旧数字搜索均保留原学习入口', () => {
+  const control = JSON.parse(fs.readFileSync(path.join(root, 'catalog-control.json'), 'utf8'));
+  const published = CatalogControl.apply(manifest, control).experiments;
+  const small = manifest.filter(entry => entry.number && Number(entry.number.split('-')[0]) < 10);
+  assert.equal(small.length, 18);
+  for (const entry of small) {
+    const original = entry.path.match(/实验(\d+)/)[1];
+    assert.equal(entry.number, original.padStart(2, '0'));
+    assert.equal(CatalogControl.matchesSearch(entry, original), true);
+    assert.equal(CatalogControl.matchesSearch(entry, entry.number), true);
+  }
+  for (let original = 1; original <= 9; original++) {
+    const formatted = String(original).padStart(2, '0');
+    const matches = published.filter(entry => CatalogControl.matchesSearch(entry, formatted));
+    assert.deepEqual(matches.map(entry => entry.path), [`physics-middle/初中物理实验${original}.html`]);
+  }
 });
 
 test('货船故事检索实际低频声主题，不误归到浮力或淡水', () => {

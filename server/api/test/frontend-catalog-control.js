@@ -209,7 +209,7 @@ function assertActiveRateZonePlacement(nginxBlock) {
 
 {
   const html = fs.readFileSync(path.resolve(__dirname, '../../../index.html'), 'utf8');
-  assert.ok(html.includes('<script src="catalog-control.js?app=v0.8.19"></script>'), '首页应加载当前版本目录模块，避免旧模块缓存');
+  assert.ok(html.includes('<script src="catalog-control.js?app=v0.8.20"></script>'), '首页应加载当前版本目录模块，避免旧模块缓存');
   assert.ok(
     /fetchJson\('catalog-control\.json',\{cache:'no-store'\}\)/.test(html),
     '控制文件请求应绕过 HTTP 缓存'
