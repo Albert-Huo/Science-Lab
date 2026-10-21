@@ -13,6 +13,15 @@ const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json'), 'u
 const topics = ['测量与实验基本操作', '运动与力', '声现象', '光现象', '物态变化与热学', '压强与浮力', '功、能和机械', '电学', '磁学与电磁现象', '综合探究'];
 const item = (name, extra = {}) => ({ path: `physics-middle/${name}.html`, title: name, subject: '物理', level: '初中', ...extra });
 
+test('所有实验统一提供与展示元数据一致的简短简介', () => {
+  const metadata = JSON.parse(fs.readFileSync(path.join(root, 'tools/experiment-metadata.json'), 'utf8')).experiments;
+  for (const entry of manifest) {
+    assert.equal(typeof entry.description, 'string', entry.path + ' 缺少目录简介');
+    assert.ok(entry.description.trim().length >= 8 && entry.description.length <= 60, entry.path + ' 简介应简短且有实际内容');
+    assert.equal(entry.description, metadata[entry.path].description, entry.path + ' 生成清单与简介来源不一致');
+  }
+});
+
 test('新目录脚本跟随当前App版本，避免已缓存旧模块缺少新能力', () => {
   const version = html.match(/experiment-scroll\.js\?app=([^"]+)/)[1];
   assert.ok(html.includes('<script src="catalog-control.js?app='+version+'"></script>'));
