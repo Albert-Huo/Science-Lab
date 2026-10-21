@@ -53,6 +53,30 @@ vm.runInNewContext(html.slice(navStart, navEnd), {
 handlers.wheel({deltaY: 200}); handlers.keydown({key: 'PageDown'});
 assert.deepEqual(moves, [], '展示期间外层滚轮、方向键不能误换实验');
 handlers.keydown({key: 'Escape'}); assert.equal(focused, false);
+
+function wheelNavigation() {
+  const events = {}, navigations = [];
+  let now = 10000;
+  vm.runInNewContext(html.slice(navStart, navEnd), {
+    window: {addEventListener: (name, handler) => {events[name] = handler;}},
+    document: {querySelector: () => null, activeElement: {tagName: 'BUTTON'}},
+    Date: {now: () => now}, next: () => navigations.push('next'), prev: () => navigations.push('prev'),
+    closePanels() {}, setPresentationMode() {}
+  });
+  return {navigations, wheel(target, deltaY, elapsed = 8) {now += elapsed; events.wheel({target, deltaY});}};
+}
+const dock = {closest: selector => selector === '.panel' ? dock : null};
+const dockChild = {closest: selector => dock.closest(selector)};
+const dockNavigation = wheelNavigation();
+for (const target of [dockChild, dock]) {
+  for (const delta of [2400, 2400, -2400, -2400]) dockNavigation.wheel(target, delta);
+}
+assert.deepEqual(dockNavigation.navigations, [], '桌面常驻目录及其子元素快速滚轮不能切换右侧实验');
+const navigation = wheelNavigation();
+navigation.wheel(dockChild, 2400);
+navigation.wheel({closest: () => null}, 2400);
+navigation.wheel({closest: () => null}, -2400, 600);
+assert.deepEqual(navigation.navigations, ['next', 'prev'], '实验区原有滚轮翻页应保留');
 const catalogue = html.slice(html.indexOf('<aside class="panel" id="panelCat">'), html.indexOf('<aside class="panel" id="panelUser">'));
 assert.ok(catalogue.includes('id="btnPrev"') && catalogue.includes('id="btnNext"'), '实验切换入口应移入目录，避开画布');
 assert.doesNotMatch(html, /右下角箭头/);

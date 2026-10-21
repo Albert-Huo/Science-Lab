@@ -1301,6 +1301,7 @@ document.getElementById('btnNext').addEventListener('click',next);
 /* desktop: wheel + keys */
 let wheelLock=0;
 window.addEventListener('wheel',e=>{
+  if(e.target?.closest?.('.panel')) return;
   if(document.querySelector('.panel.show,dialog[open],#hint:not(.hide)')) return;
   if(document.querySelector('.presentation-mode')) return;
   const now=Date.now(); if(now-wheelLock<550) return;
