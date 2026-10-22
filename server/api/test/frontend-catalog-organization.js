@@ -187,3 +187,39 @@ test('真实目录渲染将别名高亮至代表，分类搜索仍使用原导�
   assert.match(node('catList').innerHTML, /data-i="1"/);
   assert.doesNotMatch(node('catList').innerHTML, /形变/);
 });
+
+test('各层目录独立折叠，搜索临时展开且清空后恢复', () => {
+  const source = [item('反射', { topic:'光现象', topicOrder:3 }), item('摩擦', { topic:'运动与力', topicOrder:1 })];
+  const nodes = new Map();
+  const node = id => {
+    if (!nodes.has(id)) nodes.set(id, { innerHTML:'', handlers:{}, addEventListener(kind,fn){ this.handlers[kind]=fn; } });
+    return nodes.get(id);
+  };
+  const context = vm.createContext({ document:{ getElementById:node, querySelectorAll:()=>[] }, MANIFEST:source, CatalogControl, cur:0,
+    goTo:()=>assert.fail('折叠不能切换实验'), closePanels:()=>assert.fail('折叠不能关闭目录'),
+    esc:value=>String(value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;') });
+  const start = html.indexOf('/* ---------- catalog ---------- */');
+  const end = html.indexOf('/* ---------- panels ---------- */', start);
+  vm.runInContext(html.slice(start,end)+'\nrenderCat();', context);
+  const details = () => [...node('catList').innerHTML.matchAll(/<details[^>]*data-cat-key="([^"]+)"([^>]*)>/g)];
+  assert.equal(details().length, 3, '学段与两个知识分组均可折叠');
+  assert.ok(details().every(match=>/\bopen\b/.test(match[2])), '默认全部展开');
+  const keys = details().map(match=>match[1]);
+  const toggle = key => {
+    let prevented = false;
+    const section = { dataset:{ catKey:key }, open:true };
+    node('catList').handlers.click({ target:{ closest:selector=>selector==='summary'?{ parentElement:section }:null }, preventDefault(){ prevented=true; } });
+    assert.equal(prevented, true);
+    assert.equal(section.open, false);
+  };
+  toggle(keys[1]);
+  vm.runInContext('renderCat();', context);
+  assert.deepEqual(details().map(match=>/\bopen\b/.test(match[2])), [true,false,true]);
+  toggle(keys[0]);
+  node('catInput').handlers.input({ target:{ value:'摩擦' } });
+  assert.ok(details().every(match=>/\bopen\b/.test(match[2])), '搜索展开匹配实验的所有父分组');
+  toggle(keys[1]);
+  node('catInput').handlers.input({ target:{ value:'' } });
+  assert.deepEqual(details().map(match=>/\bopen\b/.test(match[2])), [false,false,true], '搜索期间的折叠不改动原状态');
+  assert.match(node('catList').innerHTML, /class="cat-count"[^>]*>2</);
+});

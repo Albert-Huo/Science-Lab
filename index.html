@@ -129,10 +129,19 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 .chip.on{background:var(--acc);border-color:var(--acc);color:#fff;}
 .chip:focus-visible,.cat-item:focus-visible{outline:2px solid var(--acc2);outline-offset:-2px;}
 .cat-group{padding:4px 0;}
-.cat-group h3{font-size:12px;color:var(--acc2);padding:10px 16px 6px;position:sticky;top:0;
+.cat-group>summary{padding:8px 16px;position:sticky;top:0;
   background:var(--panel);z-index:1;}
-.cat-group h4{margin:12px 12px 6px;padding:8px 10px;border-left:3px solid var(--acc2);border-radius:0 6px 6px 0;
-  background:var(--panel2);font-size:13px;font-weight:700;line-height:1.4;color:var(--txt);}
+.cat-group h3{font-size:12px;color:var(--acc2);margin:0;}
+.cat-topic{margin:12px 12px 6px;}
+.cat-topic>summary{padding:8px 10px;border-left:3px solid var(--acc2);border-radius:0 6px 6px 0;background:var(--panel2);}
+.cat-topic h4{font-size:13px;font-weight:700;line-height:1.4;color:var(--txt);margin:0;}
+.cat-topic .cat-item{padding-left:4px;padding-right:4px;}
+.cat-group summary{display:flex;align-items:center;gap:8px;min-height:44px;cursor:pointer;list-style:none;}
+.cat-group summary::-webkit-details-marker{display:none;}
+.cat-group summary::before{content:'›';font-size:18px;line-height:1;flex:none;color:var(--acc2);}
+.cat-group details[open]>summary::before,details.cat-group[open]>summary::before{transform:rotate(90deg);}
+.cat-group summary:focus-visible{outline:2px solid var(--acc2);outline-offset:-2px;}
+.cat-count{margin-left:auto;flex:none;font-size:11px;font-weight:400;color:var(--txt2);}
 .cat-item{padding:9px 16px;font-size:13px;font-family:inherit;color:var(--txt);cursor:pointer;display:flex;gap:8px;
   width:100%;text-align:left;background:none;border:0;border-left:3px solid transparent;}
 .cat-item .no{display:none;}
@@ -837,6 +846,11 @@ const catalogIndexes=CatalogControl.catalogIndexes(MANIFEST);
 const groups={};
 MANIFEST.forEach((it,i)=>{ if(catalogIndexes[i]!==i) return; const k=it.subject+' · '+it.level; (groups[k]=groups[k]||[]).push(i); });
 let chipFilter=null, searchText='';
+const collapsedCatGroups=new Set();
+function catGroupStart(key,title,count,level){
+  return '<details class="'+(level===3?'cat-group':'cat-topic')+'" data-cat-key="'+esc(key)+'"'+
+    (searchText||!collapsedCatGroups.has(key)?' open':'')+'><summary><h'+level+'>'+esc(title)+'</h'+level+'><span class="cat-count" aria-label="'+count+'个实验">'+count+'</span></summary>';
+}
 function renderChips(){
   const el=document.getElementById('catChips');
   el.innerHTML='<button type="button" class="chip'+(chipFilter===null?' on':'')+'" data-k="" aria-pressed="'+(chipFilter===null)+'">全部</button>'+
@@ -854,11 +868,11 @@ function renderCat(){
     if(chipFilter && k!==chipFilter) continue;
     const items=groups[k].filter(i=>CatalogControl.matchesSearch(MANIFEST[i],searchText));
     if(!items.length) continue;
-    html+='<div class="cat-group"><h3>'+esc(k)+'</h3>'+CatalogControl.topicSections(MANIFEST,items).map(section=>
-      (section.title?'<h4>'+esc(section.title)+'</h4>':'')+section.indexes.map(i=>{
+    html+=catGroupStart(k,k,items.length,3)+CatalogControl.topicSections(MANIFEST,items).map(section=>
+      (section.title?catGroupStart(k+' / '+section.title,section.title,section.indexes.length,4):'')+section.indexes.map(i=>{
         const item=MANIFEST[i],number=item.number||String(groups[k].indexOf(i)+1).padStart(2,'0');
         return '<button type="button" class="cat-item'+(i===catalogIndexes[cur]?' cur':'')+'" data-i="'+i+'"><span class="no">'+esc(number)+'</span><span class="cat-text"><span class="cat-name">'+esc(item.title)+'</span>'+(item.description?'<small class="cat-detail">'+esc(item.description)+'</small>':'')+'</span></button>';
-      }).join('')).join('')+'</div>';
+      }).join('')+(section.title?'</details>':'')).join('')+'</details>';
   }
   el.innerHTML=html||'<div class="empty">没有匹配的实验</div>';
 }
@@ -866,6 +880,17 @@ function highlightCat(){
   document.querySelectorAll('.cat-item').forEach(d=>d.classList.toggle('cur', +d.dataset.i===catalogIndexes[cur]));
 }
 document.getElementById('catList').addEventListener('click',e=>{
+  const summary=e.target.closest('summary');
+  if(summary){
+    e.preventDefault();
+    const group=summary.parentElement;
+    group.open=!group.open;
+    if(!searchText){
+      if(group.open) collapsedCatGroups.delete(group.dataset.catKey);
+      else collapsedCatGroups.add(group.dataset.catKey);
+    }
+    return;
+  }
   const it=e.target.closest('.cat-item'); if(!it) return;
   goTo(+it.dataset.i); closePanels();
 });
