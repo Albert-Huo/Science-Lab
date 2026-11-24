@@ -25,6 +25,8 @@ const AI_CONTEXT = require('./ai-context.json');
 const PORT = Number(process.env.PORT || 8970);
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES = process.env.JWT_EXPIRES || '30d';
+// CORS_ORIGINS: 迁移到 GitHub Pages 后，需在服务器环境配置中设置：
+// CORS_ORIGINS=https://lab.xingnian.net.cn
 const ORIGINS = (process.env.CORS_ORIGINS || '')
   .split(',').map(s => s.trim()).filter(Boolean);
 
