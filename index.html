@@ -529,11 +529,11 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 
 <div id="toast"></div>
 
-<script src="catalog-control.js?app=v0.8.22"></script>
+<script src="catalog-control.js?app=v0.8.23"></script>
 <script src="content-source.js"></script>
-<script src="product-analytics.js?app=v0.8.22"></script>
-<script src="experiment-scroll.js?app=v0.8.22"></script>
-<script src="ai-chat.js?app=v0.8.22"></script>
+<script src="product-analytics.js?app=v0.8.23"></script>
+<script src="experiment-scroll.js?app=v0.8.23"></script>
+<script src="ai-chat.js?app=v0.8.23"></script>
 <script>
 /* 联系入口独立于实验清单初始化，空目录时也可使用。 */
 (()=>{
@@ -670,7 +670,7 @@ document.documentElement.classList.toggle('catalog-collapsed',safeGet(LS.catalog
 Promise.all([
   fetchJson('manifest.json'),
   fetchJson('catalog-control.json',{cache:'no-store'}).catch(error=>{
-    console.warn('目录发布控制加载失败，使用全部发布：'+error.message);
+    console.warn('目录发布控制加载失败，高中实验保持隐藏：'+error.message);
     return {};
   })
 ]).then(([sourceManifest,control])=>{
@@ -679,12 +679,12 @@ Promise.all([
   const savedPath=safeGet(LS.current,'');
   const savedIndex=parseInt(safeGet(LS.idx,'0'),10)||0;
   const initialIndex=initialExperimentIndex(sourceManifest,catalog.experiments,savedPath,savedIndex,location.search);
-  boot(catalog.experiments,catalog.states,initialIndex,sourceManifest);
+  boot(catalog.experiments,catalog.states,initialIndex,sourceManifest,control);
 }).catch(e=>{
   document.body.insertAdjacentHTML('beforeend','<div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#93a1bd;font-size:14px;z-index:99;background:#0b0f17">实验清单加载失败：'+e+'</div>');
 });
 
-function boot(MANIFEST,PUBLISHING_STATES,initialIndex,SOURCE_MANIFEST=MANIFEST){
+function boot(MANIFEST,PUBLISHING_STATES,initialIndex,SOURCE_MANIFEST=MANIFEST,CATALOG_CONTROL={}){
 
 const track = document.getElementById('track');
 if(!MANIFEST.length){
@@ -843,8 +843,7 @@ document.getElementById('histList').addEventListener('click',e=>{
 
 /* ---------- catalog ---------- */
 const catalogIndexes=CatalogControl.catalogIndexes(MANIFEST);
-const groups={};
-MANIFEST.forEach((it,i)=>{ if(catalogIndexes[i]!==i) return; const k=it.subject+' · '+it.level; (groups[k]=groups[k]||[]).push(i); });
+const groups=CatalogControl.catalogGroups(typeof SOURCE_MANIFEST==='undefined'?MANIFEST:SOURCE_MANIFEST,MANIFEST,typeof CATALOG_CONTROL==='undefined'?{}:CATALOG_CONTROL);
 let chipFilter=null, searchText='';
 const collapsedCatGroups=new Set();
 function catGroupStart(key,title,count,level){
@@ -867,7 +866,10 @@ function renderCat(){
   for(const k of Object.keys(groups)){
     if(chipFilter && k!==chipFilter) continue;
     const items=groups[k].filter(i=>CatalogControl.matchesSearch(MANIFEST[i],searchText));
-    if(!items.length) continue;
+    if(!items.length){
+      if(!groups[k].length&&!searchText) html+=catGroupStart(k,k,0,3)+'<div class="empty">实验正在准备中，将陆续上线。</div></details>';
+      continue;
+    }
     html+=catGroupStart(k,k,items.length,3)+CatalogControl.topicSections(MANIFEST,items).map(section=>
       (section.title?catGroupStart(k+' / '+section.title,section.title,section.indexes.length,4):'')+section.indexes.map(i=>{
         const item=MANIFEST[i],number=item.number||String(groups[k].indexOf(i)+1).padStart(2,'0');
@@ -1330,6 +1332,7 @@ window.addEventListener('wheel',e=>{
   if(e.target?.closest?.('.panel')) return;
   if(document.querySelector('.panel.show,dialog[open],#hint:not(.hide)')) return;
   if(document.querySelector('.presentation-mode')) return;
+  if(desktopCatalog.matches&&!catalogCollapsed&&!presentationMode) return;
   const now=Date.now(); if(now-wheelLock<550) return;
   if(e.deltaY>30){ wheelLock=now; next(); }
   else if(e.deltaY<-30){ wheelLock=now; prev(); }
