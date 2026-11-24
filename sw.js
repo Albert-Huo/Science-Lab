@@ -1,11 +1,13 @@
 /* 实验馆 Service Worker
  * - App 壳预缓存
  * - 清单与目录控制网络优先，只缓存有效 JSON
- * - 跨域实验内容与 API 请求不拦截
+ * - 实验内容智能缓存（最近 20 个，网络优先 + 缓存备用）
  */
-const VERSION = 'v0.8.22';
+const VERSION = 'v0.8.24';
 const CACHE_PREFIX = 'sl-shell-';
 const SHELL_CACHE = CACHE_PREFIX + VERSION;
+const EXPERIMENTS_CACHE = 'sl-experiments-v1';
+const MAX_EXPERIMENTS = 20;
 const SCROLL_ASSET = './experiment-scroll.js?app=' + VERSION;
 const SHELL = [
   './',
@@ -58,10 +60,49 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+/* 实验缓存管理：LRU 策略，保留最近 20 个 */
+async function cacheExperiment(request, response) {
+  const cache = await caches.open(EXPERIMENTS_CACHE);
+  await cache.put(request, response.clone());
+
+  const keys = await cache.keys();
+  if (keys.length > MAX_EXPERIMENTS) {
+    await cache.delete(keys[0]);
+  }
+
+  return response;
+}
+
+/* 判断是否为实验内容 */
+function isExperimentContent(url) {
+  return (url.hostname === 'html.xingnian.net.cn' ||
+          url.hostname === self.location.hostname) &&
+         url.pathname.match(/\/(physics-|biology-|chemistry-).*\.html$/);
+}
+
 self.addEventListener('fetch', (event) => {
   const request = event.request;
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
+
+  /* 实验内容缓存：网络优先 + 缓存备用 + LRU 淘汰 */
+  if (isExperimentContent(url)) {
+    event.respondWith(
+      caches.open(EXPERIMENTS_CACHE).then((cache) =>
+        fetch(request)
+          .then((response) => {
+            if (response && response.ok) {
+              return cacheExperiment(request, response);
+            }
+            return response;
+          })
+          .catch(() => cache.match(request))
+      )
+    );
+    return;
+  }
+
+  /* 以下为应用壳的原有逻辑 */
   if (url.origin !== self.location.origin) return;
 
   if (url.pathname.endsWith('/manifest.json') ||
