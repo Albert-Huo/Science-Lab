@@ -81,6 +81,30 @@
     });
   }
 
+  /** Build ordered catalog groups; showWhenEmpty exposes a heading without publishing content. */
+  function catalogGroups(sourceManifest,experiments,control){
+    const visible=Array.isArray(experiments)?experiments:[];
+    const source=Array.isArray(sourceManifest)?sourceManifest:visible;
+    const rules=control&&control.categories&&typeof control.categories==='object'?control.categories:{};
+    const representatives=catalogIndexes(visible);
+    const groups=new Map();
+    visible.forEach((item,index)=>{
+      if(representatives[index]!==index) return;
+      const title=item.subject+' · '+item.level;
+      if(!groups.has(title)) groups.set(title,[]);
+      groups.get(title).push(index);
+    });
+    const ordered=new Map();
+    for(const item of [...source,...visible]){
+      const title=item.subject+' · '+item.level;
+      const rule=rules[categoryId(item)];
+      if(groups.has(title)||(rule&&rule.showWhenEmpty===true&&ruleState(rule)!=='disabled')){
+        ordered.set(title,groups.get(title)||[]);
+      }
+    }
+    return Object.fromEntries(ordered);
+  }
+
   /** Group catalog indexes by ordered knowledge topic without reordering navigation. */
   function topicSections(experiments,indexes){
     const groups=new Map();
@@ -108,5 +132,5 @@
     return current?current.title:item.title;
   }
 
-  return {apply,stats,initialIndex,catalogIndexes,topicSections,matchesSearch,historyTitle};
+  return {apply,stats,initialIndex,catalogIndexes,catalogGroups,topicSections,matchesSearch,historyTitle};
 });

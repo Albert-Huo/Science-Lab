@@ -27,9 +27,9 @@ test('新目录脚本跟随当前App版本，避免已缓存旧模块缺少新�
   assert.ok(html.includes('<script src="catalog-control.js?app='+version+'"></script>'));
 });
 
-test('初中70个实验均有知识分类和原编号，开发备注不作为展示标题', () => {
+test('初中实验均有知识分类和原编号，开发备注不作为展示标题', () => {
   const middle = manifest.filter(entry => entry.path.startsWith('physics-middle/'));
-  assert.equal(middle.length, 70);
+  assert.equal(middle.length, 78);
   for (const entry of middle) {
     assert.ok(topics.includes(entry.topic), entry.path + ' 缺少已审查的知识分类');
     assert.equal(entry.topicOrder, topics.indexOf(entry.topic));
@@ -39,6 +39,34 @@ test('初中70个实验均有知识分类和原编号，开发备注不作为展
   }
   for (const entry of manifest) {
     assert.doesNotMatch(entry.title, /最终|修复|优化版|模板同款|帽扣|严格步骤判定|交互版|互动闯关|交互闯关|第三关|终极|逼真人物版|空间感增强/);
+  }
+});
+
+test('人教同步补充实验保留子编号，归入对应知识分类并可按原名检索', () => {
+  const supplements = [
+    ['26-1', '功、能和机械', '比较定滑轮和动滑轮'],
+    ['30-1', '压强与浮力', '托里拆利实验'],
+    ['30-2', '压强与浮力', '探究流体压强与流速的关系'],
+    ['32-1', '压强与浮力', '验证阿基米德原理'],
+    ['32-2', '压强与浮力', '观察浮沉条件的应用'],
+    ['36-1', '光现象', '观察光沿直线传播与小孔成像'],
+    ['64-1', '电学', '测量小灯泡的电功率'],
+    ['65-1', '电学', '用电压表判断电路故障'],
+  ];
+  const control = JSON.parse(fs.readFileSync(path.join(root, 'catalog-control.json'), 'utf8'));
+  const published = CatalogControl.apply(manifest, control).experiments;
+  for (const [number, topic, title] of supplements) {
+    const file = `physics-middle/初中物理实验${number}.html`;
+    const entry = published.find(item => item.path === file);
+    assert.ok(entry, file + ' 未出现在实验馆目录');
+    assert.equal(entry.level, '初中');
+    assert.equal(entry.number, number);
+    assert.equal(entry.topic, topic);
+    assert.equal(entry.title, title);
+    assert.ok(CatalogControl.matchesSearch(entry, title));
+    const mainPath = `physics-middle/初中物理实验${number.split('-')[0]}.html`;
+    const mainIndex = published.findIndex(item => item.path === mainPath);
+    assert.ok(mainIndex >= 0 && mainIndex < published.indexOf(entry));
   }
 });
 
